@@ -1,0 +1,6 @@
+<tr>
+    <!-- item - это объект Nutrient, который мы передали из create_nutrient -->
+    <td>{{ item.name_component.name }}</td> <!-- Требует eager loading в запросе -->
+    <td>{{ item.quantity }}</td>
+    <td>{{ item.unit.name }}</td>
+</tr>

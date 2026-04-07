@@ -1,0 +1,25 @@
+# Виртуальное окружение
+.venv/
+venv/
+env/
+
+# Python кэш
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Переменные окружения
+.env
+
+# Базы данных
+*.db
+*.sqlite3
+
+# Тестирование и покрытие
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
