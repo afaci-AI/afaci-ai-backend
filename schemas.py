@@ -6,18 +6,32 @@ from typing import Optional, List
 class SimpleCreate(BaseModel):
     name: str
 
+class SimpleUpdate(BaseModel):
+    name: Optional[str] = None
+
 class ProductCreate(BaseModel):
     name: str
     category_id: UUID
     subcategory_id: Optional[UUID] = None
     region_id: UUID
 
+class ProductUpdate(BaseModel):
+    name: Optional[str] = None
+    category_id: Optional[UUID] = None
+    subcategory_id: Optional[UUID] = None
+    region_id: Optional[UUID] = None
+
 class NutrientCreate(BaseModel):
-    id_product: UUID
-    id_name_component: UUID
-    id_type_component: UUID
+    product_id: UUID
+    nutrient_name_id: UUID
     unit_id: UUID
     quantity: float
+
+class NutrientUpdate(BaseModel):
+    product_id: Optional[UUID] = None
+    nutrient_name_id: Optional[UUID] = None
+    unit_id: Optional[UUID] = None
+    quantity: Optional[float] = None
 
 # Для массового создания справочников
 class SimpleBulkCreate(BaseModel):

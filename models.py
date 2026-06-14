@@ -16,6 +16,7 @@ class Category(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False, unique=True)
 
+    subcategories = relationship("Subcategory", back_populates="category")
     products = relationship("Product", back_populates="category")
 
 
@@ -23,9 +24,12 @@ class Subcategory(Base):
     __tablename__ = "subcategories"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String, nullable=False, unique=True)
+    category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=False)
+    name = Column(String, nullable=False)
 
+    category = relationship("Category", back_populates="subcategories")
     products = relationship("Product", back_populates="subcategory")
+    __table_args__ = (UniqueConstraint('category_id', 'name', name='uq_subcategory_category_name'),)
 
 
 class Region(Base):
@@ -43,16 +47,19 @@ class NutrientType(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False, unique=True)
 
-    nutrients = relationship("Nutrient", back_populates="type_component")
+    nutrient_names = relationship("NutrientName", back_populates="nutrient_type")
 
 
 class NutrientName(Base):
     __tablename__ = "nutrients_names"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String, nullable=False, unique=True)
+    nutrient_type_id = Column(UUID(as_uuid=True), ForeignKey("nutrients_types.id"), nullable=False)
+    name = Column(String, nullable=False)
 
+    nutrient_type = relationship("NutrientType", back_populates="nutrient_names")
     nutrients = relationship("Nutrient", back_populates="name_component")
+    __table_args__ = (UniqueConstraint('nutrient_type_id', 'name', name='uq_nutrient_name_type_name'),)
 
 
 class Unit(Base):
@@ -92,21 +99,18 @@ class Nutrient(Base):
     __tablename__ = "nutrients"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    quantity = Column(Double, nullable=True)
+    quantity = Column(Double, nullable=False)
 
-    # Внешние ключи (здесь тоже нужны кавычки в ForeignKey!)
-    id_product = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=False)
-    id_name_component = Column(UUID(as_uuid=True), ForeignKey("nutrients_names.id"), nullable=False)
-    id_type_component = Column(UUID(as_uuid=True), ForeignKey("nutrients_types.id"), nullable=False)
+    # Внешние ключи
+    product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=False)
+    nutrient_name_id = Column(UUID(as_uuid=True), ForeignKey("nutrients_names.id"), nullable=False)
     unit_id = Column(UUID(as_uuid=True), ForeignKey("units.id"), nullable=False)
 
     # Связи
-    # --- ИСПРАВЛЕНО: back_populates="nutrients" (в кавычках!) ---
     product = relationship("Product", back_populates="nutrients")
     name_component = relationship("NutrientName", back_populates="nutrients")
-    type_component = relationship("NutrientType", back_populates="nutrients")
     unit = relationship("Unit", back_populates="nutrients")
 
     __table_args__ = (
-        UniqueConstraint('id_product', 'id_name_component', name='uq_product_nutrient'),
+        UniqueConstraint('product_id', 'nutrient_name_id', name='uq_product_nutrient'),
     )
