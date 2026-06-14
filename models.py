@@ -3,7 +3,6 @@ from sqlalchemy import Column, String, ForeignKey, Double, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, DeclarativeBase
 
-
 class Base(DeclarativeBase):
     pass
 
@@ -100,10 +99,12 @@ class Nutrient(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     quantity = Column(Double, nullable=False)
+    error_rate = Column(Double, nullable=True)
 
-    # Внешние ключи
-    product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=False)
-    nutrient_name_id = Column(UUID(as_uuid=True), ForeignKey("nutrients_names.id"), nullable=False)
+    # Python-атрибут → реальное имя колонки в БД
+    product_id = Column('id_product', UUID(as_uuid=True), ForeignKey("products.id"), nullable=False)
+    nutrient_name_id = Column('id_name_component', UUID(as_uuid=True), ForeignKey("nutrients_names.id"), nullable=False)
+    nutrient_type_id = Column('id_type_component', UUID(as_uuid=True), ForeignKey("nutrients_types.id"), nullable=True)
     unit_id = Column(UUID(as_uuid=True), ForeignKey("units.id"), nullable=False)
 
     # Связи
@@ -112,5 +113,5 @@ class Nutrient(Base):
     unit = relationship("Unit", back_populates="nutrients")
 
     __table_args__ = (
-        UniqueConstraint('product_id', 'nutrient_name_id', name='uq_product_nutrient'),
+        UniqueConstraint('id_product', 'id_name_component', name='uq_product_nutrient'),
     )
