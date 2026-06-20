@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from routers import api
 from routers import table
+from routers import calculator
 
 app = FastAPI(
     title="AFACI API",
@@ -22,6 +23,7 @@ app = FastAPI(
         {"name": "Units"},
         {"name": "Nutrient Types"},
         {"name": "Nutrient Names"},
+        {"name": "Calculator", "description": "Калькулятор пищевой и биологической ценности (методика Липатова)."},
     ],
 )
 
@@ -35,3 +37,4 @@ app.add_middleware(
 
 app.include_router(table.router)
 app.include_router(api.router)
+app.include_router(calculator.router)
