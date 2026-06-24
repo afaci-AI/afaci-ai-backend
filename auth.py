@@ -1,0 +1,101 @@
+"""
+Аутентификация: хеширование паролей (bcrypt), JWT-токены (PyJWT)
+и FastAPI-зависимости для получения текущего пользователя.
+"""
+import os
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+from uuid import UUID
+
+import bcrypt
+import jwt
+from fastapi import Depends, Header, HTTPException
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from database import get_db
+from models import User
+
+JWT_SECRET = os.getenv("JWT_SECRET", "change-me-in-production")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))  # 7 дней
+
+
+# ----------------------------- пароли -----------------------------
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def verify_password(password: str, password_hash: str) -> bool:
+    try:
+        return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
+    except (ValueError, TypeError):
+        return False
+
+
+# ----------------------------- токены -----------------------------
+def create_access_token(user_id: UUID) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    payload = {"sub": str(user_id), "exp": expire}
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def decode_token(token: str) -> Optional[str]:
+    """Вернуть user_id (str) из валидного токена либо None."""
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload.get("sub")
+    except jwt.PyJWTError:
+        return None
+
+
+def _extract_bearer(authorization: Optional[str]) -> Optional[str]:
+    if not authorization:
+        return None
+    parts = authorization.split(" ", 1)
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        return None
+    return parts[1].strip()
+
+
+# -------------------------- зависимости ---------------------------
+async def get_current_user(
+    authorization: Optional[str] = Header(default=None),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    token = _extract_bearer(authorization)
+    if not token:
+        raise HTTPException(status_code=401, detail="Требуется авторизация.")
+    user_id = decode_token(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Недействительный или истёкший токен.")
+    user = (await db.execute(select(User).where(User.id == UUID(user_id)))).scalar_one_or_none()
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=401, detail="Пользователь не найден или отключён.")
+    return user
+
+
+async def get_current_user_optional(
+    authorization: Optional[str] = Header(default=None),
+    db: AsyncSession = Depends(get_db),
+) -> Optional[User]:
+    token = _extract_bearer(authorization)
+    if not token:
+        return None
+    user_id = decode_token(token)
+    if not user_id:
+        return None
+    return (await db.execute(select(User).where(User.id == UUID(user_id)))).scalar_one_or_none()
+
+
+def user_public(user: User) -> dict:
+    """Сериализация пользователя для фронтенда (без пароля)."""
+    return {
+        "id": str(user.id),
+        "email": user.email,
+        "name": user.name,
+        "role": user.role,
+        "isActive": user.is_active,
+        "createdAt": user.created_at.isoformat() if user.created_at else None,
+        "lastLoginAt": user.last_login_at.isoformat() if user.last_login_at else None,
+    }
