@@ -1,16 +1,18 @@
 """
 Import script for Part 2 Excel data into the AFACI database.
 Adds 52 new products with their nutrients.
+
+Run from afaci/ directory:
+    python -m infrastructure.db.import_part2
 """
 
 import asyncio
 import uuid
-import re
 import asyncpg
 import openpyxl
 
 DB_URL = "postgresql://erikomaraliev:d@localhost/afaci"
-EXCEL_PATH = "../data/Состав_part_2_25-05-2026.xlsx"
+EXCEL_PATH = "../../data/Состав_part_2_25-05-2026.xlsx"
 
 GREEN = "FF92D050"
 BLUE = "FF00B0F0"
@@ -25,7 +27,7 @@ SHEET_TO_REGION = {
     "Джалал-Абадская область": "Джалал-Абадская область",
 }
 
-# Excel category + product name → DB category name
+
 def get_db_category(excel_cat: str, product_name: str) -> str:
     p = product_name.lower()
 
@@ -154,7 +156,6 @@ async def main():
     nutrient_types = {r["name"]: r["id"] for r in await conn.fetch("SELECT id, name FROM nutrients_types")}
     units = {r["name"]: r["id"] for r in await conn.fetch("SELECT id, name FROM units")}
 
-    # Existing products in DB: set of (region_id, product_name)
     existing = {
         (r["region_id"], r["name"])
         for r in await conn.fetch("SELECT name, region_id FROM products")
@@ -169,7 +170,7 @@ async def main():
     skipped_dup = 0
     errors = []
 
-    seen_in_file = set()  # (region_name, product_name) to deduplicate within file
+    seen_in_file = set()
 
     for sheet_name in wb.sheetnames:
         ws = wb[sheet_name]
@@ -189,26 +190,22 @@ async def main():
             product_name = product_name.strip()
             excel_cat = excel_cat.strip()
 
-            # Skip colored cells
             fill = row[1].fill
             bg = fill.fgColor.rgb if fill.fgColor.type == "rgb" else "none"
             if bg in (GREEN, BLUE):
                 skipped_color += 1
                 continue
 
-            # Skip in-file duplicates
             file_key = (db_region_name, product_name)
             if file_key in seen_in_file:
                 skipped_dup += 1
                 continue
             seen_in_file.add(file_key)
 
-            # Skip if already in DB
             if (region_id, product_name) in existing:
                 skipped_exists += 1
                 continue
 
-            # Determine DB category
             db_cat_name = get_db_category(excel_cat, product_name)
             if not db_cat_name:
                 errors.append(f"Unknown category mapping: '{excel_cat}' / '{product_name}'")
@@ -218,7 +215,6 @@ async def main():
                 errors.append(f"Category not found in DB: '{db_cat_name}' (product: {product_name})")
                 continue
 
-            # Insert product
             product_id = uuid.uuid4()
             try:
                 await conn.execute(
@@ -232,7 +228,6 @@ async def main():
                 errors.append(f"Failed to insert product '{product_name}' ({db_region_name}): {e}")
                 continue
 
-            # Parse and insert nutrients
             for col_idx, (nut_name, nut_type_name, unit_name) in COLUMN_MAP.items():
                 cell_val = row[col_idx].value if col_idx < len(row) else None
                 quantity, error_rate = parse_value(cell_val)

@@ -1,7 +1,7 @@
 """
 Сервис расчёта рецептуры: загрузка эталона и продуктов из БД + вызов
 чистой логики `compute_report`. Переиспользуется калькулятором, сохранением
-рецептур и базовой оптимизацией, чтобы не дублировать SQL и валидацию.
+рецептур и ранжированием, чтобы не дублировать SQL и валидацию.
 """
 from uuid import UUID
 from typing import List, Optional
@@ -10,11 +10,10 @@ from fastapi import HTTPException
 from sqlalchemy import text, bindparam
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from calculator import compute_report, SUM_TOLERANCE
+from domain.calculator import compute_report, SUM_TOLERANCE, REQUIRED_SUM
 
 CHEM_TYPE = "Химический состав"
 AMINO_TYPE = "Аминокислотный состав"
-REQUIRED_SUM = 100.0
 
 
 async def load_reference(db: AsyncSession, ref_id: UUID) -> Optional[dict]:

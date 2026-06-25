@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
-from database import get_db
+from infrastructure.db.session import get_db
 
 TAG = "Table (Flat)"
 
@@ -169,7 +169,6 @@ async def table_nutrients_pivot(
         "nt.name": nutrient_type,
     })
 
-    # Получаем плоские данные
     sql = text(f"""
         SELECT
             p.id::text             AS product_id,
@@ -195,7 +194,6 @@ async def table_nutrients_pivot(
     result = await db.execute(sql, params)
     rows = result.mappings().all()
 
-    # Поворот: product_id → строка, nutrient_name → колонки
     pivot: dict[str, dict] = {}
     for r in rows:
         key = r["product_id"]
@@ -220,23 +218,7 @@ async def table_nutrients_pivot(
     summary="Нутриенты — массив продуктов, нутриенты свёрнуты в {name: quantity}",
     description=(
         "Плоский массив продуктов. Нутриенты каждого продукта свёрнуты в словарь "
-        "`nutrient_name → quantity`. Готово для `pd.DataFrame(response.json())`.\n\n"
-        "```json\n"
-        "[\n"
-        "  {\n"
-        "    \"product_id\": \"...\",\n"
-        "    \"product_name\": \"Говядина\",\n"
-        "    \"category_name\": \"Мясо\",\n"
-        "    \"subcategory_name\": null,\n"
-        "    \"region_name\": \"Ошская область\",\n"
-        "    \"nutrients\": {\n"
-        "      \"Массовая доля белка\": 18.5,\n"
-        "      \"Триптофан\": 9.0,\n"
-        "      \"Ca\": 12.3\n"
-        "    }\n"
-        "  }\n"
-        "]\n"
-        "```"
+        "`nutrient_name → quantity`. Готово для `pd.DataFrame(response.json())`."
     ),
 )
 async def table_nutrients_map(
@@ -286,7 +268,6 @@ async def table_nutrients_map(
     result = await db.execute(sql, params)
     rows = result.mappings().all()
 
-    # Плоский список продуктов, нутриенты свёрнуты в словарь
     index: dict[str, dict] = {}
     order: list[str] = []
     for r in rows:
@@ -309,18 +290,6 @@ async def table_nutrients_map(
 @router.get(
     "/products/map",
     summary="Продукты в виде карты  category → region → [products]",
-    description=(
-        "Та же выборка что у `/table/products`, но в виде карты:\n\n"
-        "```\n"
-        "{\n"
-        "  \"Мясо\": {\n"
-        "    \"Ошская область\": [\n"
-        "      {\"product_id\": \"...\", \"product_name\": \"Говядина\", \"subcategory_name\": null}\n"
-        "    ]\n"
-        "  }\n"
-        "}\n"
-        "```"
-    ),
 )
 async def table_products_map(
     region: Optional[str] = Query(None, description="Фильтр по региону (ILIKE)"),
@@ -354,7 +323,6 @@ async def table_products_map(
     result = await db.execute(sql, params)
     rows = result.mappings().all()
 
-    # category → region → [products]
     out: dict = {}
     for r in rows:
         cat = r["category_name"]
@@ -375,12 +343,6 @@ async def table_products_map(
 @router.get(
     "/nutrients/csv",
     summary="Нутриенты — 4 колонки (Продукт, Регион, Показатель, Значение)",
-    description=(
-        "Минимальная выборка — ровно как в экспорте CSV:\n\n"
-        "| product_name | region_name | nutrient_name | quantity |\n"
-        "|---|---|---|---|\n"
-        "| Говядина | Ошская область | Ca | 12.3 |"
-    ),
 )
 async def table_nutrients_csv(
     region: Optional[str] = Query(None, description="Фильтр по региону (ILIKE)"),
@@ -434,7 +396,7 @@ async def table_nutrients_csv(
     writer.writeheader()
     writer.writerows([dict(r) for r in rows])
 
-    # utf-8-sig кодирует с BOM (\xef\xbb\xbf) — Excel и редакторы корректно читают кириллицу
+    # utf-8-sig кодирует с BOM — Excel и редакторы корректно читают кириллицу
     content = io.BytesIO(buf.getvalue().encode('utf-8-sig'))
 
     return StreamingResponse(

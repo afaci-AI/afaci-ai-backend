@@ -15,8 +15,8 @@
     PATCH  /api/v1/saved/recipes/{id}
     DELETE /api/v1/saved/recipes/{id}
 
-  Оптимизация:
-    POST   /api/v1/saved/optimize
+  Ранжирование:
+    POST   /api/v1/saved/ranking
 """
 from uuid import UUID
 from typing import List, Optional
@@ -27,10 +27,10 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from database import get_db
-from auth import get_current_user
-from models import User, RecipeGroup, SavedRecipe, SavedRecipeItem
-from calc_service import compute_recipe
+from infrastructure.db.session import get_db
+from infrastructure.auth import get_current_user
+from infrastructure.db.models import User, RecipeGroup, SavedRecipe, SavedRecipeItem
+from application.calculator.calculator_service import compute_recipe
 
 router = APIRouter(prefix="/api/v1/saved", tags=["Saved"])
 
@@ -51,15 +51,15 @@ class SavedRecipeCreate(BaseModel):
     new_group_name: Optional[str] = None
     reference_protein_id: UUID
     items: List[SavedItemIn]
-    draft: bool = False  # черновик: сохранить без расчёта показателей
+    draft: bool = False
 
 
 class SavedRecipeUpdate(BaseModel):
     name: Optional[str] = None
-    group_id: Optional[UUID] = None  # null = убрать из группы (см. model_fields_set)
+    group_id: Optional[UUID] = None
     reference_protein_id: Optional[UUID] = None
     items: Optional[List[SavedItemIn]] = None
-    draft: Optional[bool] = None  # true = сохранить как черновик (без пересчёта)
+    draft: Optional[bool] = None
 
 
 class Weights(BaseModel):
@@ -69,7 +69,7 @@ class Weights(BaseModel):
     g: float = 0.25
 
 
-class OptimizeRequest(BaseModel):
+class RankingRequest(BaseModel):
     recipe_ids: List[UUID]
     weights: Optional[Weights] = None
 
@@ -200,7 +200,6 @@ async def delete_group(group_id: UUID, db: AsyncSession = Depends(get_db),
     ))).scalar_one_or_none()
     if g is None:
         raise HTTPException(status_code=404, detail="Группа не найдена.")
-    # Рецептуры остаются у пользователя, но переходят в «без группы».
     await db.execute(
         SavedRecipe.__table__.update()
         .where(SavedRecipe.group_id == group_id)
@@ -236,14 +235,11 @@ async def get_recipe(recipe_id: UUID, db: AsyncSession = Depends(get_db),
 @router.post("/recipes", summary="Сохранить рецептуру")
 async def create_recipe(req: SavedRecipeCreate, db: AsyncSession = Depends(get_db),
                         user: User = Depends(get_current_user)):
-    # Обычная рецептура — считаем метрики (с валидацией суммы/эталона/продуктов).
-    # Черновик (draft) сохраняем как есть, без расчёта.
     report = None
     if not req.draft:
         items = [{"product_id": it.product_id, "amount_g": it.amount_g} for it in req.items]
         report = await compute_recipe(db, req.reference_protein_id, items)
 
-    # Группа: либо существующая, либо создаём новую по имени.
     group_id = req.group_id
     if req.new_group_name and req.new_group_name.strip():
         g = RecipeGroup(user_id=user.id, name=req.new_group_name.strip())
@@ -284,10 +280,8 @@ async def update_recipe(recipe_id: UUID, req: SavedRecipeUpdate,
     if "group_id" in fields:
         if req.group_id is not None:
             await _validate_group(db, user, req.group_id)
-        r.group_id = req.group_id  # None = убрать из группы
+        r.group_id = req.group_id
 
-    # Пересчёт нужен, если изменился состав и/или эталон.
-    # draft=true сохраняет как черновик (без расчёта), draft=false принудительно считает.
     make_draft = req.draft is True
     new_ref = req.reference_protein_id if "reference_protein_id" in fields and req.reference_protein_id else r.reference_protein_id
     if "items" in fields and req.items is not None:
@@ -303,7 +297,6 @@ async def update_recipe(recipe_id: UUID, req: SavedRecipeUpdate,
                 product_id=it.product_id, amount_g=it.amount_g, sort_order=idx,
             ))
     elif "reference_protein_id" in fields and req.reference_protein_id:
-        # Эталон сменился, состав прежний — пересчитываем по текущим items.
         r.reference_protein_id = new_ref
         if make_draft:
             _clear_metrics(r)
@@ -326,7 +319,7 @@ async def delete_recipe(recipe_id: UUID, db: AsyncSession = Depends(get_db),
     return {"ok": True}
 
 
-# ========================== оптимизация ==========================
+# ========================= ранжирование =========================
 def _normalize(values: List[Optional[float]], higher_is_better: bool) -> List[float]:
     """Нормировка показателя по выборке в [0..1]. None и нулевой разброс → нейтрально."""
     present = [v for v in values if v is not None]
@@ -337,18 +330,18 @@ def _normalize(values: List[Optional[float]], higher_is_better: bool) -> List[fl
     out: List[float] = []
     for v in values:
         if v is None:
-            out.append(0.0)  # нет данных по качеству → худший вклад
+            out.append(0.0)
         elif span == 0:
-            out.append(1.0)  # все одинаковы → показатель не различает
+            out.append(1.0)
         else:
             n = (v - lo) / span
             out.append(n if higher_is_better else 1.0 - n)
     return out
 
 
-@router.post("/optimize", summary="Ранжирование рецептур по БЦ, КРАС, V, G")
-async def optimize(req: OptimizeRequest, db: AsyncSession = Depends(get_db),
-                   user: User = Depends(get_current_user)):
+@router.post("/ranking", summary="Ранжирование рецептур по БЦ, КРАС, V, G")
+async def ranking(req: RankingRequest, db: AsyncSession = Depends(get_db),
+                  user: User = Depends(get_current_user)):
     if len(req.recipe_ids) < 1:
         raise HTTPException(status_code=400, detail="Выберите хотя бы одну рецептуру.")
 
@@ -361,7 +354,6 @@ async def optimize(req: OptimizeRequest, db: AsyncSession = Depends(get_db),
     if len(recipes) != len(set(req.recipe_ids)):
         raise HTTPException(status_code=404, detail="Некоторые рецептуры не найдены.")
 
-    # имена групп для вывода
     group_names = dict((g.id, g.name) for g in (await db.execute(
         select(RecipeGroup).where(RecipeGroup.user_id == user.id)
     )).scalars().all())
