@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from uuid import UUID
 from typing import Optional, List
 
-# Существующие схемы
+
 class SimpleCreate(BaseModel):
     name: str
 
@@ -33,17 +33,14 @@ class NutrientUpdate(BaseModel):
     unit_id: Optional[UUID] = None
     quantity: Optional[float] = None
 
-# Для массового создания справочников
 class SimpleBulkCreate(BaseModel):
     names: List[str]
 
-# Для автоматического создания продукта (передаем имена, не ID)
 class ProductAutoCreate(BaseModel):
     name: str
     category_name: str
     subcategory_name: Optional[str] = None
     region_name: str
 
-# Для массового создания нутриентов
 class NutrientBulkCreate(BaseModel):
     items: List[NutrientCreate]

@@ -12,9 +12,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database import get_db
-from models import User
-from auth import (
+from infrastructure.db.session import get_db
+from infrastructure.db.models import User
+from infrastructure.auth import (
     hash_password, verify_password, create_access_token,
     get_current_user, user_public,
 )

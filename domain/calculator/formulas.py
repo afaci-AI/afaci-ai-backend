@@ -2,7 +2,7 @@
 Расчёт пищевой и биологической ценности рецептуры (методика Липатова).
 
 Чистая вычислительная логика — без обращения к БД, поэтому легко тестируется.
-Маршрут `routers/calculator.py` подготавливает данные из БД и вызывает
+Маршрут `api/v1/calculator.py` подготавливает данные из БД и вызывает
 `compute_report`.
 
 Все формулы соответствуют документу «Решение по формулам (контроль)»:
@@ -30,6 +30,7 @@ NAK_GROUPS: list[tuple[str, list[str]]] = [
 ]
 
 SUM_TOLERANCE = 0.01  # допуск на сумму Xᵢ (борьба с ошибкой float)
+REQUIRED_SUM = 100.0
 
 
 def _round(value: float | None, digits: int) -> float | None:
@@ -113,7 +114,7 @@ def compute_report(items: list[dict], reference: dict) -> dict:
 
     limiting = [r["name"] for r in amino_rows if r["is_limiting"]]
 
-    # Предупреждение: бел­ок­содержащие ингредиенты без данных по НАК
+    # Предупреждение: белоксодержащие ингредиенты без данных по НАК
     no_amino_protein = [
         it["name"] for it in items
         if not it.get("amino") and it["chem"].get("Массовая доля белка", 0.0) > 0

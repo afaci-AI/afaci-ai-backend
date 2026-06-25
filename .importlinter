@@ -1,0 +1,21 @@
+[importlinter]
+root_package = afaci
+
+[importlinter:contract:domain-is-pure]
+name = Domain не импортирует infrastructure
+type = forbidden
+source_modules =
+    domain
+forbidden_modules =
+    infrastructure
+    api
+    sqlalchemy
+    fastapi
+
+[importlinter:contract:infra-not-domain]
+name = Infrastructure не импортирует domain напрямую
+type = forbidden
+source_modules =
+    infrastructure
+forbidden_modules =
+    domain

@@ -5,9 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-import models
-from database import get_db
-from schemas import (
+from infrastructure.db import models
+from infrastructure.db.session import get_db
+from api.v1.schemas import (
     SimpleCreate, SimpleUpdate, ProductCreate, ProductUpdate, NutrientCreate, NutrientUpdate,
     SimpleBulkCreate, ProductAutoCreate, NutrientBulkCreate
 )

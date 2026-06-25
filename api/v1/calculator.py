@@ -13,10 +13,10 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database import get_db
-from auth import get_current_user
-from models import User
-from calc_service import compute_recipe
+from infrastructure.db.session import get_db
+from infrastructure.auth import get_current_user
+from infrastructure.db.models import User
+from application.calculator.calculator_service import compute_recipe
 
 TAG = "Calculator"
 router = APIRouter(prefix="/api/v1/calculator", tags=[TAG])
