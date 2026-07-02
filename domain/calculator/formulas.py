@@ -253,7 +253,7 @@ def _build_verdict(c_min_name, c_min_val, kras, bc, util_V, util_G,
     # 3. Утилизация и избыточность (V, G)
     if util_V is not None and util_G is not None:
         points.append(
-            f"Коэффициент утилитарности V = {util_V:.2f}: незаменимые аминокислоты "
+            f"Коэффициент утилитарности U = {util_V:.2f}: незаменимые аминокислоты "
             f"используются примерно на {util_V * 100:.0f}%. Сопоставимая избыточность "
             f"G = {util_G:.1f} г/100 г белка не идёт на пластические нужды."
         )

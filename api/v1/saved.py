@@ -43,6 +43,7 @@ class GroupIn(BaseModel):
 class SavedItemIn(BaseModel):
     product_id: UUID
     amount_g: float
+    price_per_kg: Optional[float] = None
 
 
 class SavedRecipeCreate(BaseModel):
@@ -108,6 +109,7 @@ def _recipe_public(r: SavedRecipe, with_items: bool = False) -> dict:
             "product_id": str(it.product_id),
             "amount_g": it.amount_g,
             "sort_order": it.sort_order,
+            "price_per_kg": it.price_per_kg,
         } for it in items]
     return data
 
@@ -260,6 +262,7 @@ async def create_recipe(req: SavedRecipeCreate, db: AsyncSession = Depends(get_d
     for idx, it in enumerate(req.items):
         r.items.append(SavedRecipeItem(
             product_id=it.product_id, amount_g=it.amount_g, sort_order=idx,
+            price_per_kg=it.price_per_kg,
         ))
     db.add(r)
     await db.commit()
@@ -295,6 +298,7 @@ async def update_recipe(recipe_id: UUID, req: SavedRecipeUpdate,
         for idx, it in enumerate(req.items):
             r.items.append(SavedRecipeItem(
                 product_id=it.product_id, amount_g=it.amount_g, sort_order=idx,
+                price_per_kg=it.price_per_kg,
             ))
     elif "reference_protein_id" in fields and req.reference_protein_id:
         r.reference_protein_id = new_ref
