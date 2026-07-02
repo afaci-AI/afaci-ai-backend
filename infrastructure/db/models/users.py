@@ -16,6 +16,8 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     role = Column(String, nullable=False, default="viewer")
     is_active = Column(Boolean, nullable=False, default=True)
+    access_expires_at = Column(DateTime(timezone=True), nullable=True)
+    must_change_password = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
     last_login_at = Column(DateTime(timezone=True), nullable=True)
 

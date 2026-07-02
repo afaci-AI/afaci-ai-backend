@@ -16,7 +16,7 @@ from infrastructure.db.session import get_db
 from infrastructure.db.models import User
 from infrastructure.auth import (
     hash_password, verify_password, create_access_token,
-    get_current_user, user_public,
+    get_current_user, user_public, is_expired,
 )
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
@@ -60,6 +60,8 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Неверный email или пароль.")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Учётная запись отключена.")
+    if is_expired(user):
+        raise HTTPException(status_code=403, detail="Срок действия учётной записи истёк. Обратитесь в техническую поддержку.")
 
     user.last_login_at = datetime.now(timezone.utc)
     await db.commit()
@@ -70,3 +72,22 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
 @router.get("/me", summary="Текущий пользователь")
 async def me(current: User = Depends(get_current_user)):
     return user_public(current)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=6)
+
+
+@router.post("/change-password", summary="Смена пароля")
+async def change_password(
+    req: ChangePasswordRequest,
+    current: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not verify_password(req.current_password, current.password_hash):
+        raise HTTPException(status_code=401, detail="Неверный текущий пароль.")
+    current.password_hash = hash_password(req.new_password)
+    current.must_change_password = False
+    await db.commit()
+    return {"status": "ok"}

@@ -58,6 +58,22 @@ def _extract_bearer(authorization: Optional[str]) -> Optional[str]:
     return parts[1].strip()
 
 
+# ----------------------- срок действия доступа ----------------------
+def is_expired(user: User) -> bool:
+    """access_expires_at = null значит безлимитный доступ."""
+    return user.access_expires_at is not None and user.access_expires_at <= datetime.now(timezone.utc)
+
+
+def user_status(user: User) -> str:
+    if not user.is_active:
+        return "blocked"
+    if is_expired(user):
+        return "expired"
+    if user.access_expires_at is None:
+        return "unlimited"
+    return "active"
+
+
 # -------------------------- зависимости ---------------------------
 async def get_current_user(
     authorization: Optional[str] = Header(default=None),
@@ -72,7 +88,16 @@ async def get_current_user(
     user = (await db.execute(select(User).where(User.id == UUID(user_id)))).scalar_one_or_none()
     if user is None or not user.is_active:
         raise HTTPException(status_code=401, detail="Пользователь не найден или отключён.")
+    if is_expired(user):
+        # Проверка на каждом запросе: истёкший срок доступа = принудительный логаут.
+        raise HTTPException(status_code=401, detail="Срок действия учётной записи истёк. Обратитесь в техническую поддержку.")
     return user
+
+
+async def require_admin(current: User = Depends(get_current_user)) -> User:
+    if current.role != "admin":
+        raise HTTPException(status_code=403, detail="Требуются права администратора.")
+    return current
 
 
 async def get_current_user_optional(
@@ -96,6 +121,9 @@ def user_public(user: User) -> dict:
         "name": user.name,
         "role": user.role,
         "isActive": user.is_active,
+        "accessExpiresAt": user.access_expires_at.isoformat() if user.access_expires_at else None,
+        "mustChangePassword": user.must_change_password,
+        "status": user_status(user),
         "createdAt": user.created_at.isoformat() if user.created_at else None,
         "lastLoginAt": user.last_login_at.isoformat() if user.last_login_at else None,
     }
