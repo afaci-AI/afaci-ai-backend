@@ -17,3 +17,12 @@ class EmptyRecipeError(DomainError):
 
 class ReferenceProteinNotFoundError(DomainError):
     pass
+
+
+class OptimizationInfeasibleError(DomainError):
+    def __init__(self, detail: str = "") -> None:
+        msg = "Задача оптимизации не имеет допустимого решения."
+        if detail:
+            msg += f" {detail}"
+        super().__init__(msg)
+        self.detail = msg

@@ -72,5 +72,7 @@ class SavedRecipeItem(Base):
     amount_g = Column(Double, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
 
+    price_per_kg = Column(Double, nullable=True)
+
     saved_recipe = relationship("SavedRecipe", back_populates="items")
     product = relationship("Product")

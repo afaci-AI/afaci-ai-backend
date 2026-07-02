@@ -4,9 +4,10 @@
   GET  /api/v1/calculator/reference-proteins  — эталоны ФАО/ВОЗ (для селектора и Табл. 4)
   GET  /api/v1/calculator/recipes             — сохранённые рецептуры (загружаемые примеры)
   POST /api/v1/calculator/compute             — расчёт по списку ингредиентов + эталону
+  POST /api/v1/calculator/optimize-cost       — оптимизация стоимости рецептуры (SLSQP)
 """
 from uuid import UUID
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -17,6 +18,7 @@ from infrastructure.db.session import get_db
 from infrastructure.auth import get_current_user
 from infrastructure.db.models import User
 from application.calculator.calculator_service import compute_recipe
+from application.calculator.cost_optimizer import optimize_recipe_cost
 
 TAG = "Calculator"
 router = APIRouter(prefix="/api/v1/calculator", tags=[TAG])
@@ -31,6 +33,24 @@ class CalcItem(BaseModel):
 class CalcRequest(BaseModel):
     reference_protein_id: UUID
     items: List[CalcItem]
+
+
+class CandidateIn(BaseModel):
+    product_id: UUID
+    price_per_kg: float
+    min_amount_g: float = 0.0
+    max_amount_g: float = 100.0
+
+
+class OptConstraints(BaseModel):
+    bc_min: Optional[float] = None
+    kras_max: Optional[float] = None
+
+
+class OptimizeCostRequest(BaseModel):
+    reference_protein_id: UUID
+    candidates: List[CandidateIn]
+    constraints: OptConstraints = OptConstraints()
 
 
 @router.get("/reference-proteins", summary="Эталонные белки ФАО/ВОЗ")
@@ -102,3 +122,29 @@ async def compute(
 ):
     items = [{"product_id": it.product_id, "amount_g": it.amount_g} for it in req.items]
     return await compute_recipe(db, req.reference_protein_id, items)
+
+
+@router.post("/optimize-cost", summary="Оптимизировать стоимость рецептуры")
+async def optimize_cost_endpoint(
+    req: OptimizeCostRequest,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    """
+    Находит дешевейший состав рецептуры при ограничениях на качество белка (БЦ, КРАС).
+    Возвращает 422 с описанием, если задача неразрешима.
+    """
+    candidates = [
+        {
+            "product_id": str(c.product_id),
+            "price_per_kg": c.price_per_kg,
+            "min_amount_g": c.min_amount_g,
+            "max_amount_g": c.max_amount_g,
+        }
+        for c in req.candidates
+    ]
+    constraints = {
+        "bc_min": req.constraints.bc_min,
+        "kras_max": req.constraints.kras_max,
+    }
+    return await optimize_recipe_cost(db, req.reference_protein_id, candidates, constraints)
