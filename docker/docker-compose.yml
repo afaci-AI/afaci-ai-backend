@@ -59,6 +59,10 @@ services:
     build:
       context: ../../afaci-frontend
       dockerfile: Dockerfile
+      # rewrites() в next.config.mjs резолвится на этапе `next build`, поэтому
+      # BACKEND_URL нужен и здесь (build-time), и ниже в environment (runtime).
+      args:
+        BACKEND_URL: http://backend:8000
     restart: unless-stopped
     environment:
       BACKEND_URL: http://backend:8000
