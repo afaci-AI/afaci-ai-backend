@@ -1,0 +1,10 @@
+name: test-runner
+on: workflow_dispatch
+
+jobs:
+  smoke:
+    runs-on: [self-hosted, dev]
+    steps:
+      - run: echo "hostname=$(hostname); user=$(whoami)"
+      - run: docker ps
+      - run: sleep 30
