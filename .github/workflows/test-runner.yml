@@ -3,8 +3,8 @@ on: workflow_dispatch
 
 jobs:
   smoke:
-    runs-on: [self-hosted, dev]
+    runs-on: [afafci-runner-01]
     steps:
-      - run: echo "hostname=$(hostname); user=$(whoami)"
-      - run: docker ps
-      - run: sleep 30
+      - run: docker run --rm alpine echo ok
+      - run: git --version
+      - run: echo "script ok" > script.sh && bash script.sh
