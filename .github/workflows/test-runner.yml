@@ -6,6 +6,6 @@ jobs:
     runs-on: [afaci-runner-01]
     steps:
       - run: docker ps
-      - run: docker run --rm hello-world
+      - run: docker run --rm echo hello-world
       - run: git --version
       - run: echo "script ok" > script.sh && bash script.sh
