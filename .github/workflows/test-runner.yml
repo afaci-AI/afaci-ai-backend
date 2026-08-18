@@ -3,7 +3,7 @@ on: workflow_dispatch
 
 jobs:
   smoke:
-    runs-on: [afafci-runner-01]
+    runs-on: [afafci-runner-01, ARM64]
     steps:
       - run: docker run --rm alpine echo ok
       - run: git --version
