@@ -15,10 +15,10 @@ jobs:
     runs-on: afaci-runner-01
     steps:
       - name: Checkout code by ruff
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
@@ -40,8 +40,32 @@ jobs:
       - ruff-sca
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
     
-      - name: Build docker image
-        run: docker build .
+      - run: docker build -t $NEXUS_REGISTRY/$IMAGE_NAME:${{ github.sha }} .
+      - run: docker save $NEXUS_REGISTRY/$IMAGE_NAME:${{ github.sha }} -o image.tar
+      
+      - name: Upload Docker Image Artifact
+        uses: actions/upload-artifact@v4
+        with:
+            name: docker-image
+            path: image.tar
+            retention-days: 1
+
+  image-push:
+    runs-on: afaci-runner-01
+    needs: build
+    steps:
+      - name: Download Docker Image Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+
+      - run: docker load -i image.tar
+      - run: echo "${{ secrets.NEXUS_PASSWORD }}" | docker login $NEXUS_REGISTRY -u "${{ secrets.NEXUS_USER }}" --password-stdin
+      - run: docker push $NEXUS_REGISTRY/$IMAGE_NAME:${{ github.sha }}
+
+      - name: Log out from Nexus
+        if: always()
+        run: docker logout $NEXUS_REGISTRY
   
