@@ -41,5 +41,5 @@ networks:
     external: true
     name: afaci_afaci-network
 
- volumes:
-   afaci-pgdata:
+volumes:
+  afaci-pgdata:
