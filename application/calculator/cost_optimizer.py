@@ -5,20 +5,20 @@ Application-слой оптимизации стоимости рецептур�
 делегирует математику в domain/calculator/optimizer.py, затем
 прогоняет compute_report для полного отчёта по оптимальной рецептуре.
 """
+
 from uuid import UUID
-from typing import Optional
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from application.calculator.calculator_service import load_products, load_reference
 from domain.calculator import (
-    optimize_cost,
-    compute_report,
     CandidateItem,
     CostOptimizationConstraints,
     OptimizationInfeasibleError,
+    compute_report,
+    optimize_cost,
 )
-from application.calculator.calculator_service import load_reference, load_products
 
 
 async def optimize_recipe_cost(

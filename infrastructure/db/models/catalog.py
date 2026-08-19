@@ -1,5 +1,6 @@
 import uuid
-from sqlalchemy import Column, String, ForeignKey, UniqueConstraint
+
+from sqlalchemy import Column, ForeignKey, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -20,12 +21,16 @@ class Subcategory(Base):
     __tablename__ = "subcategories"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=False)
+    category_id = Column(
+        UUID(as_uuid=True), ForeignKey("categories.id"), nullable=False
+    )
     name = Column(String, nullable=False)
 
     category = relationship("Category", back_populates="subcategories")
     products = relationship("Product", back_populates="subcategory")
-    __table_args__ = (UniqueConstraint('category_id', 'name', name='uq_subcategory_category_name'),)
+    __table_args__ = (
+        UniqueConstraint("category_id", "name", name="uq_subcategory_category_name"),
+    )
 
 
 class Region(Base):
@@ -50,12 +55,16 @@ class NutrientName(Base):
     __tablename__ = "nutrients_names"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    nutrient_type_id = Column(UUID(as_uuid=True), ForeignKey("nutrients_types.id"), nullable=False)
+    nutrient_type_id = Column(
+        UUID(as_uuid=True), ForeignKey("nutrients_types.id"), nullable=False
+    )
     name = Column(String, nullable=False)
 
     nutrient_type = relationship("NutrientType", back_populates="nutrient_names")
     nutrients = relationship("Nutrient", back_populates="name_component")
-    __table_args__ = (UniqueConstraint('nutrient_type_id', 'name', name='uq_nutrient_name_type_name'),)
+    __table_args__ = (
+        UniqueConstraint("nutrient_type_id", "name", name="uq_nutrient_name_type_name"),
+    )
 
 
 class Unit(Base):

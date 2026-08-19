@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from api.v1 import products, table, calculator, auth, saved, users
+from api.v1 import auth, calculator, products, saved, table, users
 
 
 def register_routers(app: FastAPI) -> None:

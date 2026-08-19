@@ -8,6 +8,7 @@ Run from afaci/ directory:
 
 import asyncio
 import uuid
+
 import asyncpg
 import openpyxl
 
@@ -42,9 +43,21 @@ def get_db_category(excel_cat: str, product_name: str) -> str:
         return "Молоко и молочные продукты"
 
     if excel_cat == "Овощи, фрукты, ягоды и продукты их переработки (кроме соков)":
-        fruits = ["яблок", "яблоки", "хурма", "гранат", "смородин", "клубник",
-                  "персик", "черешн", "курага", "кишмиш", "облепих", "чернослив",
-                  "сухофрукт"]
+        fruits = [
+            "яблок",
+            "яблоки",
+            "хурма",
+            "гранат",
+            "смородин",
+            "клубник",
+            "персик",
+            "черешн",
+            "курага",
+            "кишмиш",
+            "облепих",
+            "чернослив",
+            "сухофрукт",
+        ]
         greens = ["шпинат", "листья"]
         if any(k in p for k in fruits):
             return "Фрукты, ягоды, сухофрукты"
@@ -96,52 +109,52 @@ def parse_value(val) -> tuple[float | None, float | None]:
 # Column index → (nutrient_name_in_db, nutrient_type_name, unit_name)
 # Columns 0=category, 1=product; skip section headers at 9, 28, 48+
 COLUMN_MAP = {
-    2:  ("Массовая доля растворимых сухих веществ", "Химический состав", "%/100г"),
+    2: ("Массовая доля растворимых сухих веществ", "Химический состав", "%/100г"),
     # col 3: аскорбиновая кислота — not in DB, skip
-    4:  ("Зольность",                               "Химический состав", "%/100г"),
-    5:  ("Массовая доля влаги",                     "Химический состав", "%/100г"),
-    6:  ("Массовая доля белка",                     "Химический состав", "%/100г"),
-    7:  ("Массовая доля жира",                      "Химический состав", "%/100г"),
-    8:  ("Углеводы",                                "Химический состав", "%/100г"),
+    4: ("Зольность", "Химический состав", "%/100г"),
+    5: ("Массовая доля влаги", "Химический состав", "%/100г"),
+    6: ("Массовая доля белка", "Химический состав", "%/100г"),
+    7: ("Массовая доля жира", "Химический состав", "%/100г"),
+    8: ("Углеводы", "Химический состав", "%/100г"),
     # col 9: section header
-    10: ("Валин",                                   "Аминокислотный состав", "мг/100г"),
-    11: ("Изолейцин",                               "Аминокислотный состав", "мг/100г"),
-    12: ("Лейцин",                                  "Аминокислотный состав", "мг/100г"),
-    13: ("Лизин",                                   "Аминокислотный состав", "мг/100г"),
-    14: ("Метионин",                                "Аминокислотный состав", "мг/100г"),
-    15: ("Треонин",                                 "Аминокислотный состав", "мг/100г"),
-    16: ("Триптофан",                               "Аминокислотный состав", "мг/100г"),
-    17: ("Фенилаланин",                             "Аминокислотный состав", "мг/100г"),
-    18: ("Аланин",                                  "Аминокислотный состав", "мг/100г"),
-    19: ("Аргинин",                                 "Аминокислотный состав", "мг/100г"),
-    20: ("Аспарагиновая кислота",                   "Аминокислотный состав", "мг/100г"),
-    21: ("Гистидин",                                "Аминокислотный состав", "мг/100г"),
-    22: ("Глицин",                                  "Аминокислотный состав", "мг/100г"),
-    23: ("Глутаминовая кислота",                    "Аминокислотный состав", "мг/100г"),
-    24: ("Пролин",                                  "Аминокислотный состав", "мг/100г"),
-    25: ("Серин",                                   "Аминокислотный состав", "мг/100г"),
-    26: ("Тирозин",                                 "Аминокислотный состав", "мг/100г"),
-    27: ("Цистеин",                                 "Аминокислотный состав", "мг/100г"),
+    10: ("Валин", "Аминокислотный состав", "мг/100г"),
+    11: ("Изолейцин", "Аминокислотный состав", "мг/100г"),
+    12: ("Лейцин", "Аминокислотный состав", "мг/100г"),
+    13: ("Лизин", "Аминокислотный состав", "мг/100г"),
+    14: ("Метионин", "Аминокислотный состав", "мг/100г"),
+    15: ("Треонин", "Аминокислотный состав", "мг/100г"),
+    16: ("Триптофан", "Аминокислотный состав", "мг/100г"),
+    17: ("Фенилаланин", "Аминокислотный состав", "мг/100г"),
+    18: ("Аланин", "Аминокислотный состав", "мг/100г"),
+    19: ("Аргинин", "Аминокислотный состав", "мг/100г"),
+    20: ("Аспарагиновая кислота", "Аминокислотный состав", "мг/100г"),
+    21: ("Гистидин", "Аминокислотный состав", "мг/100г"),
+    22: ("Глицин", "Аминокислотный состав", "мг/100г"),
+    23: ("Глутаминовая кислота", "Аминокислотный состав", "мг/100г"),
+    24: ("Пролин", "Аминокислотный состав", "мг/100г"),
+    25: ("Серин", "Аминокислотный состав", "мг/100г"),
+    26: ("Тирозин", "Аминокислотный состав", "мг/100г"),
+    27: ("Цистеин", "Аминокислотный состав", "мг/100г"),
     # col 28: section header
-    29: ("Ca",  "Минеральный состав", "мг/100г"),
-    30: ("Na",  "Минеральный состав", "мг/100г"),
-    31: ("K",   "Минеральный состав", "мг/100г"),
-    32: ("P",   "Минеральный состав", "мг/100г"),
-    33: ("Mn",  "Минеральный состав", "мг/100г"),
-    34: ("Zn",  "Минеральный состав", "мг/100г"),
-    35: ("Se",  "Минеральный состав", "мг/100г"),
-    36: ("Cu",  "Минеральный состав", "мг/100г"),
-    37: ("Fe",  "Минеральный состав", "мг/100г"),
-    38: ("I",   "Минеральный состав", "мг/100г"),
-    39: ("B",   "Минеральный состав", "мг/100г"),
-    40: ("Li",  "Минеральный состав", "мг/100г"),
-    41: ("Al",  "Минеральный состав", "мг/100г"),
-    42: ("Mg",  "Минеральный состав", "мг/100г"),
-    43: ("V",   "Минеральный состав", "мг/100г"),
-    44: ("Ni",  "Минеральный состав", "мг/100г"),
-    45: ("Co",  "Минеральный состав", "мг/100г"),
-    46: ("Cr",  "Минеральный состав", "мг/100г"),
-    47: ("Sn",  "Минеральный состав", "мг/100г"),
+    29: ("Ca", "Минеральный состав", "мг/100г"),
+    30: ("Na", "Минеральный состав", "мг/100г"),
+    31: ("K", "Минеральный состав", "мг/100г"),
+    32: ("P", "Минеральный состав", "мг/100г"),
+    33: ("Mn", "Минеральный состав", "мг/100г"),
+    34: ("Zn", "Минеральный состав", "мг/100г"),
+    35: ("Se", "Минеральный состав", "мг/100г"),
+    36: ("Cu", "Минеральный состав", "мг/100г"),
+    37: ("Fe", "Минеральный состав", "мг/100г"),
+    38: ("I", "Минеральный состав", "мг/100г"),
+    39: ("B", "Минеральный состав", "мг/100г"),
+    40: ("Li", "Минеральный состав", "мг/100г"),
+    41: ("Al", "Минеральный состав", "мг/100г"),
+    42: ("Mg", "Минеральный состав", "мг/100г"),
+    43: ("V", "Минеральный состав", "мг/100г"),
+    44: ("Ni", "Минеральный состав", "мг/100г"),
+    45: ("Co", "Минеральный состав", "мг/100г"),
+    46: ("Cr", "Минеральный состав", "мг/100г"),
+    47: ("Sn", "Минеральный состав", "мг/100г"),
     # cols 48+: fatty acids — not in DB, skip
 }
 
@@ -150,10 +163,20 @@ async def main():
     conn = await asyncpg.connect(DB_URL)
 
     # --- Load reference data from DB ---
-    regions = {r["name"]: r["id"] for r in await conn.fetch("SELECT id, name FROM regions")}
-    categories = {r["name"]: r["id"] for r in await conn.fetch("SELECT id, name FROM categories")}
-    nutrient_names = {r["name"]: r["id"] for r in await conn.fetch("SELECT id, name FROM nutrients_names")}
-    nutrient_types = {r["name"]: r["id"] for r in await conn.fetch("SELECT id, name FROM nutrients_types")}
+    regions = {
+        r["name"]: r["id"] for r in await conn.fetch("SELECT id, name FROM regions")
+    }
+    categories = {
+        r["name"]: r["id"] for r in await conn.fetch("SELECT id, name FROM categories")
+    }
+    nutrient_names = {
+        r["name"]: r["id"]
+        for r in await conn.fetch("SELECT id, name FROM nutrients_names")
+    }
+    nutrient_types = {
+        r["name"]: r["id"]
+        for r in await conn.fetch("SELECT id, name FROM nutrients_types")
+    }
     units = {r["name"]: r["id"] for r in await conn.fetch("SELECT id, name FROM units")}
 
     existing = {
@@ -208,11 +231,15 @@ async def main():
 
             db_cat_name = get_db_category(excel_cat, product_name)
             if not db_cat_name:
-                errors.append(f"Unknown category mapping: '{excel_cat}' / '{product_name}'")
+                errors.append(
+                    f"Unknown category mapping: '{excel_cat}' / '{product_name}'"
+                )
                 continue
             category_id = categories.get(db_cat_name)
             if not category_id:
-                errors.append(f"Category not found in DB: '{db_cat_name}' (product: {product_name})")
+                errors.append(
+                    f"Category not found in DB: '{db_cat_name}' (product: {product_name})"
+                )
                 continue
 
             product_id = uuid.uuid4()
@@ -220,12 +247,17 @@ async def main():
                 await conn.execute(
                     """INSERT INTO products (id, name, category_id, region_id, subcategory_id)
                        VALUES ($1, $2, $3, $4, NULL)""",
-                    product_id, product_name, category_id, region_id,
+                    product_id,
+                    product_name,
+                    category_id,
+                    region_id,
                 )
                 existing.add((region_id, product_name))
                 added_products += 1
-            except Exception as e:
-                errors.append(f"Failed to insert product '{product_name}' ({db_region_name}): {e}")
+            except Exception as e:  # noqa: BLE001
+                errors.append(
+                    f"Failed to insert product '{product_name}' ({db_region_name}): {e}"
+                )
                 continue
 
             for col_idx, (nut_name, nut_type_name, unit_name) in COLUMN_MAP.items():
@@ -239,7 +271,9 @@ async def main():
                 unit_id = units.get(unit_name)
 
                 if not name_id or not type_id or not unit_id:
-                    errors.append(f"Missing ref for nutrient '{nut_name}' (product: {product_name})")
+                    errors.append(
+                        f"Missing ref for nutrient '{nut_name}' (product: {product_name})"
+                    )
                     continue
 
                 try:
@@ -250,12 +284,19 @@ async def main():
                            ON CONFLICT (id_product, id_name_component) DO UPDATE
                              SET quantity = EXCLUDED.quantity,
                                  error_rate = EXCLUDED.error_rate""",
-                        uuid.uuid4(), product_id, name_id, type_id, unit_id,
-                        quantity, error_rate,
+                        uuid.uuid4(),
+                        product_id,
+                        name_id,
+                        type_id,
+                        unit_id,
+                        quantity,
+                        error_rate,
                     )
                     added_nutrients += 1
-                except Exception as e:
-                    errors.append(f"Nutrient insert error '{nut_name}' / '{product_name}': {e}")
+                except Exception as e:  # noqa: BLE001
+                    errors.append(
+                        f"Nutrient insert error '{nut_name}' / '{product_name}': {e}"
+                    )
 
     await conn.close()
 

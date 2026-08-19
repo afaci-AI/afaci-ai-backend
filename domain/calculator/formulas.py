@@ -14,19 +14,20 @@
                               αⱼ = Cmin/Cⱼ,  V = Σ(αⱼ·Aⱼ)/ΣAⱼ,
                               G = Σ(Aⱼ·(1−αⱼ)) / (Cmin/100)
 """
+
 from __future__ import annotations
 
 # Порядок и состав групп незаменимых аминокислот (НАК).
 # Группа -> список названий аминокислот в БД, которые её формируют.
 NAK_GROUPS: list[tuple[str, list[str]]] = [
-    ("ИЗО",     ["Изолейцин"]),
-    ("ЛЕЙ",     ["Лейцин"]),
-    ("ВАЛ",     ["Валин"]),
+    ("ИЗО", ["Изолейцин"]),
+    ("ЛЕЙ", ["Лейцин"]),
+    ("ВАЛ", ["Валин"]),
     ("МЕТ+ЦИС", ["Метионин", "Цистеин"]),
-    ("Ф+Т",     ["Фенилаланин", "Тирозин"]),
-    ("ТРИ",     ["Триптофан"]),
-    ("ТРЕ",     ["Треонин"]),
-    ("ЛИЗ",     ["Лизин"]),
+    ("Ф+Т", ["Фенилаланин", "Тирозин"]),
+    ("ТРИ", ["Триптофан"]),
+    ("ТРЕ", ["Треонин"]),
+    ("ЛИЗ", ["Лизин"]),
 ]
 
 SUM_TOLERANCE = 0.01  # допуск на сумму Xᵢ (борьба с ошибкой float)
@@ -62,8 +63,10 @@ def compute_report(items: list[dict], reference: dict) -> dict:
     # ---- Этап 2. НАК суммарного белка и аминокислотный скор ----
     # Вклад в белок учитывают только ингредиенты, у которых есть данные по НАК.
     contributors = [it for it in items if it.get("amino")]
-    protein_base = sum(it["chem"].get("Массовая доля белка", 0.0) * it["amount_g"]
-                       for it in contributors)
+    protein_base = sum(
+        it["chem"].get("Массовая доля белка", 0.0) * it["amount_g"]
+        for it in contributors
+    )
 
     amino_rows: list[dict] = []
     if contributors and protein_base > 0:
@@ -75,12 +78,14 @@ def compute_report(items: list[dict], reference: dict) -> dict:
                 if p <= 0:
                     continue
                 group_mg = sum(it["amino"].get(m, 0.0) for m in members)
-                m_ij = group_mg / (p * 10.0)          # г/100 г белка
+                m_ij = group_mg / (p * 10.0)  # г/100 г белка
                 numerator += p * it["amount_g"] * m_ij
             m_j = numerator / protein_base
             ref_val = reference["values"].get(group)
             score = (m_j / ref_val * 100.0) if ref_val else None
-            amino_rows.append({"name": group, "m_j": m_j, "reference": ref_val, "score": score})
+            amino_rows.append(
+                {"name": group, "m_j": m_j, "reference": ref_val, "score": score}
+            )
 
     # ---- Cmin, лимитирующие НАК ----
     scored = [r for r in amino_rows if r["score"] is not None]
@@ -116,7 +121,8 @@ def compute_report(items: list[dict], reference: dict) -> dict:
 
     # Предупреждение: белоксодержащие ингредиенты без данных по НАК
     no_amino_protein = [
-        it["name"] for it in items
+        it["name"]
+        for it in items
         if not it.get("amino") and it["chem"].get("Массовая доля белка", 0.0) > 0
     ]
     warnings: list[str] = []
@@ -127,8 +133,15 @@ def compute_report(items: list[dict], reference: dict) -> dict:
         )
 
     verdict = _build_verdict(
-        c_min_name, c_min_val, kras, bc, util_V, util_G, len(limiting),
-        protein, fat,
+        c_min_name,
+        c_min_val,
+        kras,
+        bc,
+        util_V,
+        util_G,
+        len(limiting),
+        protein,
+        fat,
     )
 
     return {
@@ -173,7 +186,9 @@ def compute_report(items: list[dict], reference: dict) -> dict:
             }
             for r in amino_rows
         ],
-        "c_min": {"name": c_min_name, "score": _round(c_min_val, 1)} if c_min_name else None,
+        "c_min": {"name": c_min_name, "score": _round(c_min_val, 1)}
+        if c_min_name
+        else None,
         "limiting": limiting,
         "limiting_count": len(limiting),
         "quality": {
@@ -197,8 +212,9 @@ _LEVEL_HEADLINE = {
 }
 
 
-def _build_verdict(c_min_name, c_min_val, kras, bc, util_V, util_G,
-                   limiting_count, protein, fat) -> dict | None:
+def _build_verdict(
+    c_min_name, c_min_val, kras, bc, util_V, util_G, limiting_count, protein, fat
+) -> dict | None:
     """
     Текстовый вердикт по качеству белка — интерпретация уже посчитанных
     показателей (Cmin, КРАС/БЦ, V, G) словами. БЕЗ обращения к банку продуктов.
@@ -221,7 +237,11 @@ def _build_verdict(c_min_name, c_min_val, kras, bc, util_V, util_G,
         points.append(
             f"Лимитирующая аминокислота — {c_min_name} (скор {c_min_val:.0f}%). "
             f"Именно она ограничивает биологическую ценность белка"
-            + (f"; всего лимитирующих НАК: {limiting_count}." if limiting_count else ".")
+            + (
+                f"; всего лимитирующих НАК: {limiting_count}."
+                if limiting_count
+                else "."
+            )
         )
     else:
         completeness = "poor"

@@ -8,8 +8,9 @@
   DELETE /api/v1/users/{id}           — деактивировать
   DELETE /api/v1/users/{id}/permanent — удалить безвозвратно вместе с сохранёнными рецептурами
 """
+
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -17,9 +18,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from infrastructure.db.session import get_db
-from infrastructure.db.models import User
 from infrastructure.auth import hash_password, require_admin, user_public
+from infrastructure.db.models import User
+from infrastructure.db.session import get_db
 
 router = APIRouter(prefix="/api/v1/users", tags=["Users"])
 
@@ -31,16 +32,16 @@ class UserCreateRequest(BaseModel):
     name: str = Field(min_length=1)
     password: str = Field(min_length=6)
     role: str = "viewer"
-    access_expires_at: Optional[datetime] = None
+    access_expires_at: datetime | None = None
     must_change_password: bool = False
 
 
 class UserUpdateRequest(BaseModel):
-    name: Optional[str] = None
-    role: Optional[str] = None
-    is_active: Optional[bool] = None
-    access_expires_at: Optional[datetime] = None
-    access_expires_at_unlimited: Optional[bool] = None  # True — сбросить срок в null
+    name: str | None = None
+    role: str | None = None
+    is_active: bool | None = None
+    access_expires_at: datetime | None = None
+    access_expires_at_unlimited: bool | None = None  # True — сбросить срок в null
 
 
 def _validate_role(role: str) -> None:
@@ -48,17 +49,19 @@ def _validate_role(role: str) -> None:
         raise HTTPException(status_code=400, detail=f"Недопустимая роль: {role}")
 
 
-def _validate_expiry(expires_at: Optional[datetime]) -> None:
+def _validate_expiry(expires_at: datetime | None) -> None:
     if expires_at is not None and expires_at <= datetime.now(timezone.utc):
-        raise HTTPException(status_code=400, detail="Дата окончания доступа не может быть в прошлом.")
+        raise HTTPException(
+            status_code=400, detail="Дата окончания доступа не может быть в прошлом."
+        )
 
 
 @router.get("", summary="Список пользователей")
 async def list_users(
-    search: Optional[str] = None,
-    role: Optional[str] = None,
-    db: AsyncSession = Depends(get_db),
-    _admin: User = Depends(require_admin),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _admin: Annotated[User, Depends(require_admin)],
+    search: str | None = None,
+    role: str | None = None,
 ):
     query = select(User)
     if role:
@@ -72,7 +75,11 @@ async def list_users(
 
 
 @router.get("/{id}", summary="Пользователь по id")
-async def get_user(id: UUID, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
+async def get_user(
+    id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _admin: Annotated[User, Depends(require_admin)],
+):
     user = await db.get(User, id)
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден.")
@@ -82,15 +89,19 @@ async def get_user(id: UUID, db: AsyncSession = Depends(get_db), _admin: User = 
 @router.post("", status_code=201, summary="Создать пользователя")
 async def create_user(
     data: UserCreateRequest,
-    db: AsyncSession = Depends(get_db),
-    _admin: User = Depends(require_admin),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _admin: Annotated[User, Depends(require_admin)],
 ):
     _validate_role(data.role)
     _validate_expiry(data.access_expires_at)
     email = data.email.lower()
-    exists = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+    exists = (
+        await db.execute(select(User).where(User.email == email))
+    ).scalar_one_or_none()
     if exists is not None:
-        raise HTTPException(status_code=409, detail="Пользователь с таким email уже существует.")
+        raise HTTPException(
+            status_code=409, detail="Пользователь с таким email уже существует."
+        )
 
     user = User(
         email=email,
@@ -110,8 +121,8 @@ async def create_user(
 async def update_user(
     id: UUID,
     data: UserUpdateRequest,
-    db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_admin),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    admin: Annotated[User, Depends(require_admin)],
 ):
     user = await db.get(User, id)
     if not user:
@@ -120,12 +131,18 @@ async def update_user(
     if data.role is not None:
         _validate_role(data.role)
         if user.id == admin.id and data.role != "admin":
-            raise HTTPException(status_code=400, detail="Нельзя понизить роль собственной учётной записи.")
+            raise HTTPException(
+                status_code=400,
+                detail="Нельзя понизить роль собственной учётной записи.",
+            )
         user.role = data.role
 
     if data.is_active is not None:
         if user.id == admin.id and not data.is_active:
-            raise HTTPException(status_code=400, detail="Нельзя деактивировать собственную учётную запись.")
+            raise HTTPException(
+                status_code=400,
+                detail="Нельзя деактивировать собственную учётную запись.",
+            )
         user.is_active = data.is_active
 
     if data.name is not None:
@@ -143,9 +160,15 @@ async def update_user(
 
 
 @router.delete("/{id}", summary="Деактивировать пользователя")
-async def deactivate_user(id: UUID, db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin)):
+async def deactivate_user(
+    id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    admin: Annotated[User, Depends(require_admin)],
+):
     if id == admin.id:
-        raise HTTPException(status_code=400, detail="Нельзя деактивировать собственную учётную запись.")
+        raise HTTPException(
+            status_code=400, detail="Нельзя деактивировать собственную учётную запись."
+        )
     user = await db.get(User, id)
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден.")
@@ -154,10 +177,18 @@ async def deactivate_user(id: UUID, db: AsyncSession = Depends(get_db), admin: U
     return {"status": "deactivated"}
 
 
-@router.delete("/{id}/permanent", summary="Удалить пользователя безвозвратно вместе с рецептурами")
-async def delete_user_permanently(id: UUID, db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin)):
+@router.delete(
+    "/{id}/permanent", summary="Удалить пользователя безвозвратно вместе с рецептурами"
+)
+async def delete_user_permanently(
+    id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    admin: Annotated[User, Depends(require_admin)],
+):
     if id == admin.id:
-        raise HTTPException(status_code=400, detail="Нельзя удалить собственную учётную запись.")
+        raise HTTPException(
+            status_code=400, detail="Нельзя удалить собственную учётную запись."
+        )
     user = await db.get(User, id)
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден.")
