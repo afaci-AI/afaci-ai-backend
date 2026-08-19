@@ -12,7 +12,7 @@ permissions:
 jobs:
   ruff-sca:
     name: ruff
-    runs-on: ‎[afaci-runner-01]
+    runs-on: [self-hosted, afaci-runner-01]
     steps:
       - name: Checkout code by ruff
         uses: actions/checkout@v4
@@ -36,7 +36,7 @@ jobs:
 
   mypy-sca:
     name: mypy
-    runs-on: ‎afaci-runner-01
+    runs-on: [self-hosted, afaci-runner-01]
     needs: ruff-sca
     steps:
       - name: Checkout code by mypy
@@ -59,7 +59,7 @@ jobs:
 
   bandit-check-security:
     name: bandit
-    runs-on: ‎afaci-runner-01
+    runs-on: [self-hosted, afaci-runner-01]
     needs: mypy-sca
     steps:
       - name: Checkout code by bandit
@@ -81,7 +81,7 @@ jobs:
 
   build:
     name: build
-    runs-on: afaci-runner-01
+    runs-on: [self-hosted, afaci-runner-01]
     needs:
       - ruff-sca
       - mypy-sca
