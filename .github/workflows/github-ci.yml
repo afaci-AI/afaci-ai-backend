@@ -72,7 +72,6 @@ jobs:
   deploy:
     runs-on: afaci-runner-01
     needs: image-push
-    if: github.ref == 'refs/heads/develop'
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
