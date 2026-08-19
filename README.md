@@ -124,4 +124,7 @@ alembic upgrade head
 
 # посмотреть текущую версию схемы в БД
 alembic current
+
+# обновить локальную ветку с удалённого репозитория
+git pull --ff-only origin develop
 ```
