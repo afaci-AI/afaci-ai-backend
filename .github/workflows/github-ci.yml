@@ -12,7 +12,7 @@ permissions:
 jobs:
   ruff-sca:
     name: ruff
-    runs-on: ‎afaci-runner-01
+    runs-on: ‎[afaci-runner-01]
     steps:
       - name: Checkout code by ruff
         uses: actions/checkout@v4
