@@ -1,0 +1,95 @@
+name: base-ci
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main", "develop"]
+
+permissions:
+  contents: read
+
+jobs:
+  ruff-sca:
+    name: ruff
+    runs-on: afaci-runner-01
+    steps:
+      - name: Checkout code by ruff
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+
+      - name: Run Ruff (Linting)
+        run: ruff check .
+
+      - name: Run Ruff (Format Check)
+        run: ruff format --check .
+
+
+  mypy-sca:
+    name: mypy
+    runs-on: afaci-runner-01
+    needs: ruff-sca
+    steps:
+      - name: Checkout code by mypy
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install mypy
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          
+      - name: Run Mypy (Type Checking)
+        run: mypy . --ignore-missing-imports
+
+
+  bandit-check-security:
+    name: bandit
+    runs-on: afaci-runner-01
+    needs: mypy-sca
+    steps:
+      - name: Checkout code by bandit
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit
+          
+      - name: Run Security Check
+        run: bandit -r . -x tests/ -ll
+
+
+  build:
+    name: build
+    runs-on: afaci-runner-01
+    needs:
+      - ruff-sca
+      - mypy-sca
+      - bandit-check-security
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+    
+      - name: Build docker image
+        run: docker build .
+  
