@@ -87,5 +87,5 @@ jobs:
           JWT_ALGORITHM: ${{ secrets.JWT_ALGORITHM || 'HS256' }}
           ACCESS_TOKEN_EXPIRE_MINUTES: ${{ secrets.ACCESS_TOKEN_EXPIRE_MINUTES || '10080' }}
           BACKEND_PORT: ${{ secrets.BACKEND_PORT || '8000' }}
-        run: docker compose -f deploy/docker-compose.yml up -d --pull always
+        run: docker compose -f up -d --pull always
   
