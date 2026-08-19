@@ -78,6 +78,7 @@ jobs:
       - name: Run Security Check
         run: bandit -r . -x tests/ -ll
 
+
   build:
     name: build
     runs-on: afaci-runner-01
