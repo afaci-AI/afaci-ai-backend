@@ -42,8 +42,8 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
     
-      - run: docker build -t $NEXUS_REGISTRY/$IMAGE_NAME:${{ github.sha }} .
-      - run: docker save $NEXUS_REGISTRY/$IMAGE_NAME:${{ github.sha }} -o image.tar
+      - run: docker build -t ${{ secrets.NEXUS_REGISTRY }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }} .
+      - run: docker save ${{ secrets.NEXUS_REGISTRY }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }} -o image.tar
       
       - name: Upload Docker Image Artifact
         uses: actions/upload-artifact@v4
@@ -62,10 +62,10 @@ jobs:
           name: docker-image
 
       - run: docker load -i image.tar
-      - run: echo "${{ secrets.NEXUS_PASSWORD }}" | docker login $NEXUS_REGISTRY -u "${{ secrets.NEXUS_USER }}" --password-stdin
-      - run: docker push $NEXUS_REGISTRY/$IMAGE_NAME:${{ github.sha }}
+      - run: echo "${{ secrets.NEXUS_PASSWORD }}" | docker login ${{ secrets.NEXUS_REGISTRY }} -u "${{ secrets.NEXUS_USER }}" --password-stdin
+      - run: docker push ${{ secrets.NEXUS_REGISTRY }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }}
 
       - name: Log out from Nexus
         if: always()
-        run: docker logout $NEXUS_REGISTRY
+        run: docker logout ${{ secrets.NEXUS_REGISTRY }}
   
