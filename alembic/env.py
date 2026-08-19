@@ -1,14 +1,15 @@
 import asyncio
-from logging.config import fileConfig
-import sys
 import os
+import sys
+from logging.config import fileConfig
 
+from dotenv import load_dotenv
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
-from infrastructure.db.models import Base
+
 from alembic import context
-from dotenv import load_dotenv
+from infrastructure.db.models import Base
 
 sys.path.append(os.getcwd())
 
@@ -17,7 +18,7 @@ load_dotenv()
 # this is the Alembic Config object
 config = context.config
 
-db_url = os.getenv('DATABASE_URL')
+db_url = os.getenv("DATABASE_URL")
 
 if not db_url:
     raise ValueError("DATABASE_URL не найден в .env файле или переменных окружения")
@@ -28,6 +29,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
+
 
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")

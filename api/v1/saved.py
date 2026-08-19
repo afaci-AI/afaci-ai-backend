@@ -18,19 +18,20 @@
   Ранжирование:
     POST   /api/v1/saved/ranking
 """
+
+from typing import Annotated
 from uuid import UUID
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from infrastructure.db.session import get_db
-from infrastructure.auth import get_current_user
-from infrastructure.db.models import User, RecipeGroup, SavedRecipe, SavedRecipeItem
 from application.calculator.calculator_service import compute_recipe
+from infrastructure.auth import get_current_user
+from infrastructure.db.models import RecipeGroup, SavedRecipe, SavedRecipeItem, User
+from infrastructure.db.session import get_db
 
 router = APIRouter(prefix="/api/v1/saved", tags=["Saved"])
 
@@ -43,24 +44,24 @@ class GroupIn(BaseModel):
 class SavedItemIn(BaseModel):
     product_id: UUID
     amount_g: float
-    price_per_kg: Optional[float] = None
+    price_per_kg: float | None = None
 
 
 class SavedRecipeCreate(BaseModel):
     name: str = Field(min_length=1)
-    group_id: Optional[UUID] = None
-    new_group_name: Optional[str] = None
+    group_id: UUID | None = None
+    new_group_name: str | None = None
     reference_protein_id: UUID
-    items: List[SavedItemIn]
+    items: list[SavedItemIn]
     draft: bool = False
 
 
 class SavedRecipeUpdate(BaseModel):
-    name: Optional[str] = None
-    group_id: Optional[UUID] = None
-    reference_protein_id: Optional[UUID] = None
-    items: Optional[List[SavedItemIn]] = None
-    draft: Optional[bool] = None
+    name: str | None = None
+    group_id: UUID | None = None
+    reference_protein_id: UUID | None = None
+    items: list[SavedItemIn] | None = None
+    draft: bool | None = None
 
 
 class Weights(BaseModel):
@@ -71,8 +72,8 @@ class Weights(BaseModel):
 
 
 class RankingRequest(BaseModel):
-    recipe_ids: List[UUID]
-    weights: Optional[Weights] = None
+    recipe_ids: list[UUID]
+    weights: Weights | None = None
 
 
 # ============================ помощники ============================
@@ -105,12 +106,15 @@ def _recipe_public(r: SavedRecipe, with_items: bool = False) -> dict:
     }
     if with_items:
         items = sorted(r.items, key=lambda it: it.sort_order)
-        data["items"] = [{
-            "product_id": str(it.product_id),
-            "amount_g": it.amount_g,
-            "sort_order": it.sort_order,
-            "price_per_kg": it.price_per_kg,
-        } for it in items]
+        data["items"] = [
+            {
+                "product_id": str(it.product_id),
+                "amount_g": it.amount_g,
+                "sort_order": it.sort_order,
+                "price_per_kg": it.price_per_kg,
+            }
+            for it in items
+        ]
     return data
 
 
@@ -132,8 +136,9 @@ def _clear_metrics(r: SavedRecipe) -> None:
     r.c_min_name = None
 
 
-async def _get_owned_recipe(db: AsyncSession, user: User, recipe_id: UUID,
-                            with_items: bool = False) -> SavedRecipe:
+async def _get_owned_recipe(
+    db: AsyncSession, user: User, recipe_id: UUID, with_items: bool = False
+) -> SavedRecipe:
     stmt = select(SavedRecipe).where(
         SavedRecipe.id == recipe_id, SavedRecipe.user_id == user.id
     )
@@ -146,32 +151,52 @@ async def _get_owned_recipe(db: AsyncSession, user: User, recipe_id: UUID,
 
 
 async def _validate_group(db: AsyncSession, user: User, group_id: UUID) -> None:
-    g = (await db.execute(select(RecipeGroup).where(
-        RecipeGroup.id == group_id, RecipeGroup.user_id == user.id
-    ))).scalar_one_or_none()
+    g = (
+        await db.execute(
+            select(RecipeGroup).where(
+                RecipeGroup.id == group_id, RecipeGroup.user_id == user.id
+            )
+        )
+    ).scalar_one_or_none()
     if g is None:
         raise HTTPException(status_code=404, detail="Группа не найдена.")
 
 
 # ============================= группы =============================
 @router.get("/groups", summary="Группы пользователя")
-async def list_groups(db: AsyncSession = Depends(get_db),
-                      user: User = Depends(get_current_user)):
-    groups = (await db.execute(
-        select(RecipeGroup).where(RecipeGroup.user_id == user.id)
-        .order_by(RecipeGroup.created_at)
-    )).scalars().all()
-    counts = dict((await db.execute(
-        select(SavedRecipe.group_id, func.count())
-        .where(SavedRecipe.user_id == user.id, SavedRecipe.group_id.isnot(None))
-        .group_by(SavedRecipe.group_id)
-    )).all())
+async def list_groups(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    groups = (
+        (
+            await db.execute(
+                select(RecipeGroup)
+                .where(RecipeGroup.user_id == user.id)
+                .order_by(RecipeGroup.created_at)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    counts = dict(
+        (
+            await db.execute(
+                select(SavedRecipe.group_id, func.count())
+                .where(SavedRecipe.user_id == user.id, SavedRecipe.group_id.isnot(None))
+                .group_by(SavedRecipe.group_id)
+            )
+        ).all()
+    )
     return [_group_public(g, counts.get(g.id, 0)) for g in groups]
 
 
 @router.post("/groups", summary="Создать группу")
-async def create_group(req: GroupIn, db: AsyncSession = Depends(get_db),
-                       user: User = Depends(get_current_user)):
+async def create_group(
+    req: GroupIn,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
     g = RecipeGroup(user_id=user.id, name=req.name.strip())
     db.add(g)
     await db.commit()
@@ -180,12 +205,19 @@ async def create_group(req: GroupIn, db: AsyncSession = Depends(get_db),
 
 
 @router.patch("/groups/{group_id}", summary="Переименовать группу")
-async def update_group(group_id: UUID, req: GroupIn,
-                       db: AsyncSession = Depends(get_db),
-                       user: User = Depends(get_current_user)):
-    g = (await db.execute(select(RecipeGroup).where(
-        RecipeGroup.id == group_id, RecipeGroup.user_id == user.id
-    ))).scalar_one_or_none()
+async def update_group(
+    group_id: UUID,
+    req: GroupIn,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    g = (
+        await db.execute(
+            select(RecipeGroup).where(
+                RecipeGroup.id == group_id, RecipeGroup.user_id == user.id
+            )
+        )
+    ).scalar_one_or_none()
     if g is None:
         raise HTTPException(status_code=404, detail="Группа не найдена.")
     g.name = req.name.strip()
@@ -194,12 +226,21 @@ async def update_group(group_id: UUID, req: GroupIn,
     return _group_public(g)
 
 
-@router.delete("/groups/{group_id}", summary="Удалить группу (рецептуры остаются без группы)")
-async def delete_group(group_id: UUID, db: AsyncSession = Depends(get_db),
-                       user: User = Depends(get_current_user)):
-    g = (await db.execute(select(RecipeGroup).where(
-        RecipeGroup.id == group_id, RecipeGroup.user_id == user.id
-    ))).scalar_one_or_none()
+@router.delete(
+    "/groups/{group_id}", summary="Удалить группу (рецептуры остаются без группы)"
+)
+async def delete_group(
+    group_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    g = (
+        await db.execute(
+            select(RecipeGroup).where(
+                RecipeGroup.id == group_id, RecipeGroup.user_id == user.id
+            )
+        )
+    ).scalar_one_or_none()
     if g is None:
         raise HTTPException(status_code=404, detail="Группа не найдена.")
     await db.execute(
@@ -215,9 +256,9 @@ async def delete_group(group_id: UUID, db: AsyncSession = Depends(get_db),
 # =========================== рецептуры ===========================
 @router.get("/recipes", summary="Сохранённые рецептуры пользователя")
 async def list_recipes(
-    group_id: Optional[UUID] = Query(default=None),
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+    group_id: Annotated[UUID | None, Query()] = None,
 ):
     stmt = select(SavedRecipe).where(SavedRecipe.user_id == user.id)
     if group_id is not None:
@@ -228,18 +269,26 @@ async def list_recipes(
 
 
 @router.get("/recipes/{recipe_id}", summary="Сохранённая рецептура с составом")
-async def get_recipe(recipe_id: UUID, db: AsyncSession = Depends(get_db),
-                     user: User = Depends(get_current_user)):
+async def get_recipe(
+    recipe_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
     r = await _get_owned_recipe(db, user, recipe_id, with_items=True)
     return _recipe_public(r, with_items=True)
 
 
 @router.post("/recipes", summary="Сохранить рецептуру")
-async def create_recipe(req: SavedRecipeCreate, db: AsyncSession = Depends(get_db),
-                        user: User = Depends(get_current_user)):
+async def create_recipe(
+    req: SavedRecipeCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
     report = None
     if not req.draft:
-        items = [{"product_id": it.product_id, "amount_g": it.amount_g} for it in req.items]
+        items = [
+            {"product_id": it.product_id, "amount_g": it.amount_g} for it in req.items
+        ]
         report = await compute_recipe(db, req.reference_protein_id, items)
 
     group_id = req.group_id
@@ -260,10 +309,14 @@ async def create_recipe(req: SavedRecipeCreate, db: AsyncSession = Depends(get_d
     if report:
         _apply_metrics(r, report)
     for idx, it in enumerate(req.items):
-        r.items.append(SavedRecipeItem(
-            product_id=it.product_id, amount_g=it.amount_g, sort_order=idx,
-            price_per_kg=it.price_per_kg,
-        ))
+        r.items.append(
+            SavedRecipeItem(
+                product_id=it.product_id,
+                amount_g=it.amount_g,
+                sort_order=idx,
+                price_per_kg=it.price_per_kg,
+            )
+        )
     db.add(r)
     await db.commit()
     await db.refresh(r)
@@ -271,9 +324,12 @@ async def create_recipe(req: SavedRecipeCreate, db: AsyncSession = Depends(get_d
 
 
 @router.patch("/recipes/{recipe_id}", summary="Изменить рецептуру (имя/группа/состав)")
-async def update_recipe(recipe_id: UUID, req: SavedRecipeUpdate,
-                        db: AsyncSession = Depends(get_db),
-                        user: User = Depends(get_current_user)):
+async def update_recipe(
+    recipe_id: UUID,
+    req: SavedRecipeUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
     r = await _get_owned_recipe(db, user, recipe_id, with_items=True)
     fields = req.model_fields_set
 
@@ -286,27 +342,40 @@ async def update_recipe(recipe_id: UUID, req: SavedRecipeUpdate,
         r.group_id = req.group_id
 
     make_draft = req.draft is True
-    new_ref = req.reference_protein_id if "reference_protein_id" in fields and req.reference_protein_id else r.reference_protein_id
+    new_ref = (
+        req.reference_protein_id
+        if "reference_protein_id" in fields and req.reference_protein_id
+        else r.reference_protein_id
+    )
     if "items" in fields and req.items is not None:
         r.reference_protein_id = new_ref
         if make_draft:
             _clear_metrics(r)
         else:
-            items = [{"product_id": it.product_id, "amount_g": it.amount_g} for it in req.items]
+            items = [
+                {"product_id": it.product_id, "amount_g": it.amount_g}
+                for it in req.items
+            ]
             _apply_metrics(r, await compute_recipe(db, new_ref, items))
         r.items.clear()
         for idx, it in enumerate(req.items):
-            r.items.append(SavedRecipeItem(
-                product_id=it.product_id, amount_g=it.amount_g, sort_order=idx,
-                price_per_kg=it.price_per_kg,
-            ))
+            r.items.append(
+                SavedRecipeItem(
+                    product_id=it.product_id,
+                    amount_g=it.amount_g,
+                    sort_order=idx,
+                    price_per_kg=it.price_per_kg,
+                )
+            )
     elif "reference_protein_id" in fields and req.reference_protein_id:
         r.reference_protein_id = new_ref
         if make_draft:
             _clear_metrics(r)
         else:
-            items = [{"product_id": it.product_id, "amount_g": it.amount_g}
-                     for it in sorted(r.items, key=lambda x: x.sort_order)]
+            items = [
+                {"product_id": it.product_id, "amount_g": it.amount_g}
+                for it in sorted(r.items, key=lambda x: x.sort_order)
+            ]
             _apply_metrics(r, await compute_recipe(db, new_ref, items))
 
     await db.commit()
@@ -315,8 +384,11 @@ async def update_recipe(recipe_id: UUID, req: SavedRecipeUpdate,
 
 
 @router.delete("/recipes/{recipe_id}", summary="Удалить рецептуру")
-async def delete_recipe(recipe_id: UUID, db: AsyncSession = Depends(get_db),
-                        user: User = Depends(get_current_user)):
+async def delete_recipe(
+    recipe_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
     r = await _get_owned_recipe(db, user, recipe_id)
     await db.delete(r)
     await db.commit()
@@ -324,14 +396,14 @@ async def delete_recipe(recipe_id: UUID, db: AsyncSession = Depends(get_db),
 
 
 # ========================= ранжирование =========================
-def _normalize(values: List[Optional[float]], higher_is_better: bool) -> List[float]:
+def _normalize(values: list[float | None], higher_is_better: bool) -> list[float]:
     """Нормировка показателя по выборке в [0..1]. None и нулевой разброс → нейтрально."""
     present = [v for v in values if v is not None]
     if not present:
         return [0.0 for _ in values]
     lo, hi = min(present), max(present)
     span = hi - lo
-    out: List[float] = []
+    out: list[float] = []
     for v in values:
         if v is None:
             out.append(0.0)
@@ -344,23 +416,37 @@ def _normalize(values: List[Optional[float]], higher_is_better: bool) -> List[fl
 
 
 @router.post("/ranking", summary="Ранжирование рецептур по БЦ, КРАС, V, G")
-async def ranking(req: RankingRequest, db: AsyncSession = Depends(get_db),
-                  user: User = Depends(get_current_user)):
+async def ranking(
+    req: RankingRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
     if len(req.recipe_ids) < 1:
         raise HTTPException(status_code=400, detail="Выберите хотя бы одну рецептуру.")
 
-    recipes = (await db.execute(
-        select(SavedRecipe).where(
-            SavedRecipe.user_id == user.id,
-            SavedRecipe.id.in_(req.recipe_ids),
+    recipes = (
+        (
+            await db.execute(
+                select(SavedRecipe).where(
+                    SavedRecipe.user_id == user.id,
+                    SavedRecipe.id.in_(req.recipe_ids),
+                )
+            )
         )
-    )).scalars().all()
+        .scalars()
+        .all()
+    )
     if len(recipes) != len(set(req.recipe_ids)):
         raise HTTPException(status_code=404, detail="Некоторые рецептуры не найдены.")
 
-    group_names = dict((g.id, g.name) for g in (await db.execute(
-        select(RecipeGroup).where(RecipeGroup.user_id == user.id)
-    )).scalars().all())
+    group_names = {
+        g.id: g.name
+        for g in (
+            await db.execute(select(RecipeGroup).where(RecipeGroup.user_id == user.id))
+        )
+        .scalars()
+        .all()
+    }
 
     w = req.weights or Weights()
     wsum = (w.bc + w.kras + w.v + w.g) or 1.0
@@ -373,24 +459,30 @@ async def ranking(req: RankingRequest, db: AsyncSession = Depends(get_db),
 
     results = []
     for i, r in enumerate(recipes):
-        composite = (wn["bc"] * n_bc[i] + wn["kras"] * n_kras[i]
-                     + wn["v"] * n_v[i] + wn["g"] * n_g[i])
-        results.append({
-            "recipe_id": str(r.id),
-            "name": r.name,
-            "group": group_names.get(r.group_id) if r.group_id else None,
-            "bc": r.bc,
-            "kras": r.kras,
-            "V": r.v_coef,
-            "G": r.g_coef,
-            "normalized": {
-                "bc": round(n_bc[i], 4),
-                "kras": round(n_kras[i], 4),
-                "V": round(n_v[i], 4),
-                "G": round(n_g[i], 4),
-            },
-            "composite": round(composite, 4),
-        })
+        composite = (
+            wn["bc"] * n_bc[i]
+            + wn["kras"] * n_kras[i]
+            + wn["v"] * n_v[i]
+            + wn["g"] * n_g[i]
+        )
+        results.append(
+            {
+                "recipe_id": str(r.id),
+                "name": r.name,
+                "group": group_names.get(r.group_id) if r.group_id else None,
+                "bc": r.bc,
+                "kras": r.kras,
+                "V": r.v_coef,
+                "G": r.g_coef,
+                "normalized": {
+                    "bc": round(n_bc[i], 4),
+                    "kras": round(n_kras[i], 4),
+                    "V": round(n_v[i], 4),
+                    "G": round(n_g[i], 4),
+                },
+                "composite": round(composite, 4),
+            }
+        )
 
     results.sort(key=lambda x: x["composite"], reverse=True)
     for rank, item in enumerate(results, start=1):

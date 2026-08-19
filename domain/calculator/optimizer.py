@@ -6,16 +6,16 @@
 минимизирующий суммарную стоимость сырья при заданных
 ограничениях на качество белка (БЦ, КРАС).
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
 import numpy as np
-from scipy.optimize import minimize, Bounds, LinearConstraint
+from scipy.optimize import Bounds, minimize
 
-from domain.calculator.formulas import compute_report
 from domain.calculator.exceptions import OptimizationInfeasibleError
+from domain.calculator.formulas import compute_report
 
 
 @dataclass
@@ -27,14 +27,14 @@ class CandidateItem:
     price_per_kg: float
     min_amount_g: float = 0.0
     max_amount_g: float = 100.0
-    region: Optional[str] = None
-    subcategory: Optional[str] = None
+    region: str | None = None
+    subcategory: str | None = None
 
 
 @dataclass
 class CostOptimizationConstraints:
-    bc_min: Optional[float] = None    # БЦ ≥ bc_min
-    kras_max: Optional[float] = None  # КРАС ≤ kras_max
+    bc_min: float | None = None  # БЦ ≥ bc_min
+    kras_max: float | None = None  # КРАС ≤ kras_max
 
 
 def _build_items(candidates: list[CandidateItem], x: np.ndarray) -> list[dict]:
@@ -60,7 +60,6 @@ def _random_feasible_start(
     n = len(candidates)
     lb = np.array([c.min_amount_g for c in candidates])
     ub = np.array([c.max_amount_g for c in candidates])
-    free = ub - lb
     # Случайный вектор на основе Dirichlet + сдвиг в lb
     alpha = rng.random(n) + 0.1
     dirichlet = rng.dirichlet(alpha)
@@ -70,7 +69,7 @@ def _random_feasible_start(
     x0 = np.clip(x0, lb, ub)
     deficit = 100.0 - x0.sum()
     if abs(deficit) > 1e-6:
-        slack = (ub - x0)
+        slack = ub - x0
         total_slack = slack.sum()
         if total_slack > 1e-9:
             x0 += slack / total_slack * deficit
@@ -79,7 +78,6 @@ def _random_feasible_start(
 
 def _uniform_start(candidates: list[CandidateItem]) -> np.ndarray:
     """Начальная точка: распределяем 100 г обратно пропорционально цене (дешёвые получают больше)."""
-    n = len(candidates)
     lb = np.array([c.min_amount_g for c in candidates])
     ub = np.array([c.max_amount_g for c in candidates])
     prices = np.array([c.price_per_kg for c in candidates], dtype=float)
@@ -126,7 +124,6 @@ def optimize_cost(
         return prices
 
     bounds = Bounds(lb=lb, ub=ub)
-    eq_constraint = LinearConstraint(np.ones((1, n)), lb=100.0, ub=100.0)
 
     slsqp_constraints: list[dict] = [
         {"type": "eq", "fun": lambda x: np.sum(x) - 100.0, "jac": lambda x: np.ones(n)},
@@ -139,7 +136,7 @@ def optimize_cost(
             try:
                 report = compute_report(_build_items(candidates, x), reference)
                 return (report["quality"]["bc"] or 0.0) - bc_min
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return -1.0
 
         slsqp_constraints.append({"type": "ineq", "fun": _bc_con})
@@ -151,7 +148,7 @@ def optimize_cost(
             try:
                 report = compute_report(_build_items(candidates, x), reference)
                 return kras_max - (report["quality"]["kras"] or 999.0)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return -1.0
 
         slsqp_constraints.append({"type": "ineq", "fun": _kras_con})
@@ -161,7 +158,11 @@ def optimize_cost(
     N_RESTARTS = 6
 
     for i in range(N_RESTARTS):
-        x0 = _uniform_start(candidates) if i == 0 else _random_feasible_start(candidates, rng)
+        x0 = (
+            _uniform_start(candidates)
+            if i == 0
+            else _random_feasible_start(candidates, rng)
+        )
         try:
             res = minimize(
                 objective,
@@ -174,7 +175,7 @@ def optimize_cost(
             )
             if res.success and (best_result is None or res.fun < best_result.fun):
                 best_result = res
-        except Exception:
+        except Exception:  # noqa: BLE001, S112
             continue
 
     if best_result is None or not best_result.success:

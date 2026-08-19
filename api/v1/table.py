@@ -1,10 +1,11 @@
 import csv
 import io
-from typing import Optional, Literal
+from typing import Annotated, Literal
+
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from infrastructure.db.session import get_db
 
@@ -13,12 +14,22 @@ TAG = "Table (Flat)"
 router = APIRouter(prefix="/api/v1/table", tags=[TAG])
 
 _NUTRIENT_COLS = {
-    "product_name", "category_name", "subcategory_name", "region_name",
-    "nutrient_name", "nutrient_type", "unit", "quantity", "error_rate",
+    "product_name",
+    "category_name",
+    "subcategory_name",
+    "region_name",
+    "nutrient_name",
+    "nutrient_type",
+    "unit",
+    "quantity",
+    "error_rate",
 }
 
 _PRODUCT_COLS = {
-    "product_name", "category_name", "subcategory_name", "region_name",
+    "product_name",
+    "category_name",
+    "subcategory_name",
+    "region_name",
 }
 
 
@@ -34,29 +45,47 @@ _PRODUCT_COLS = {
     ),
 )
 async def table_nutrients(
-    region: Optional[str] = Query(None, description="Фильтр по региону (ILIKE)"),
-    category: Optional[str] = Query(None, description="Фильтр по категории (ILIKE)"),
-    subcategory: Optional[str] = Query(None, description="Фильтр по подкатегории (ILIKE)"),
-    product: Optional[str] = Query(None, description="Фильтр по названию продукта (ILIKE)"),
-    nutrient_type: Optional[str] = Query(None, description="Фильтр по типу нутриента (ILIKE)"),
-    nutrient_name: Optional[str] = Query(None, description="Фильтр по названию нутриента (ILIKE)"),
-    sort_by: str = Query("product_name", description="Колонка для сортировки"),
-    sort_order: Literal["asc", "desc"] = Query("asc", description="Направление сортировки"),
-    limit: int = Query(1000, ge=1, le=10000, description="Максимум строк"),
-    offset: int = Query(0, ge=0, description="Сдвиг (пагинация)"),
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    region: Annotated[
+        str | None, Query(description="Фильтр по региону (ILIKE)")
+    ] = None,
+    category: Annotated[
+        str | None, Query(description="Фильтр по категории (ILIKE)")
+    ] = None,
+    subcategory: Annotated[
+        str | None, Query(description="Фильтр по подкатегории (ILIKE)")
+    ] = None,
+    product: Annotated[
+        str | None, Query(description="Фильтр по названию продукта (ILIKE)")
+    ] = None,
+    nutrient_type: Annotated[
+        str | None, Query(description="Фильтр по типу нутриента (ILIKE)")
+    ] = None,
+    nutrient_name: Annotated[
+        str | None, Query(description="Фильтр по названию нутриента (ILIKE)")
+    ] = None,
+    sort_by: Annotated[
+        str, Query(description="Колонка для сортировки")
+    ] = "product_name",
+    sort_order: Annotated[
+        Literal["asc", "desc"], Query(description="Направление сортировки")
+    ] = "asc",
+    limit: Annotated[int, Query(ge=1, le=10000, description="Максимум строк")] = 1000,
+    offset: Annotated[int, Query(ge=0, description="Сдвиг (пагинация)")] = 0,
 ):
     if sort_by not in _NUTRIENT_COLS:
         sort_by = "product_name"
 
-    where, params = _build_where({
-        "r.name": region,
-        "c.name": category,
-        "sc.name": subcategory,
-        "p.name": product,
-        "nt.name": nutrient_type,
-        "nn.name": nutrient_name,
-    })
+    where, params = _build_where(
+        {
+            "r.name": region,
+            "c.name": category,
+            "sc.name": subcategory,
+            "p.name": product,
+            "nt.name": nutrient_type,
+            "nn.name": nutrient_name,
+        }
+    )
 
     params["_limit"] = limit
     params["_offset"] = offset
@@ -101,25 +130,39 @@ async def table_nutrients(
     ),
 )
 async def table_products(
-    region: Optional[str] = Query(None, description="Фильтр по региону (ILIKE)"),
-    category: Optional[str] = Query(None, description="Фильтр по категории (ILIKE)"),
-    subcategory: Optional[str] = Query(None, description="Фильтр по подкатегории (ILIKE)"),
-    product: Optional[str] = Query(None, description="Фильтр по названию продукта (ILIKE)"),
-    sort_by: str = Query("product_name", description="Колонка для сортировки"),
-    sort_order: Literal["asc", "desc"] = Query("asc", description="Направление сортировки"),
-    limit: int = Query(1000, ge=1, le=10000, description="Максимум строк"),
-    offset: int = Query(0, ge=0, description="Сдвиг (пагинация)"),
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    region: Annotated[
+        str | None, Query(description="Фильтр по региону (ILIKE)")
+    ] = None,
+    category: Annotated[
+        str | None, Query(description="Фильтр по категории (ILIKE)")
+    ] = None,
+    subcategory: Annotated[
+        str | None, Query(description="Фильтр по подкатегории (ILIKE)")
+    ] = None,
+    product: Annotated[
+        str | None, Query(description="Фильтр по названию продукта (ILIKE)")
+    ] = None,
+    sort_by: Annotated[
+        str, Query(description="Колонка для сортировки")
+    ] = "product_name",
+    sort_order: Annotated[
+        Literal["asc", "desc"], Query(description="Направление сортировки")
+    ] = "asc",
+    limit: Annotated[int, Query(ge=1, le=10000, description="Максимум строк")] = 1000,
+    offset: Annotated[int, Query(ge=0, description="Сдвиг (пагинация)")] = 0,
 ):
     if sort_by not in _PRODUCT_COLS:
         sort_by = "product_name"
 
-    where, params = _build_where({
-        "r.name": region,
-        "c.name": category,
-        "sc.name": subcategory,
-        "p.name": product,
-    })
+    where, params = _build_where(
+        {
+            "r.name": region,
+            "c.name": category,
+            "sc.name": subcategory,
+            "p.name": product,
+        }
+    )
 
     params["_limit"] = limit
     params["_offset"] = offset
@@ -154,20 +197,32 @@ async def table_products(
     ),
 )
 async def table_nutrients_pivot(
-    region: Optional[str] = Query(None, description="Фильтр по региону (ILIKE)"),
-    category: Optional[str] = Query(None, description="Фильтр по категории (ILIKE)"),
-    subcategory: Optional[str] = Query(None, description="Фильтр по подкатегории (ILIKE)"),
-    product: Optional[str] = Query(None, description="Фильтр по названию продукта (ILIKE)"),
-    nutrient_type: Optional[str] = Query(None, description="Фильтр по типу нутриента (ILIKE)"),
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    region: Annotated[
+        str | None, Query(description="Фильтр по региону (ILIKE)")
+    ] = None,
+    category: Annotated[
+        str | None, Query(description="Фильтр по категории (ILIKE)")
+    ] = None,
+    subcategory: Annotated[
+        str | None, Query(description="Фильтр по подкатегории (ILIKE)")
+    ] = None,
+    product: Annotated[
+        str | None, Query(description="Фильтр по названию продукта (ILIKE)")
+    ] = None,
+    nutrient_type: Annotated[
+        str | None, Query(description="Фильтр по типу нутриента (ILIKE)")
+    ] = None,
 ):
-    where, params = _build_where({
-        "r.name": region,
-        "c.name": category,
-        "sc.name": subcategory,
-        "p.name": product,
-        "nt.name": nutrient_type,
-    })
+    where, params = _build_where(
+        {
+            "r.name": region,
+            "c.name": category,
+            "sc.name": subcategory,
+            "p.name": product,
+            "nt.name": nutrient_type,
+        }
+    )
 
     sql = text(f"""
         SELECT
@@ -222,27 +277,48 @@ async def table_nutrients_pivot(
     ),
 )
 async def table_nutrients_map(
-    region: Optional[str] = Query(None, description="Фильтр по региону (ILIKE)"),
-    category: Optional[str] = Query(None, description="Фильтр по категории (ILIKE)"),
-    subcategory: Optional[str] = Query(None, description="Фильтр по подкатегории (ILIKE)"),
-    product: Optional[str] = Query(None, description="Фильтр по названию продукта (ILIKE)"),
-    nutrient_type: Optional[str] = Query(None, description="Фильтр по типу нутриента (ILIKE)"),
-    nutrient_name: Optional[str] = Query(None, description="Фильтр по названию нутриента (ILIKE)"),
-    sort_by: str = Query("product_name", description="Колонка для сортировки (product_name, category_name, region_name)"),
-    sort_order: Literal["asc", "desc"] = Query("asc", description="Направление сортировки"),
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    region: Annotated[
+        str | None, Query(description="Фильтр по региону (ILIKE)")
+    ] = None,
+    category: Annotated[
+        str | None, Query(description="Фильтр по категории (ILIKE)")
+    ] = None,
+    subcategory: Annotated[
+        str | None, Query(description="Фильтр по подкатегории (ILIKE)")
+    ] = None,
+    product: Annotated[
+        str | None, Query(description="Фильтр по названию продукта (ILIKE)")
+    ] = None,
+    nutrient_type: Annotated[
+        str | None, Query(description="Фильтр по типу нутриента (ILIKE)")
+    ] = None,
+    nutrient_name: Annotated[
+        str | None, Query(description="Фильтр по названию нутриента (ILIKE)")
+    ] = None,
+    sort_by: Annotated[
+        str,
+        Query(
+            description="Колонка для сортировки (product_name, category_name, region_name)"
+        ),
+    ] = "product_name",
+    sort_order: Annotated[
+        Literal["asc", "desc"], Query(description="Направление сортировки")
+    ] = "asc",
 ):
     if sort_by not in _PRODUCT_COLS:
         sort_by = "product_name"
 
-    where, params = _build_where({
-        "r.name": region,
-        "c.name": category,
-        "sc.name": subcategory,
-        "p.name": product,
-        "nt.name": nutrient_type,
-        "nn.name": nutrient_name,
-    })
+    where, params = _build_where(
+        {
+            "r.name": region,
+            "c.name": category,
+            "sc.name": subcategory,
+            "p.name": product,
+            "nt.name": nutrient_type,
+            "nn.name": nutrient_name,
+        }
+    )
 
     sql = text(f"""
         SELECT
@@ -292,18 +368,28 @@ async def table_nutrients_map(
     summary="Продукты в виде карты  category → region → [products]",
 )
 async def table_products_map(
-    region: Optional[str] = Query(None, description="Фильтр по региону (ILIKE)"),
-    category: Optional[str] = Query(None, description="Фильтр по категории (ILIKE)"),
-    subcategory: Optional[str] = Query(None, description="Фильтр по подкатегории (ILIKE)"),
-    product: Optional[str] = Query(None, description="Фильтр по названию продукта (ILIKE)"),
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    region: Annotated[
+        str | None, Query(description="Фильтр по региону (ILIKE)")
+    ] = None,
+    category: Annotated[
+        str | None, Query(description="Фильтр по категории (ILIKE)")
+    ] = None,
+    subcategory: Annotated[
+        str | None, Query(description="Фильтр по подкатегории (ILIKE)")
+    ] = None,
+    product: Annotated[
+        str | None, Query(description="Фильтр по названию продукта (ILIKE)")
+    ] = None,
 ):
-    where, params = _build_where({
-        "r.name": region,
-        "c.name": category,
-        "sc.name": subcategory,
-        "p.name": product,
-    })
+    where, params = _build_where(
+        {
+            "r.name": region,
+            "c.name": category,
+            "sc.name": subcategory,
+            "p.name": product,
+        }
+    )
 
     sql = text(f"""
         SELECT
@@ -331,11 +417,13 @@ async def table_products_map(
             out[cat] = {}
         if reg not in out[cat]:
             out[cat][reg] = []
-        out[cat][reg].append({
-            "product_id": r["product_id"],
-            "product_name": r["product_name"],
-            "subcategory_name": r["subcategory_name"],
-        })
+        out[cat][reg].append(
+            {
+                "product_id": r["product_id"],
+                "product_name": r["product_name"],
+                "subcategory_name": r["subcategory_name"],
+            }
+        )
 
     return out
 
@@ -345,28 +433,42 @@ async def table_products_map(
     summary="Нутриенты — 4 колонки (Продукт, Регион, Показатель, Значение)",
 )
 async def table_nutrients_csv(
-    region: Optional[str] = Query(None, description="Фильтр по региону (ILIKE)"),
-    category: Optional[str] = Query(None, description="Фильтр по категории (ILIKE)"),
-    product: Optional[str] = Query(None, description="Фильтр по названию продукта (ILIKE)"),
-    nutrient_type: Optional[str] = Query(None, description="Фильтр по типу нутриента (ILIKE)"),
-    nutrient_name: Optional[str] = Query(None, description="Фильтр по названию нутриента (ILIKE)"),
-    sort_by: str = Query("product_name", description="product_name / region_name / nutrient_name / quantity"),
-    sort_order: Literal["asc", "desc"] = Query("asc"),
-    limit: int = Query(10000, ge=1, le=50000),
-    offset: int = Query(0, ge=0),
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    region: Annotated[
+        str | None, Query(description="Фильтр по региону (ILIKE)")
+    ] = None,
+    category: Annotated[
+        str | None, Query(description="Фильтр по категории (ILIKE)")
+    ] = None,
+    product: Annotated[
+        str | None, Query(description="Фильтр по названию продукта (ILIKE)")
+    ] = None,
+    nutrient_type: Annotated[
+        str | None, Query(description="Фильтр по типу нутриента (ILIKE)")
+    ] = None,
+    nutrient_name: Annotated[
+        str | None, Query(description="Фильтр по названию нутриента (ILIKE)")
+    ] = None,
+    sort_by: Annotated[
+        str, Query(description="product_name / region_name / nutrient_name / quantity")
+    ] = "product_name",
+    sort_order: Annotated[Literal["asc", "desc"], Query()] = "asc",
+    limit: Annotated[int, Query(ge=1, le=50000)] = 10000,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ):
     allowed = {"product_name", "region_name", "nutrient_name", "quantity"}
     if sort_by not in allowed:
         sort_by = "product_name"
 
-    where, params = _build_where({
-        "r.name": region,
-        "c.name": category,
-        "p.name": product,
-        "nt.name": nutrient_type,
-        "nn.name": nutrient_name,
-    })
+    where, params = _build_where(
+        {
+            "r.name": region,
+            "c.name": category,
+            "p.name": product,
+            "nt.name": nutrient_type,
+            "nn.name": nutrient_name,
+        }
+    )
 
     params["_limit"] = limit
     params["_offset"] = offset
@@ -392,12 +494,14 @@ async def table_nutrients_csv(
     rows = result.mappings().all()
 
     buf = io.StringIO()
-    writer = csv.DictWriter(buf, fieldnames=["product_name", "region_name", "nutrient_name", "quantity"])
+    writer = csv.DictWriter(
+        buf, fieldnames=["product_name", "region_name", "nutrient_name", "quantity"]
+    )
     writer.writeheader()
     writer.writerows([dict(r) for r in rows])
 
     # utf-8-sig кодирует с BOM — Excel и редакторы корректно читают кириллицу
-    content = io.BytesIO(buf.getvalue().encode('utf-8-sig'))
+    content = io.BytesIO(buf.getvalue().encode("utf-8-sig"))
 
     return StreamingResponse(
         content,
@@ -406,7 +510,7 @@ async def table_nutrients_csv(
     )
 
 
-def _build_where(filters: dict[str, Optional[str]]) -> tuple[str, dict]:
+def _build_where(filters: dict[str, str | None]) -> tuple[str, dict]:
     clauses = []
     params: dict = {}
     for i, (col, val) in enumerate(filters.items()):

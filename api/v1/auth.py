@@ -5,19 +5,25 @@
   POST /api/v1/auth/login     — вход, возвращает JWT
   GET  /api/v1/auth/me        — текущий пользователь
 """
+
 from datetime import datetime, timezone
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from infrastructure.db.session import get_db
-from infrastructure.db.models import User
 from infrastructure.auth import (
-    hash_password, verify_password, create_access_token,
-    get_current_user, user_public, is_expired,
+    create_access_token,
+    get_current_user,
+    hash_password,
+    is_expired,
+    user_public,
+    verify_password,
 )
+from infrastructure.db.models import User
+from infrastructure.db.session import get_db
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
 
@@ -34,11 +40,15 @@ class LoginRequest(BaseModel):
 
 
 @router.post("/register", summary="Регистрация пользователя")
-async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
+async def register(req: RegisterRequest, db: Annotated[AsyncSession, Depends(get_db)]):
     email = req.email.lower()
-    exists = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+    exists = (
+        await db.execute(select(User).where(User.email == email))
+    ).scalar_one_or_none()
     if exists is not None:
-        raise HTTPException(status_code=409, detail="Пользователь с таким email уже существует.")
+        raise HTTPException(
+            status_code=409, detail="Пользователь с таким email уже существует."
+        )
 
     user = User(
         email=email,
@@ -53,15 +63,20 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/login", summary="Вход")
-async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(req: LoginRequest, db: Annotated[AsyncSession, Depends(get_db)]):
     email = req.email.lower()
-    user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+    user = (
+        await db.execute(select(User).where(User.email == email))
+    ).scalar_one_or_none()
     if user is None or not verify_password(req.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Неверный email или пароль.")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Учётная запись отключена.")
     if is_expired(user):
-        raise HTTPException(status_code=403, detail="Срок действия учётной записи истёк. Обратитесь в техническую поддержку.")
+        raise HTTPException(
+            status_code=403,
+            detail="Срок действия учётной записи истёк. Обратитесь в техническую поддержку.",
+        )
 
     user.last_login_at = datetime.now(timezone.utc)
     await db.commit()
@@ -70,7 +85,7 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/me", summary="Текущий пользователь")
-async def me(current: User = Depends(get_current_user)):
+async def me(current: Annotated[User, Depends(get_current_user)]):
     return user_public(current)
 
 
@@ -82,8 +97,8 @@ class ChangePasswordRequest(BaseModel):
 @router.post("/change-password", summary="Смена пароля")
 async def change_password(
     req: ChangePasswordRequest,
-    current: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     if not verify_password(req.current_password, current.password_hash):
         raise HTTPException(status_code=401, detail="Неверный текущий пароль.")
