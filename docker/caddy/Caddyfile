@@ -1,9 +1,0 @@
-foodcraftsl.kstu.kg {
-    reverse_proxy frontend:3000
-}
-
-# Swagger backend напрямую (опционально). Если не нужно — удали блок
-# и A-запись api.foodcraftsl.kstu.kg можно не создавать.
-api.foodcraftsl.kstu.kg {
-    reverse_proxy backend:8000
-}
