@@ -12,7 +12,7 @@ permissions:
 jobs:
   ruff-sca:
     name: ruff
-    runs-on: ubuntu-latest
+    runs-on: ARM64
     steps:
       - name: Checkout code by ruff
         uses: actions/checkout@v4
