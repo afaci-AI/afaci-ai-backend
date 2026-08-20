@@ -40,7 +40,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
     
-      - run: docker build -t ${{ secrets.NEXUS_REGISTRY }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }} .
+      - run: |
+             docker build \
+               --build-arg REGISTRY_PROXY=${{ secrets.NEXUS_REGISTRY_PROXY }} \
+               -t ${{ secrets.NEXUS_REGISTRY }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }} .
       - run: docker save ${{ secrets.NEXUS_REGISTRY }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }} -o image.tar
       
       - name: Upload Docker Image Artifact
