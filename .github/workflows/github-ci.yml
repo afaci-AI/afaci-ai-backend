@@ -78,6 +78,7 @@ jobs:
         uses: actions/checkout@v5
 
       - run: echo "${{ secrets.NEXUS_PASSWORD }}" | docker login ${{ secrets.NEXUS_REGISTRY }} -u "${{ secrets.NEXUS_USER }}" --password-stdin
+      - run: echo "${{ secrets.NEXUS_PASSWORD }}" | docker login ${{ secrets.NEXUS_REGISTRY_PROXY }} -u "${{ secrets.NEXUS_USER }}" --password-stdin
 
       - name: Deploy to devops-server (external daemon)
         env:
