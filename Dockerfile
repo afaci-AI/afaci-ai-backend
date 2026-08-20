@@ -1,9 +1,6 @@
-# syntax=docker/dockerfile:1
+ARG REGISTRY_PROXY
 
-# ---------- Stage 1: builder ----------
-# Собираем зависимости в venv отдельным слоем, чтобы в финальный образ
-# не попали компиляторы и заголовочные файлы, нужные для scipy/psycopg2.
-FROM python:3.12-slim AS builder
+FROM ${REGISTRY_PROXY}/python:3.12-slim AS builder
 
 WORKDIR /build
 
@@ -18,10 +15,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-# ---------- Stage 2: runtime ----------
-FROM python:3.12-slim AS runtime
+FROM ${REGISTRY_PROXY}/python:3.12-slim AS runtime
 
-# Postgres client нужен только для healthcheck/psql-утилит, не для сборки.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
