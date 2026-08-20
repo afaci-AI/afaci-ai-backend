@@ -90,6 +90,7 @@ jobs:
           JWT_ALGORITHM: ${{ secrets.JWT_ALGORITHM || 'HS256' }}
           ACCESS_TOKEN_EXPIRE_MINUTES: ${{ secrets.ACCESS_TOKEN_EXPIRE_MINUTES || '10080' }}
           BACKEND_PORT: ${{ secrets.BACKEND_PORT || '8000' }}
+          REGISTRY_PROXY: ${{ secrets.NEXUS_REGISTRY_PROXY }}
         run: |
           pwd
           ls -la
