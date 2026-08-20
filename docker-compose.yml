@@ -2,7 +2,7 @@ name: afaci
 
 services:
   db:
-    image: nexus:8083/postgres:16-alpine
+    image: ${REGISTRY_PROXY}/postgres:16-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
