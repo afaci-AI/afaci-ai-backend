@@ -13,8 +13,8 @@ from infrastructure.audit.logger import get_audit_logger, setup_audit_logging
 from infrastructure.audit.middleware import AuditLogMiddleware
 
 __all__ = [
-    "AuditLogMiddleware",
     "FOOD_ENTITY",
+    "AuditLogMiddleware",
     "audit_log",
     "compute_diff",
     "get_audit_logger",
