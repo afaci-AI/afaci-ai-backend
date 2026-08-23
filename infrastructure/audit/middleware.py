@@ -11,7 +11,6 @@ import json
 import logging
 import time
 from datetime import datetime, timezone
-from typing import Callable
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
@@ -40,10 +39,8 @@ def _is_excluded(path: str) -> bool:
     if path in EXCLUDE_PATHS:
         return True
     for prefix in EXCLUDE_PREFIXES:
-        if path.startswith(prefix + "/") or path == prefix:
-            # Точное совпадение уже проверено выше, но оставляем для /docs/*
-            if path.startswith(prefix):
-                return True
+        if path == prefix or path.startswith(prefix + "/"):
+            return True
     return False
 
 
@@ -75,8 +72,7 @@ def _extract_user(authorization: str | None) -> str:
         if sub is None:
             return "InvalidToken"
         return f"user:{sub}"
-    except Exception:
-        # Любой сбой декодирования — InvalidToken, но запрос не ломаем
+    except Exception:  # noqa: BLE001 — любой сбой декодирования -> InvalidToken, не ломаем запрос
         return "InvalidToken"
 
 
@@ -170,6 +166,5 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
             try:
                 logger = get_audit_logger()
                 logger.log(level, json.dumps(payload, ensure_ascii=False))
-            except Exception:
-                # Последний рубеж — полностью игнорируем ошибку логирования
+            except Exception:  # noqa: BLE001,S110 — последний рубеж, игнор ошибки логгирования
                 pass

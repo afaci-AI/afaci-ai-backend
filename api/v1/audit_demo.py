@@ -7,7 +7,6 @@ PUT  /api/v1/demo/items/{id}    — мутация с декоратором @au
 GET  /api/v1/demo/error         — проверка WARNING (4xx) и ERROR (5xx)
 """
 
-from typing import Annotated
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException

@@ -27,8 +27,9 @@ from __future__ import annotations
 import functools
 import json
 import logging
+from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import Any, Callable
+from typing import Any
 from uuid import UUID
 
 from infrastructure.audit.logger import get_audit_logger
@@ -107,8 +108,7 @@ def log_audit_change(
 
         msg = _truncate(json.dumps(payload, ensure_ascii=False, default=str))
         logger.log(level, msg)
-    except Exception:
-        # Отказоустойчивость: сбой аудита изменений не ломает бизнес-логику
+    except Exception:  # noqa: BLE001,S110 — fail-safe: аудит не должен ронять запрос
         pass
 
 
@@ -198,7 +198,7 @@ def audit_log(
                     changed_fields=changed,
                     actor=actor_str,
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001,S110 — fail-safe: аудит не должен ронять запрос
                 pass
 
             return result
@@ -237,7 +237,7 @@ def audit_log(
                     changed_fields=changed,
                     actor=actor_str,
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001,S110 — fail-safe: аудит не должен ронять запрос
                 pass
             return result
 
@@ -260,6 +260,5 @@ def _bind_args(func: Callable, args: tuple, kwargs: dict) -> dict[str, Any]:
         bound = sig.bind_partial(*args, **kwargs)
         bound.apply_defaults()
         return dict(bound.arguments)
-    except Exception:
-        # Fallback: только kwargs
+    except Exception:  # noqa: BLE001 — fallback на kwargs при ошибке inspect
         return dict(kwargs)
