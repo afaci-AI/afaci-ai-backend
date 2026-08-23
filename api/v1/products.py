@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,10 +17,22 @@ from api.v1.schemas import (
     SimpleCreate,
     SimpleUpdate,
 )
+from infrastructure.audit.food_audit import (
+    FOOD_ENTITY,
+    compute_diff,
+    log_food_event,
+    resolve_food_user,
+    snapshot_nutrient,
+    snapshot_product,
+)
+from infrastructure.auth import get_current_user_optional
 from infrastructure.db import models
+from infrastructure.db.models import User
 from infrastructure.db.session import get_db
 
 router = APIRouter(prefix="/api/v1")
+
+CurrentUserOpt = Annotated[User | None, Depends(get_current_user_optional)]
 
 
 async def get_item(db: AsyncSession, model, item_id: UUID):
@@ -475,13 +487,24 @@ async def api_bulk_nutrient_names(
 # ==================== PRODUCTS ====================
 @router.post("/products", status_code=201, tags=["Products"])
 async def api_create_product(
-    data: ProductCreate, db: Annotated[AsyncSession, Depends(get_db)]
+    data: ProductCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    authorization: Annotated[str | None, Header()] = None,
+    current_user: CurrentUserOpt = None,
 ):
     try:
-        item = models.Product(**data.dict())
+        payload = data.model_dump() if hasattr(data, "model_dump") else data.dict()
+        item = models.Product(**payload)
         db.add(item)
         await db.commit()
         await db.refresh(item)
+        log_food_event(
+            event="FOOD_PRODUCT_CREATED",
+            user=resolve_food_user(current_user, authorization),
+            target_entity=FOOD_ENTITY,
+            target_id=item.id,
+            changes={"old": None, "new": snapshot_product(item)},
+        )
         return item
     except IntegrityError:
         await db.rollback()
@@ -502,39 +525,98 @@ async def api_get_product(id: UUID, db: Annotated[AsyncSession, Depends(get_db)]
 
 
 @router.delete("/products/{id}", tags=["Products"])
-async def api_delete_product(id: UUID, db: Annotated[AsyncSession, Depends(get_db)]):
+async def api_delete_product(
+    id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    authorization: Annotated[str | None, Header()] = None,
+    current_user: CurrentUserOpt = None,
+):
     item = await get_item(db, models.Product, id)
+    old_snapshot = snapshot_product(item)
     await db.delete(item)
     await db.commit()
+    log_food_event(
+        event="FOOD_PRODUCT_DELETED",
+        user=resolve_food_user(current_user, authorization),
+        target_entity=FOOD_ENTITY,
+        target_id=id,
+        changes={"old": old_snapshot, "new": None},
+    )
     return {"status": "deleted"}
 
 
 @router.patch("/products/{id}", tags=["Products"])
 async def api_update_product(
-    id: UUID, data: ProductUpdate, db: Annotated[AsyncSession, Depends(get_db)]
+    id: UUID,
+    data: ProductUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    authorization: Annotated[str | None, Header()] = None,
+    current_user: CurrentUserOpt = None,
 ):
     item = await get_item(db, models.Product, id)
-    for field, value in data.dict(exclude_unset=True).items():
+    old_snapshot = snapshot_product(item)
+    patch = (
+        data.model_dump(exclude_unset=True)
+        if hasattr(data, "model_dump")
+        else data.dict(exclude_unset=True)
+    )
+    if not patch:
+        return item
+    for field, value in patch.items():
         setattr(item, field, value)
     try:
         await db.commit()
         await db.refresh(item)
-        return item
     except IntegrityError:
         await db.rollback()
         raise HTTPException(
             status_code=400, detail="Product already exists in this region"
         )
+    new_snapshot = snapshot_product(item)
+    old_diff, new_diff = compute_diff(old_snapshot, new_snapshot)
+    if old_diff:
+        log_food_event(
+            event="FOOD_PRODUCT_UPDATED",
+            user=resolve_food_user(current_user, authorization),
+            target_entity=FOOD_ENTITY,
+            target_id=id,
+            changes={"old": old_diff, "new": new_diff},
+        )
+    return item
 
 
 @router.post("/products/bulk", status_code=201, tags=["Products"])
 async def api_bulk_products(
-    data: list[ProductCreate], db: Annotated[AsyncSession, Depends(get_db)]
+    data: list[ProductCreate],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    authorization: Annotated[str | None, Header()] = None,
+    current_user: CurrentUserOpt = None,
 ):
     try:
-        items = [models.Product(**p.dict()) for p in data]
+        payloads = [
+            p.model_dump() if hasattr(p, "model_dump") else p.dict() for p in data
+        ]
+        items = [models.Product(**p) for p in payloads]
         db.add_all(items)
         await db.commit()
+        for it in items:
+            await db.refresh(it)
+        target_ids = [str(it.id) for it in items]
+        # Одна запись на bulk — защита диска при сотнях позиций
+        log_food_event(
+            event="FOOD_PRODUCT_BULK_CREATED",
+            user=resolve_food_user(current_user, authorization),
+            target_entity=FOOD_ENTITY,
+            target_id=target_ids[0] if target_ids else "bulk",
+            changes={
+                "old": None,
+                "new": {
+                    "count": len(items),
+                    "target_ids": target_ids[:100],
+                    "truncated": len(target_ids) > 100,
+                },
+            },
+        )
         return {"inserted": len(items)}
     except IntegrityError:
         await db.rollback()
@@ -563,7 +645,10 @@ async def api_products_by_category(
 
 @router.post("/products/auto", status_code=201, tags=["Products"])
 async def api_auto_create_product(
-    data: ProductAutoCreate, db: Annotated[AsyncSession, Depends(get_db)]
+    data: ProductAutoCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    authorization: Annotated[str | None, Header()] = None,
+    current_user: CurrentUserOpt = None,
 ):
     async def get_or_create(model, name):
         res = await db.execute(select(model).where(model.name == name))
@@ -589,6 +674,13 @@ async def api_auto_create_product(
         db.add(product)
         await db.commit()
         await db.refresh(product)
+        log_food_event(
+            event="FOOD_PRODUCT_CREATED",
+            user=resolve_food_user(current_user, authorization),
+            target_entity=FOOD_ENTITY,
+            target_id=product.id,
+            changes={"old": None, "new": snapshot_product(product)},
+        )
         return product
     except IntegrityError:
         await db.rollback()
@@ -597,7 +689,10 @@ async def api_auto_create_product(
 
 @router.post("/products/auto/bulk", status_code=201, tags=["Products"])
 async def api_auto_bulk_products(
-    data: list[ProductAutoCreate], db: Annotated[AsyncSession, Depends(get_db)]
+    data: list[ProductAutoCreate],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    authorization: Annotated[str | None, Header()] = None,
+    current_user: CurrentUserOpt = None,
 ):
     created = 0
     errors = []
@@ -611,6 +706,7 @@ async def api_auto_bulk_products(
             await db.flush()
         return item
 
+    created_products: list[models.Product] = []
     for idx, item_data in enumerate(data):
         try:
             cat = await get_or_create(models.Category, item_data.category_name)
@@ -638,6 +734,8 @@ async def api_auto_bulk_products(
                 subcategory_id=subcat.id if subcat else None,
             )
             db.add(product)
+            await db.flush()
+            created_products.append(product)
             created += 1
         except Exception as e:  # noqa: BLE001
             errors.append(f"Row {idx}: {e!s}")
@@ -648,18 +746,50 @@ async def api_auto_bulk_products(
         await db.rollback()
         return {"warning": "Transaction rolled back due to conflict", "errors": errors}
 
+    if created > 0:
+        target_ids = [str(p.id) for p in created_products]
+        log_food_event(
+            event="FOOD_PRODUCT_BULK_CREATED",
+            user=resolve_food_user(current_user, authorization),
+            target_entity=FOOD_ENTITY,
+            target_id="bulk",
+            changes={
+                "old": None,
+                "new": {
+                    "count": created,
+                    "target_ids": target_ids[:100],
+                    "truncated": len(target_ids) > 100,
+                },
+            },
+        )
+
     return {"created": created, "errors": errors}
 
 
 # ==================== NUTRIENTS ====================
 @router.post("/nutrients", status_code=201, tags=["Nutrients"])
 async def api_create_nutrient(
-    data: NutrientCreate, db: Annotated[AsyncSession, Depends(get_db)]
+    data: NutrientCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    authorization: Annotated[str | None, Header()] = None,
+    current_user: CurrentUserOpt = None,
 ):
-    item = models.Nutrient(**data.dict())
+    payload = data.model_dump() if hasattr(data, "model_dump") else data.dict()
+    item = models.Nutrient(**payload)
     db.add(item)
     await db.commit()
     await db.refresh(item)
+    log_food_event(
+        event="FOOD_PRODUCT_CREATED",
+        user=resolve_food_user(current_user, authorization),
+        target_entity=FOOD_ENTITY,
+        target_id=item.product_id,
+        changes={
+            "old": None,
+            "new": snapshot_nutrient(item),
+            "nutrient_id": str(item.id),
+        },
+    )
     return item
 
 
@@ -675,22 +805,66 @@ async def api_get_nutrient(id: UUID, db: Annotated[AsyncSession, Depends(get_db)
 
 
 @router.delete("/nutrients/{id}", tags=["Nutrients"])
-async def api_delete_nutrient(id: UUID, db: Annotated[AsyncSession, Depends(get_db)]):
+async def api_delete_nutrient(
+    id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    authorization: Annotated[str | None, Header()] = None,
+    current_user: CurrentUserOpt = None,
+):
     item = await get_item(db, models.Nutrient, id)
+    old_snapshot = snapshot_nutrient(item)
+    product_id = item.product_id
     await db.delete(item)
     await db.commit()
+    log_food_event(
+        event="FOOD_PRODUCT_DELETED",
+        user=resolve_food_user(current_user, authorization),
+        target_entity=FOOD_ENTITY,
+        target_id=product_id,
+        changes={
+            "old": old_snapshot,
+            "new": None,
+            "nutrient_id": str(id),
+        },
+    )
     return {"status": "deleted"}
 
 
 @router.patch("/nutrients/{id}", tags=["Nutrients"])
 async def api_update_nutrient(
-    id: UUID, data: NutrientUpdate, db: Annotated[AsyncSession, Depends(get_db)]
+    id: UUID,
+    data: NutrientUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    authorization: Annotated[str | None, Header()] = None,
+    current_user: CurrentUserOpt = None,
 ):
     item = await get_item(db, models.Nutrient, id)
-    for field, value in data.dict(exclude_unset=True).items():
+    old_snapshot = snapshot_nutrient(item)
+    patch = (
+        data.model_dump(exclude_unset=True)
+        if hasattr(data, "model_dump")
+        else data.dict(exclude_unset=True)
+    )
+    if not patch:
+        return item
+    for field, value in patch.items():
         setattr(item, field, value)
     await db.commit()
     await db.refresh(item)
+    new_snapshot = snapshot_nutrient(item)
+    old_diff, new_diff = compute_diff(old_snapshot, new_snapshot)
+    if old_diff:
+        log_food_event(
+            event="FOOD_PRODUCT_UPDATED",
+            user=resolve_food_user(current_user, authorization),
+            target_entity=FOOD_ENTITY,
+            target_id=item.product_id,
+            changes={
+                "old": old_diff,
+                "new": new_diff,
+                "nutrient_id": str(id),
+            },
+        )
     return item
 
 
@@ -704,12 +878,37 @@ async def api_product_nutrients(id: UUID, db: Annotated[AsyncSession, Depends(ge
 
 @router.post("/nutrients/bulk", status_code=201, tags=["Nutrients"])
 async def api_bulk_nutrients(
-    data: NutrientBulkCreate, db: Annotated[AsyncSession, Depends(get_db)]
+    data: NutrientBulkCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    authorization: Annotated[str | None, Header()] = None,
+    current_user: CurrentUserOpt = None,
 ):
     try:
-        items = [models.Nutrient(**n.dict()) for n in data.items]
+        payloads = [
+            n.model_dump() if hasattr(n, "model_dump") else n.dict() for n in data.items
+        ]
+        items = [models.Nutrient(**n) for n in payloads]
         db.add_all(items)
         await db.commit()
+        for it in items:
+            await db.refresh(it)
+        nutrient_ids = [str(it.id) for it in items]
+        product_ids = list({str(it.product_id) for it in items})
+        log_food_event(
+            event="FOOD_PRODUCT_BULK_CREATED",
+            user=resolve_food_user(current_user, authorization),
+            target_entity=FOOD_ENTITY,
+            target_id=product_ids[0] if product_ids else "bulk",
+            changes={
+                "old": None,
+                "new": {
+                    "count": len(items),
+                    "target_ids": nutrient_ids[:100],
+                    "product_ids": product_ids[:20],
+                    "truncated": len(nutrient_ids) > 100,
+                },
+            },
+        )
         return {"inserted": len(items)}
     except IntegrityError:
         await db.rollback()

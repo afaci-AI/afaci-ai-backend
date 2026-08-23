@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from infrastructure.audit.helpers import log_audit_change
 from infrastructure.auth import hash_password, require_admin, user_public
 from infrastructure.db.models import User
 from infrastructure.db.session import get_db
@@ -156,6 +157,17 @@ async def update_user(
 
     await db.commit()
     await db.refresh(user)
+
+    # --- Аудит мутации (ТЗ п.4): фиксируем кто и что изменил ---
+    log_audit_change(
+        action="update_user",
+        target_type="User",
+        target_id=str(id),
+        changed_fields=data.model_dump(exclude_unset=True),
+        actor=str(admin.id),
+        extra={"target_email": user.email},
+    )
+
     return user_public(user)
 
 
