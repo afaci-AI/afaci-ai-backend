@@ -38,11 +38,18 @@ async def demo_ping() -> dict:
     return {"pong": True, "msg": "GET logged as INFO"}
 
 
-@router.post("/items", status_code=201, summary="[AUDIT DEMO] POST — создание с audit.change")
+@router.post(
+    "/items", status_code=201, summary="[AUDIT DEMO] POST — создание с audit.change"
+)
 async def demo_create_item(data: ItemCreate) -> dict:
     """POST — демонстрирует явный вызов log_audit_change."""
     item_id = str(uuid4())
-    item = {"id": item_id, "name": data.name, "description": data.description, "role": data.role}
+    item = {
+        "id": item_id,
+        "name": data.name,
+        "description": data.description,
+        "role": data.role,
+    }
     _demo_store[item_id] = item
 
     # Логирование деталей изменения (ТЗ п.4)
@@ -58,7 +65,9 @@ async def demo_create_item(data: ItemCreate) -> dict:
     return item
 
 
-@router.put("/items/{id}", summary="[AUDIT DEMO] PUT — обновление с декоратором @audit_log")
+@router.put(
+    "/items/{id}", summary="[AUDIT DEMO] PUT — обновление с декоратором @audit_log"
+)
 @audit_log("update_item", "DemoItem", target_id_arg="id", changed_fields_arg="data")
 async def demo_update_item(id: UUID, data: ItemUpdate) -> dict:
     """PUT — демонстрирует декоратор @audit_log.
@@ -86,7 +95,9 @@ async def demo_patch_item(id: UUID, data: ItemUpdate) -> dict:
     return stored
 
 
-@router.delete("/items/{id}", summary="[AUDIT DEMO] DELETE — удаление с log_audit_change")
+@router.delete(
+    "/items/{id}", summary="[AUDIT DEMO] DELETE — удаление с log_audit_change"
+)
 async def demo_delete_item(id: UUID) -> dict:
     key = str(id)
     if key not in _demo_store:
