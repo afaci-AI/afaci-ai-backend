@@ -29,3 +29,7 @@ htmlcov/
 
 # Дампы БД
 backups/
+
+# Аудит-логи (ротация по дням)
+logs/*
+!logs/.gitkeep
