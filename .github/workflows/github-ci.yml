@@ -45,24 +45,12 @@ jobs:
                --build-arg REGISTRY_PROXY=${{ secrets.NEXUS_REGISTRY_PROXY }} \
                -t ${{ secrets.NEXUS_REGISTRY }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }} .
       - run: docker save ${{ secrets.NEXUS_REGISTRY }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }} -o image.tar
-      
-      - name: Upload Docker Image Artifact
-        uses: actions/upload-artifact@v6
-        with:
-            name: docker-image
-            path: image.tar
-            retention-days: 1
+
 
   image-push:
     runs-on: afaci-runner-01
     needs: build
     steps:
-      - name: Download Docker Image Artifact
-        uses: actions/download-artifact@v6
-        with:
-          name: docker-image
-
-      - run: docker load -i image.tar
       - run: echo "${{ secrets.NEXUS_PASSWORD }}" | docker login ${{ secrets.NEXUS_REGISTRY }} -u "${{ secrets.NEXUS_USER }}" --password-stdin
       - run: docker push ${{ secrets.NEXUS_REGISTRY }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }}
 
