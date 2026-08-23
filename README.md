@@ -99,12 +99,6 @@ uvicorn main:app --reload
 общий/прод-контур обязательно смените пароль (через UI: раздел «Пользователи» →
 редактирование, либо `POST /api/v1/auth/change-password`).
 
-```
-Email:  admin@afaci.local
-Пароль: zTxUR78xQGRzsK
-Роль:   admin
-```
-
 ## Примечания по данным
 
 - **Кириллица и ILIKE**: БД создана с `LC_CTYPE=C`, поэтому `ILIKE` не сворачивает
