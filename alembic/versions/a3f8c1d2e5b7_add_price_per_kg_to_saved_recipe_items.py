@@ -7,8 +7,10 @@ Create Date: 2026-06-25
 Цена сырья (руб/кг) на ингредиент сохранённой рецептуры — опциональное поле
 для режима расчёта стоимости рецептуры.
 """
-from alembic import op
+
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "a3f8c1d2e5b7"
 down_revision = "e2a1b7c4d9f0"

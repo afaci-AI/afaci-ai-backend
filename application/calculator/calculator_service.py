@@ -3,31 +3,47 @@
 чистой логики `compute_report`. Переиспользуется калькулятором, сохранением
 рецептур и ранжированием, чтобы не дублировать SQL и валидацию.
 """
+
 from uuid import UUID
-from typing import List, Optional
 
 from fastapi import HTTPException
-from sqlalchemy import text, bindparam
+from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from domain.calculator import compute_report, SUM_TOLERANCE, REQUIRED_SUM
+from domain.calculator import REQUIRED_SUM, SUM_TOLERANCE, compute_report
 
 CHEM_TYPE = "Химический состав"
 AMINO_TYPE = "Аминокислотный состав"
 
 
-async def load_reference(db: AsyncSession, ref_id: UUID) -> Optional[dict]:
-    rp = (await db.execute(
-        text("SELECT id, name, year, description FROM reference_proteins WHERE id = :id"),
-        {"id": ref_id},
-    )).mappings().first()
+async def load_reference(db: AsyncSession, ref_id: UUID) -> dict | None:
+    rp = (
+        (
+            await db.execute(
+                text(
+                    "SELECT id, name, year, description FROM reference_proteins WHERE id = :id"
+                ),
+                {"id": ref_id},
+            )
+        )
+        .mappings()
+        .first()
+    )
     if not rp:
         return None
-    vals = (await db.execute(
-        text("SELECT amino_acid, value FROM reference_protein_values "
-             "WHERE reference_protein_id = :id"),
-        {"id": ref_id},
-    )).mappings().all()
+    vals = (
+        (
+            await db.execute(
+                text(
+                    "SELECT amino_acid, value FROM reference_protein_values "
+                    "WHERE reference_protein_id = :id"
+                ),
+                {"id": ref_id},
+            )
+        )
+        .mappings()
+        .all()
+    )
     return {
         "id": str(rp["id"]),
         "name": rp["name"],
@@ -37,7 +53,7 @@ async def load_reference(db: AsyncSession, ref_id: UUID) -> Optional[dict]:
     }
 
 
-async def load_products(db: AsyncSession, ids: List[UUID]) -> dict:
+async def load_products(db: AsyncSession, ids: list[UUID]) -> dict:
     q = text("""
         SELECT p.id AS product_id, p.name, r.name AS region, s.name AS subcategory,
                nn.name AS nutrient, nt.name AS ntype, n.quantity
@@ -54,14 +70,17 @@ async def load_products(db: AsyncSession, ids: List[UUID]) -> dict:
     products: dict = {}
     for row in rows:
         pid = str(row["product_id"])
-        prod = products.setdefault(pid, {
-            "product_id": pid,
-            "name": row["name"],
-            "region": row["region"],
-            "subcategory": row["subcategory"],
-            "chem": {},
-            "amino": {},
-        })
+        prod = products.setdefault(
+            pid,
+            {
+                "product_id": pid,
+                "name": row["name"],
+                "region": row["region"],
+                "subcategory": row["subcategory"],
+                "chem": {},
+                "amino": {},
+            },
+        )
         if row["nutrient"] is None:
             continue
         if row["ntype"] == CHEM_TYPE:
@@ -74,7 +93,7 @@ async def load_products(db: AsyncSession, ids: List[UUID]) -> dict:
 async def compute_recipe(
     db: AsyncSession,
     reference_protein_id: UUID,
-    items: List[dict],
+    items: list[dict],
 ) -> dict:
     """
     items: [{product_id: UUID|str, amount_g: float}, ...]
@@ -90,7 +109,7 @@ async def compute_recipe(
         raise HTTPException(
             status_code=400,
             detail=f"Сумма Xᵢ должна быть ровно {REQUIRED_SUM:.0f} г "
-                   f"(сейчас {total:.2f} г). Расчёт невозможен.",
+            f"(сейчас {total:.2f} г). Расчёт невозможен.",
         )
 
     reference = await load_reference(db, reference_protein_id)
@@ -100,9 +119,13 @@ async def compute_recipe(
     ids = [it["product_id"] for it in items]
     products = await load_products(db, ids)
 
-    missing = [str(it["product_id"]) for it in items if str(it["product_id"]) not in products]
+    missing = [
+        str(it["product_id"]) for it in items if str(it["product_id"]) not in products
+    ]
     if missing:
-        raise HTTPException(status_code=404, detail=f"Продукты не найдены: {', '.join(missing)}")
+        raise HTTPException(
+            status_code=404, detail=f"Продукты не найдены: {', '.join(missing)}"
+        )
 
     enriched = []
     for it in items:

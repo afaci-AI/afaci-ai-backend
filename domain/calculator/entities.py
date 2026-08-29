@@ -1,5 +1,4 @@
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
 
 @dataclass
@@ -12,9 +11,9 @@ class RecipeItem:
 class AminoAcidRow:
     name: str
     m_j: float
-    reference: Optional[float]
-    score: Optional[float]
-    utility: Optional[float]
+    reference: float | None
+    score: float | None
+    utility: float | None
     is_limiting: bool
     is_min: bool
 
@@ -27,10 +26,10 @@ class ComputeResult:
     macro: dict
     energy_kcal: float
     amino_acids: list
-    c_min: Optional[dict]
+    c_min: dict | None
     limiting: list
     limiting_count: int
     quality: dict
     amino_contributors: list
     warnings: list
-    verdict: Optional[dict]
+    verdict: dict | None

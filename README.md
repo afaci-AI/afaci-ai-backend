@@ -1,107 +1,124 @@
-# 1. Настройка и запуск проекта
-## Предварительные требования
+# AFACI — Backend
 
-- Установленный **Python 3.10+**
-- Установленный **PostgreSQL 15+**
+FastAPI-бэкенд: каталог продуктов и нутриентов, калькулятор аминокислотного скора
+(формулы Липатова), сохранённые рецептуры пользователей, аутентификация (JWT) и
+управление пользователями с контролем срока действия учётной записи.
 
-## Шаги по установке и запуску
+## Стек
 
-### 1. Клонируйте репозиторий
-```
-git clone <ссылка-на-репозиторий>
-cd <название-папки-проекта>
-```
-### 2. Создайте и активируйте виртуальное окружение
-***macOS / Linux:***
-```
+- Python 3.10+, FastAPI, SQLAlchemy (async) + asyncpg
+- PostgreSQL 15+, Alembic (миграции)
+- JWT (PyJWT) + bcrypt для аутентификации
+
+## Архитектура
+
+Слоистая архитектура (см. корневой `CLAUDE.md` для подробностей):
+
+| Слой | Назначение |
+|---|---|
+| `domain/` | доменная логика и формулы (напр. `domain/calculator/formulas.py`) без зависимостей |
+| `application/` | use-case'ы, зависят только от `domain/` |
+| `infrastructure/` | БД (`infrastructure/db/`), auth (`infrastructure/auth.py`) |
+| `api/` | роутеры FastAPI (`api/v1/*.py`), валидация запросов |
+
+Простой CRUD без доменной логики (например, `api/v1/products.py`) обращается к моделям
+напрямую, без отдельного `application/`-слоя.
+
+## Установка и запуск
+
+### 1. Предварительные требования
+
+- Python 3.10+
+- PostgreSQL 15+ (БД создаётся с `LC_CTYPE=C` — см. примечание про кириллицу ниже)
+
+### 2. Виртуальное окружение
+
+```bash
 python3 -m venv venv
-source venv/bin/activate
-```
-***Windows:***
-```
-python -m venv venv
-venv\Scripts\activate
-```
-### 3. Установите зависимости
-```
+source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
-### 4. Настройте подключение к базе данных
-1) Создайте БД в PostgreSQL (например, food_db).
-2) Скопируйте файл .env.example в .env:
-```
+
+### 3. Настройка окружения
+
+Скопируйте `.env.example` в `.env` и заполните:
+
+```bash
 cp .env.example .env
 ```
-Откройте файл .env и укажите свои данные для подключения к БД (логин, пароль, название базы).
-### 5. Примените миграции (создайте таблицы в БД)
+
+```env
+DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@localhost/DATA_BASE_NAME
+
+# Аутентификация (JWT)
+JWT_SECRET=change-me-to-a-long-random-string
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=10080
 ```
+
+### 4. Миграции
+
+```bash
 alembic upgrade head
 ```
-### 6. Запустите сервер
-```
+
+### 5. Запуск
+
+```bash
 uvicorn main:app --reload
 ```
-### 7. Откройте в браузере
-```
-Интерфейс: http://127.0.0.1:8000
 
-API документация: http://127.0.0.1:8000/docs (swagger)
-```
-# 2. SQL БД (Если нужно)
-```
--- Расширение для генерации UUID (если не включено)
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+- API документация (Swagger): http://127.0.0.1:8000/docs
+- Базовый префикс API: `/api/v1`
 
--- 1. Справочники
-CREATE TABLE categories (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) NOT NULL UNIQUE
-);
+## Основные разделы API
 
-CREATE TABLE subcategories (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) NOT NULL UNIQUE
-);
+| Роутер | Префикс | Назначение |
+|---|---|---|
+| `api/v1/auth.py` | `/api/v1/auth` | регистрация, вход, `/me`, смена пароля |
+| `api/v1/users.py` | `/api/v1/users` | управление пользователями (только для роли `admin`) |
+| `api/v1/products.py` | `/api/v1` | каталог: категории, регионы, продукты, нутриенты |
+| `api/v1/calculator.py` | `/api/v1/calculator` | расчёт аминокислотного скора, эталонные белки |
+| `api/v1/saved.py` | `/api/v1/saved` | группы и сохранённые рецептуры пользователя |
+| `api/v1/table.py` | `/api/v1/table` | табличные выгрузки продуктов |
 
-CREATE TABLE regions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) NOT NULL UNIQUE
-);
+## Аутентификация и роли
 
-CREATE TABLE nutrients_types (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) NOT NULL UNIQUE
-);
+- JWT-токен в заголовке `Authorization: Bearer <token>`.
+- Роли: `admin`, `editor`, `viewer`.
+- У каждого пользователя есть `access_expires_at` (nullable = безлимитный доступ).
+  Срок действия проверяется на **каждом запросе** в `get_current_user`
+  (`infrastructure/auth.py`) — при истечении сервер сразу отдаёт `401`, фронтенд
+  принудительно разлогинивает пользователя.
+- Эндпоинты `/api/v1/users/*` защищены зависимостью `require_admin`.
 
-CREATE TABLE nutrients_names (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) NOT NULL UNIQUE
-);
+### Тестовый администратор (локальная БД разработки)
 
-CREATE TABLE units (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) NOT NULL UNIQUE
-);
+Создан локально командой `POST /api/v1/auth/register` + промоушен роли в БД.
+**Это учётные данные только для локальной разработки** — при развёртывании на
+общий/прод-контур обязательно смените пароль (через UI: раздел «Пользователи» →
+редактирование, либо `POST /api/v1/auth/change-password`).
 
--- 2. Таблица Продуктов
-CREATE TABLE products (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) NOT NULL,
-    category_id UUID NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
-    subcategory_id UUID REFERENCES subcategories(id) ON DELETE SET NULL,
-    region_id UUID NOT NULL REFERENCES regions(id) ON DELETE RESTRICT
-);
+## Примечания по данным
 
--- 3. Таблица Нутриентов
-CREATE TABLE nutrients (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    id_product UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-    id_name_component UUID NOT NULL REFERENCES nutrients_names(id),
-    id_type_component UUID NOT NULL REFERENCES nutrients_types(id),
-    unit_id UUID NOT NULL REFERENCES units(id),
-    quantity DOUBLE PRECISION,
-    
-    -- Уникальность: в одном продукте не может быть дубликатов по названию нутриента
-    CONSTRAINT uq_product_nutrient UNIQUE (id_product, id_name_component)
-);
+- **Кириллица и ILIKE**: БД создана с `LC_CTYPE=C`, поэтому `ILIKE` не сворачивает
+  регистр кириллицы. Все кириллические поиски выполняются в `infrastructure/db/`
+  через `lower(name) = lower(:val)` или `pg_trgm`.
+- **Аминокислоты**: в БД хранятся в мг/100г продукта; конвертация в г/100г белка
+  происходит в `domain/calculator/formulas.py`.
+
+## Полезные команды
+
+```bash
+# создать новую миграцию
+alembic revision -m "описание"
+
+# применить миграции
+alembic upgrade head
+
+# посмотреть текущую версию схемы в БД
+alembic current
+
+# обновить локальную ветку с удалённого репозитория
+git pull --ff-only origin develop
 ```
