@@ -32,6 +32,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     networks:
