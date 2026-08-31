@@ -32,9 +32,7 @@ def upgrade() -> None:
             "force_update", sa.Boolean(), nullable=False, server_default=sa.false()
         ),
         sa.Column("min_supported_version_code", sa.Integer(), nullable=True),
-        sa.Column(
-            "is_current", sa.Boolean(), nullable=False, server_default=sa.true()
-        ),
+        sa.Column("is_current", sa.Boolean(), nullable=False, server_default=sa.true()),
         sa.Column(
             "published_at",
             sa.DateTime(timezone=True),

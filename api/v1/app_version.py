@@ -118,9 +118,7 @@ async def get_app_version(
         )
     ).scalar_one_or_none()
     if version is None:
-        raise HTTPException(
-            status_code=503, detail="Информация о версии не настроена."
-        )
+        raise HTTPException(status_code=503, detail="Информация о версии не настроена.")
     return _public(version)
 
 
@@ -155,7 +153,8 @@ async def upload_apk(
                 out.close()
                 os.remove(path)
                 raise HTTPException(
-                    status_code=413, detail="Файл больше максимального размера (200 МБ)."
+                    status_code=413,
+                    detail="Файл больше максимального размера (200 МБ).",
                 )
             out.write(chunk)
 
@@ -170,16 +169,14 @@ async def list_app_versions(
     _admin_user: Annotated[User, Depends(require_admin)],
 ):
     rows = (
-        await db.execute(
-            select(AppVersion).order_by(AppVersion.version_code.desc())
-        )
-    ).scalars().all()
+        (await db.execute(select(AppVersion).order_by(AppVersion.version_code.desc())))
+        .scalars()
+        .all()
+    )
     return [_admin(v) for v in rows]
 
 
-@router.post(
-    "/api/v1/admin/app-versions", status_code=201, summary="Создать версию"
-)
+@router.post("/api/v1/admin/app-versions", status_code=201, summary="Создать версию")
 async def create_app_version(
     data: AppVersionCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -224,9 +221,7 @@ async def create_app_version(
     return _admin(version)
 
 
-@router.patch(
-    "/api/v1/admin/app-versions/{id}", summary="Отредактировать версию"
-)
+@router.patch("/api/v1/admin/app-versions/{id}", summary="Отредактировать версию")
 async def update_app_version(
     id: UUID,
     data: AppVersionUpdate,
@@ -285,9 +280,7 @@ async def delete_app_version(
     if not version:
         raise HTTPException(status_code=404, detail="Версия не найдена.")
     if version.is_current:
-        raise HTTPException(
-            status_code=400, detail="Нельзя удалить текущую версию."
-        )
+        raise HTTPException(status_code=400, detail="Нельзя удалить текущую версию.")
     await db.delete(version)
     await db.commit()
     return {"status": "deleted"}
