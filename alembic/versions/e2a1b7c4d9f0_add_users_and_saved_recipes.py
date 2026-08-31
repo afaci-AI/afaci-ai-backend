@@ -1,10 +1,14 @@
 """Add users, recipe_groups, saved_recipes, saved_recipe_items
 
 Revision ID: e2a1b7c4d9f0
-Revises: c6ef9e3d7f1a
+Revises: f4d8a2c6b3e1
 Create Date: 2026-06-24
 
 Аутентификация и сохранённые пользователем рецептуры с группами (как плейлисты).
+
+Внимание: saved_recipes имеет FOREIGN KEY на reference_proteins, поэтому эта
+миграция идёт ПОСЛЕ f4d8a2c6b3e1 (создаёт эти таблицы), чтобы upgrade head
+работал на свежей БД.
 """
 
 import sqlalchemy as sa
@@ -14,7 +18,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "e2a1b7c4d9f0"
-down_revision = "c6ef9e3d7f1a"
+down_revision = "f4d8a2c6b3e1"
 branch_labels = None
 depends_on = None
 
