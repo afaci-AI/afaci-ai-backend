@@ -1,0 +1,62 @@
+name: ci-prod
+
+on:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  ruff-sca:
+    name: ruff
+    runs-on: afaci-runner-01
+    steps:
+      - name: Checkout code by ruff
+        uses: actions/checkout@v5
+        
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+
+      - name: Run Ruff (Linting)
+        run: ruff check .
+
+      - name: Run Ruff (Format Check)
+        run: ruff format --check .
+
+  build:
+    name: build
+    runs-on: afaci-runner-01
+    needs:
+      - ruff-sca
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+    
+      - run: docker build -f Dockerfile.prod -t afaci-ai-backend:prod .
+
+  deploy:
+    runs-on: afaci-runner-01
+    needs: build
+    steps:
+      - name: Execute remote SSH commands
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          envs: APP_PATH
+          script: |
+            cd $APP_PATH
+            git pull origin main
+            docker compose -f docker-compose.prod.yml up --build -d
+        env:
+          APP_PATH: ${{ vars.APP_PATH }} 

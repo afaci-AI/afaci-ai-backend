@@ -2,7 +2,7 @@ name: base-ci
 
 on:
   pull_request:
-    branches: ["main", "develop"]
+    branches: ["develop"]
 
 permissions:
   contents: read
