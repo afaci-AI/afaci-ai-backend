@@ -57,6 +57,6 @@ jobs:
           script: |
             cd $APP_PATH
             git pull origin main
-            docker compose up -d --build
+            docker compose -f docker-compose.prod.yml up --build -d
         env:
           APP_PATH: ${{ vars.APP_PATH }} 
