@@ -1,6 +1,5 @@
 ARG REGISTRY_PROXY
-
-FROM ${REGISTRY_PROXY}/python:3.12-slim AS builder
+FROM ${REGISTRY_PROXY}/library/python:3.12-slim AS builder
 
 WORKDIR /build
 
@@ -15,10 +14,11 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-FROM ${REGISTRY_PROXY}/python:3.12-slim AS runtime
+ARG REGISTRY_PROXY
+FROM ${REGISTRY_PROXY}/library/python:3.12-slim AS runtime
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
+    && apt-get install -y --no-install-recommends curl util-linux \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 1000 afaci \
     && useradd --uid 1000 --gid afaci --shell /bin/bash --create-home afaci
@@ -32,9 +32,9 @@ WORKDIR /app
 
 COPY --chown=afaci:afaci . .
 COPY --chown=afaci:afaci docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-
-USER afaci
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
+    && mkdir -p /app/uploads/apk \
+    && chown -R afaci:afaci /app/uploads
 
 EXPOSE 8000
 

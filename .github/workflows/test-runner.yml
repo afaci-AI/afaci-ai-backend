@@ -1,0 +1,11 @@
+name: test-runnerr
+on: workflow_dispatch
+
+jobs:
+  smoke:
+    runs-on: [afaci-runner-01]
+    steps:
+      - run: docker ps
+      - run: docker run --rm alpine echo hello-world
+      - run: git --version
+      - run: echo "script ok" > script.sh && bash script.sh
