@@ -18,7 +18,7 @@ ARG REGISTRY_PROXY
 FROM ${REGISTRY_PROXY}/library/python:3.12-slim AS runtime
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
+    && apt-get install -y --no-install-recommends curl util-linux \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 1000 afaci \
     && useradd --uid 1000 --gid afaci --shell /bin/bash --create-home afaci
@@ -35,8 +35,6 @@ COPY --chown=afaci:afaci docker-entrypoint.sh /usr/local/bin/docker-entrypoint.s
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
     && mkdir -p /app/uploads/apk \
     && chown -R afaci:afaci /app/uploads
-    
-USER afaci
 
 EXPOSE 8000
 
