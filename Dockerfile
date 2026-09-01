@@ -1,5 +1,4 @@
 ARG REGISTRY_PROXY
-
 FROM ${REGISTRY_PROXY}/library/python:3.12-slim AS builder
 
 WORKDIR /build
@@ -15,6 +14,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
+ARG REGISTRY_PROXY
 FROM ${REGISTRY_PROXY}/library/python:3.12-slim AS runtime
 
 RUN apt-get update \
