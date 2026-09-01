@@ -32,8 +32,9 @@ WORKDIR /app
 
 COPY --chown=afaci:afaci . .
 COPY --chown=afaci:afaci docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
+    && mkdir -p /app/uploads/apk \
+    && chown -R afaci:afaci /app/uploads
 USER afaci
 
 EXPOSE 8000
