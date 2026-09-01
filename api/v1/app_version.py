@@ -20,6 +20,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.requests import ClientDisconnect
 
 from api.rate_limit import limiter
 from infrastructure.auth import require_admin
@@ -76,6 +77,7 @@ class AppVersionAdmin(BaseModel):
 class UploadApkResponse(BaseModel):
     filename: str
     url: str
+    size: int
 
 
 # -------------------------- сериализация --------------------------
@@ -146,20 +148,40 @@ async def upload_apk(
     path = os.path.join(base, filename)
 
     size = 0
-    with open(path, "wb") as out:  # noqa: ASYNC230 (одноразовая загрузка APK)
-        while chunk := await file.read(1024 * 1024):
-            size += len(chunk)
-            if size > MAX_APK_SIZE:
-                out.close()
-                os.remove(path)
-                raise HTTPException(
-                    status_code=413,
-                    detail="Файл больше максимального размера (200 МБ).",
-                )
-            out.write(chunk)
+    magic = b""
+    try:
+        with open(path, "wb") as out:  # noqa: ASYNC230 (одноразовая загрузка APK)
+            while chunk := await file.read(1024 * 1024):
+                if not magic:
+                    magic = chunk[:4]
+                size += len(chunk)
+                if size > MAX_APK_SIZE:
+                    out.close()
+                    os.remove(path)
+                    raise HTTPException(
+                        status_code=413,
+                        detail="Файл больше максимального размера (200 МБ).",
+                    )
+                out.write(chunk)
+    except ClientDisconnect:
+        if os.path.exists(path):
+            os.remove(path)
+        raise HTTPException(
+            status_code=400, detail="Соединение прервано, файл не сохранён."
+        )
+
+    if size == 0:
+        os.remove(path)
+        raise HTTPException(status_code=400, detail="APK-файл пуст.")
+
+    if magic != b"PK\x03\x04":
+        os.remove(path)
+        raise HTTPException(
+            status_code=400, detail="Файл не является действительным APK архивом."
+        )
 
     url = f"{APK_BASE_URL.rstrip('/')}/{filename}"
-    return UploadApkResponse(filename=filename, url=url)
+    return UploadApkResponse(filename=filename, url=url, size=size)
 
 
 # ------------------------- управление -----------------------------
@@ -190,6 +212,14 @@ async def create_app_version(
             status_code=400,
             detail=f"versionCode должен быть больше текущего максимального значения ({max_code}).",
         )
+
+    if not data.apkFilename.startswith(("http://", "https://")):
+        apk_path = os.path.join(APK_STORAGE_PATH, data.apkFilename.lstrip("/"))
+        if not os.path.isfile(apk_path):
+            raise HTTPException(
+                status_code=400,
+                detail="Указанный APK-файл не найден в хранилище. Сначала загрузите файл.",
+            )
 
     apk_url = (
         f"{APK_BASE_URL.rstrip('/')}/{data.apkFilename.lstrip('/')}"
