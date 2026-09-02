@@ -60,7 +60,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
-          envs: APP_PATH
+          envs: APP_PATH,GH_PAT
           script: |
             cd $APP_PATH
             git -c http.extraheader="AUTHORIZATION: basic $(echo -n "x-access-token:$GH_PAT" | base64)" fetch --tags
