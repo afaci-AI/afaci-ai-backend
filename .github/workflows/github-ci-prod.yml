@@ -63,8 +63,7 @@ jobs:
           envs: APP_PATH,GH_PAT
           script: |
             cd $APP_PATH
-            git -c http.extraheader="AUTHORIZATION: basic $(echo -n "x-access-token:$GH_PAT" | base64)" fetch --tags
-            git fetch --tags
+            git fetch https://x-access-token:${GH_PAT}@github.com/afaci-AI/afaci-ai-backend.git --tags --force
             git checkout tags/${{ github.ref_name }}
             docker compose -f docker-compose.prod.yml up --build -d
         env:
