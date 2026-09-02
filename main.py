@@ -1,10 +1,11 @@
 import os
+import re
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from slowapi.middleware import SlowAPIMiddleware
-from starlette.staticfiles import StaticFiles
 
 from api.openapi import OPENAPI_TAGS
 from api.rate_limit import limiter
@@ -37,10 +38,31 @@ app.add_middleware(
 # и ловить запросы до остальных middleware.
 app.add_middleware(SlowAPIMiddleware)
 
-# Статическая раздача APK-файлов (папка примонтирована через docker volume)
-# Относительный путь работает и локально, и в контейнере (workdir=/app).
+# Раздача APK-файлов (папка примонтирована через docker volume).
+# Используем кастомный роут вместо StaticFiles, чтобы гарантированно
+# отправлять Content-Type: application/vnd.android.package-archive и
+# Content-Disposition: attachment — иначе Android Chrome добавляет .zip
+# к имени файла (Android игнорирует download-атрибут на <a>).
 apk_path = os.getenv("APK_STORAGE_PATH", "uploads/apk")
 os.makedirs(apk_path, exist_ok=True)
-app.mount("/static/apk", StaticFiles(directory=apk_path), name="apk")
+
+
+@app.get("/static/apk/{filename:path}")
+async def download_apk(filename: str):
+    safe = os.path.normpath(filename)
+    if safe.startswith("..") or os.sep in safe or "/" in safe:
+        raise HTTPException(status_code=400, detail="Invalid filename.")
+
+    file_path = os.path.join(apk_path, safe)
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="APK not found.")
+
+    download_name = re.sub(r"^\d{14}-", "", safe)
+    return FileResponse(
+        file_path,
+        media_type="application/vnd.android.package-archive",
+        filename=download_name,
+    )
+
 
 register_routers(app)
