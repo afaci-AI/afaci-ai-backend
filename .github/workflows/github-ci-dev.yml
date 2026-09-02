@@ -39,12 +39,14 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
-    
+
+      - run: echo "${{ secrets.NEXUS_PASSWORD }}" | docker login ${{ secrets.NEXUS_REGISTRY_PROXY }} -u "${{ secrets.NEXUS_USER }}" --password-stdin
+            
       - run: |
              docker build \
                --build-arg REGISTRY_PROXY=${{ secrets.NEXUS_REGISTRY_PROXY }} \
                -t ${{ secrets.NEXUS_REGISTRY }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }} .
-      - run: docker save ${{ secrets.NEXUS_REGISTRY }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }} -o image.tar
+      - run: docker save ${{ secrets.NEXUS_REGISTRY }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }}
 
 
   image-push:

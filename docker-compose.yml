@@ -33,6 +33,7 @@ services:
         condition: service_healthy
     volumes:
       - ./logs:/app/logs
+      - afaci-apk-storage:/app/uploads/apk
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     networks:
@@ -45,3 +46,4 @@ networks:
 
 volumes:
   afaci-pgdata:
+  afaci-apk-storage:
