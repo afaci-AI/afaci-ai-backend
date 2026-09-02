@@ -63,11 +63,13 @@ jobs:
           envs: APP_PATH
           script: |
             cd $APP_PATH
+            git -c http.extraheader="AUTHORIZATION: basic $(echo -n "x-access-token:$GH_PAT" | base64)" fetch --tags
             git fetch --tags
             git checkout tags/${{ github.ref_name }}
             docker compose -f docker-compose.prod.yml up --build -d
         env:
           APP_PATH: ${{ vars.APP_PATH }}
+          GH_PAT: ${{ secrets.GH_PAT }}
 
 
   create-release:
