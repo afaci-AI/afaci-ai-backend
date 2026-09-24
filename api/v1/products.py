@@ -775,6 +775,10 @@ async def api_create_nutrient(
     current_user: CurrentUserOpt = None,
 ):
     payload = data.model_dump() if hasattr(data, "model_dump") else data.dict()
+    name = await db.get(models.NutrientName, payload["nutrient_name_id"])
+    if not name:
+        raise HTTPException(status_code=404, detail="Nutrient name not found")
+    payload["nutrient_type_id"] = name.nutrient_type_id
     item = models.Nutrient(**payload)
     db.add(item)
     await db.commit()
@@ -887,6 +891,16 @@ async def api_bulk_nutrients(
         payloads = [
             n.model_dump() if hasattr(n, "model_dump") else n.dict() for n in data.items
         ]
+        name_ids = {p["nutrient_name_id"] for p in payloads}
+        names = await db.scalars(
+            select(models.NutrientName).where(models.NutrientName.id.in_(name_ids))
+        )
+        names_by_id = {n.id: n for n in names}
+        for p in payloads:
+            name = names_by_id.get(p["nutrient_name_id"])
+            if not name:
+                raise HTTPException(status_code=404, detail="Nutrient name not found")
+            p["nutrient_type_id"] = name.nutrient_type_id
         items = [models.Nutrient(**n) for n in payloads]
         db.add_all(items)
         await db.commit()

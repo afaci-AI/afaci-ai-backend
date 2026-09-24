@@ -30,6 +30,7 @@ class NutrientCreate(BaseModel):
     nutrient_name_id: UUID
     unit_id: UUID
     quantity: float
+    error_rate: float | None = None
 
 
 class NutrientUpdate(BaseModel):
@@ -37,6 +38,7 @@ class NutrientUpdate(BaseModel):
     nutrient_name_id: UUID | None = None
     unit_id: UUID | None = None
     quantity: float | None = None
+    error_rate: float | None = None
 
 
 class SimpleBulkCreate(BaseModel):

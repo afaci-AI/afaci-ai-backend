@@ -53,7 +53,7 @@ class Nutrient(Base):
         "id_type_component",
         UUID(as_uuid=True),
         ForeignKey("nutrients_types.id"),
-        nullable=True,
+        nullable=False,
     )
     unit_id = Column(UUID(as_uuid=True), ForeignKey("units.id"), nullable=False)
 
