@@ -109,6 +109,7 @@ def _recipe_public(r: SavedRecipe, with_items: bool = False) -> dict:
         data["items"] = [
             {
                 "product_id": str(it.product_id),
+                "product_name": it.product.name if it.product else None,
                 "amount_g": it.amount_g,
                 "sort_order": it.sort_order,
                 "price_per_kg": it.price_per_kg,
@@ -143,7 +144,9 @@ async def _get_owned_recipe(
         SavedRecipe.id == recipe_id, SavedRecipe.user_id == user.id
     )
     if with_items:
-        stmt = stmt.options(selectinload(SavedRecipe.items))
+        stmt = stmt.options(
+            selectinload(SavedRecipe.items).selectinload(SavedRecipeItem.product)
+        )
     r = (await db.execute(stmt)).scalar_one_or_none()
     if r is None:
         raise HTTPException(status_code=404, detail="Рецептура не найдена.")
