@@ -57,7 +57,10 @@ def _validate_data(candidates: list[CandidateItem], reference: dict) -> None:
                 raise RecipeOptimizationError(
                     f"Для «{item.name}» есть пропущенные или некорректные данные состава."
                 )
-        if protein > 0:
+        # Match compute_report: a wholly absent profile is excluded from the
+        # amino-acid calculation and reported as a warning, not invented as zero.
+        # A present but incomplete profile still cannot support a valid search.
+        if protein > 0 and item.amino:
             missing = [
                 m for _, members in NAK_GROUPS for m in members if m not in item.amino
             ]

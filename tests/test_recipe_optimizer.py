@@ -120,6 +120,117 @@ class OptimizationChecks(unittest.TestCase):
         with self.assertRaises(RecipeOptimizationError):
             optimize_recipe(invalid, reference, [50, 50], "basic")
 
+    def test_missing_profiles_follow_compute_policy_in_both_modes(self):
+        donors, reference = fixture()
+        candidates = [
+            replace(donors[0], name="Мясо", min_amount_g=40, max_amount_g=65),
+            CandidateItem(
+                "fat",
+                "Жир-сырец говяжий",
+                {"Массовая доля белка": 0.2, "Массовая доля жира": 99},
+                {},
+                200,
+                5,
+                12,
+            ),
+            replace(donors[1], name="Хлеб", min_amount_g=10, max_amount_g=18),
+            CandidateItem(
+                "onion",
+                "Лук репчатый",
+                {"Массовая доля белка": 1, "Углеводы": 8},
+                {},
+                40,
+                0.5,
+                2,
+            ),
+            CandidateItem(
+                "pepper",
+                "Перец",
+                {"Массовая доля белка": 0},
+                {},
+                400,
+                0.06,
+                0.06,
+            ),
+            CandidateItem(
+                "salt",
+                "Соль",
+                {"Массовая доля белка": 0},
+                {},
+                20,
+                1.2,
+                1.2,
+            ),
+            CandidateItem(
+                "water",
+                "Вода",
+                {"Массовая доля белка": 0},
+                {},
+                0,
+                15,
+                25,
+            ),
+            CandidateItem(
+                "crumbs",
+                "Сухари панировочные",
+                {"Массовая доля белка": 10, "Углеводы": 70},
+                {},
+                80,
+                3,
+                6,
+            ),
+        ]
+        baseline = [50, 8.94, 14, 1, 0.06, 1.2, 20.8, 4]
+        before = compute_report(_build_items(candidates, baseline), reference)
+        missing = ("Жир-сырец говяжий", "Лук репчатый", "Сухари панировочные")
+        for mode in ("basic", "cost"):
+            with self.subTest(mode=mode):
+                result = optimize_recipe(candidates, reference, baseline, mode)
+                self.assertEqual(result["status"], "goal_achieved")
+                amounts = self.assert_valid(result, candidates, reference)
+                self.assertEqual(result["original_report"]["macro"], before["macro"])
+                self.assertEqual(
+                    result["thresholds"]["bc_min"], before["quality_precise"]["bc"]
+                )
+                for report in (result["original_report"], result["report"]):
+                    self.assertEqual(report["amino_contributors"], ["Мясо", "Хлеб"])
+                    self.assertEqual(len(report["warnings"]), 1)
+                    for name in missing:
+                        self.assertIn(name, report["warnings"][0])
+                # These ingredients keep contributing to macro/protein, but no
+                # artificial amino-acid values are written into their profiles.
+                donor_protein = sum(amounts[i] * 20 / 100 for i in (0, 2))
+                self.assertGreater(result["report"]["macro"]["protein"], donor_protein)
+                self.assertTrue(
+                    all(
+                        not c.amino for i, c in enumerate(candidates) if i not in (0, 2)
+                    )
+                )
+
+    def test_missing_all_profiles_still_cannot_produce_quality(self):
+        candidates, reference = fixture()
+        candidates = [replace(c, amino={}) for c in candidates]
+        for mode in ("basic", "cost"):
+            with (
+                self.subTest(mode=mode),
+                self.assertRaisesRegex(
+                    RecipeOptimizationError, "Невозможно рассчитать БЦ, V и G"
+                ),
+            ):
+                optimize_recipe(candidates, reference, [50, 50], mode)
+
+    def test_partial_profiles_remain_invalid_in_both_modes(self):
+        candidates, reference = fixture()
+        candidates[0] = replace(candidates[0], amino={"Лизин": 100})
+        for mode in ("basic", "cost"):
+            with (
+                self.subTest(mode=mode),
+                self.assertRaisesRegex(
+                    RecipeOptimizationError, "отсутствуют данные НАК"
+                ),
+            ):
+                optimize_recipe(candidates, reference, [50, 50], mode)
+
     def test_solver_failure_returns_only_verified_composition(self):
         candidates, reference = fixture()
         with patch(
