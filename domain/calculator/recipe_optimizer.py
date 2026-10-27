@@ -47,7 +47,10 @@ def _validate_data(candidates: list[CandidateItem], reference: dict) -> None:
                 f"В эталонном белке отсутствует положительное значение {group}."
             )
     for item in candidates:
-        protein = item.chem.get("Массовая доля белка")
+        # compute_report uses zero only for absent chemical keys. Preserve that
+        # policy for non-contributors; a known amino profile needs known protein.
+        # An explicit NULL is still invalid and never replaced by the default.
+        protein = item.chem.get("Массовая доля белка", None if item.amino else 0.0)
         if not _finite(protein) or protein < 0:
             raise RecipeOptimizationError(
                 f"Для «{item.name}» отсутствует корректное содержание белка."

@@ -136,6 +136,27 @@ def compute_report(items: list[dict], reference: dict, *, rounded: bool = True) 
             "(вклад в макросостав сохранён): " + ", ".join(no_amino_protein) + "."
         )
 
+    macro_names = {
+        "Массовая доля белка": "белок",
+        "Массовая доля жира": "жир",
+        "Углеводы": "углеводы",
+        "Пищевые волокна": "пищевые волокна",
+    }
+    missing_chem = []
+    for it in items:
+        if it["amount_g"] <= 0:
+            continue
+        missing = [label for key, label in macro_names.items() if key not in it["chem"]]
+        if missing:
+            missing_chem.append(f"{it['name']} ({', '.join(missing)})")
+    if missing_chem:
+        warnings.append(
+            "Отсутствуют данные химического состава: "
+            + "; ".join(missing_chem)
+            + ". Макросостав и энергетическая ценность рассчитаны только по известным "
+            "данным; отсутствие значения не означает нулевое содержание."
+        )
+
     verdict = _build_verdict(
         c_min_name,
         c_min_val,

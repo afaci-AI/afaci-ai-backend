@@ -1,8 +1,10 @@
 """Deterministic checks independent of the database and deployed backend."""
 
+import json
 import math
 import unittest
 from dataclasses import replace
+from pathlib import Path
 from unittest.mock import patch
 
 from domain.calculator.formulas import NAK_GROUPS, compute_report
@@ -194,7 +196,7 @@ class OptimizationChecks(unittest.TestCase):
                 )
                 for report in (result["original_report"], result["report"]):
                     self.assertEqual(report["amino_contributors"], ["Мясо", "Хлеб"])
-                    self.assertEqual(len(report["warnings"]), 1)
+                    self.assertTrue(report["warnings"])
                     for name in missing:
                         self.assertIn(name, report["warnings"][0])
                 # These ingredients keep contributing to macro/protein, but no
@@ -209,15 +211,111 @@ class OptimizationChecks(unittest.TestCase):
 
     def test_missing_all_profiles_still_cannot_produce_quality(self):
         candidates, reference = fixture()
-        candidates = [replace(c, amino={}) for c in candidates]
+        for missing_chem in (False, True):
+            unknown = [
+                replace(c, chem={} if missing_chem else c.chem, amino={})
+                for c in candidates
+            ]
+            for mode in ("basic", "cost"):
+                with (
+                    self.subTest(mode=mode, missing_chem=missing_chem),
+                    self.assertRaisesRegex(
+                        RecipeOptimizationError, "Невозможно рассчитать БЦ, V и G"
+                    ),
+                ):
+                    optimize_recipe(unknown, reference, [50, 50], mode)
+
+    def test_real_control_recipe_in_both_modes(self):
+        # Catalog values match seed_calculator.sql; no live API is needed to run.
+        data = json.loads(
+            (Path(__file__).parent / "fixtures" / "control_recipe.json").read_text()
+        )
+        candidates = [CandidateItem(**item) for item in data["candidates"]]
+        reference, baseline = data["reference"], data["baseline_amounts"]
+        original = compute_report(_build_items(candidates, baseline), reference)
+        for metric, expected in (
+            ("bc", 78.2668201),
+            ("V", 0.78524439),
+            ("G", 9.84559986),
+        ):
+            self.assertAlmostEqual(
+                original["quality_precise"][metric], expected, places=7
+            )
+        for mode in ("basic", "cost"):
+            with self.subTest(mode=mode):
+                result = optimize_recipe(candidates, reference, baseline, mode)
+                self.assert_valid(result, candidates, reference)
+                self.assertIn(result["status"], ("goal_achieved", "goal_not_achieved"))
+                self.assertEqual(
+                    result["original_report"]["quality_precise"],
+                    original["quality_precise"],
+                )
+                self.assertEqual(result["original_report"]["macro"], original["macro"])
+                for report in (result["original_report"], result["report"]):
+                    self.assertEqual(len(report["warnings"]), 2)
+                    self.assertEqual(
+                        report["amino_contributors"],
+                        [candidates[i].name for i in (0, 2)],
+                    )
+                    for index in (1, 3, 7):
+                        self.assertIn(candidates[index].name, report["warnings"][0])
+                    for index in (4, 5, 6):
+                        self.assertIn(candidates[index].name, report["warnings"][1])
+                    self.assertIn(
+                        "отсутствие значения не означает нулевое содержание",
+                        report["warnings"][1],
+                    )
+                # Missing catalog entries remain missing; no fabricated zero rows.
+                for index in (4, 5, 6):
+                    self.assertEqual(candidates[index].chem, {})
+                    self.assertEqual(candidates[index].amino, {})
+
+    def test_missing_protein_with_known_amino_and_explicit_invalid_still_fail(self):
+        candidates, reference = fixture()
+        for amino in ({}, candidates[0].amino):
+            for protein in (None, math.nan, math.inf, -1):
+                invalid = [
+                    replace(
+                        candidates[0],
+                        chem={"Массовая доля белка": protein},
+                        amino=amino,
+                    ),
+                    candidates[1],
+                ]
+                for mode in ("basic", "cost"):
+                    with (
+                        self.subTest(amino=bool(amino), protein=protein, mode=mode),
+                        self.assertRaisesRegex(
+                            RecipeOptimizationError,
+                            "отсутствует корректное содержание белка",
+                        ),
+                    ):
+                        optimize_recipe(invalid, reference, [50, 50], mode)
+        invalid = [replace(candidates[0], chem={}), candidates[1]]
         for mode in ("basic", "cost"):
             with (
                 self.subTest(mode=mode),
                 self.assertRaisesRegex(
-                    RecipeOptimizationError, "Невозможно рассчитать БЦ, V и G"
+                    RecipeOptimizationError, "отсутствует корректное содержание белка"
                 ),
             ):
-                optimize_recipe(candidates, reference, [50, 50], mode)
+                optimize_recipe(invalid, reference, [50, 50], mode)
+
+    def test_missing_macro_warning_names_fields_and_ignores_zero_mass(self):
+        candidates, reference = fixture()
+        candidates[0] = replace(
+            candidates[0],
+            name="Известный белок",
+            chem={"Массовая доля белка": 20, "Углеводы": 0, "Пищевые волокна": 0},
+        )
+        candidates[1] = replace(
+            candidates[1], name="Неиспользованный", chem={}, amino={}
+        )
+        report = compute_report(_build_items(candidates, [100, 0]), reference)
+        self.assertEqual(report["macro"]["protein"], 20)
+        self.assertEqual(len(report["warnings"]), 1)
+        self.assertIn("Известный белок (жир)", report["warnings"][0])
+        self.assertNotIn("Неиспользованный", report["warnings"][0])
 
     def test_partial_profiles_remain_invalid_in_both_modes(self):
         candidates, reference = fixture()
