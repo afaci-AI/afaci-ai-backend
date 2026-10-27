@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.v1.schemas import (
     NutrientBulkCreate,
     NutrientCreate,
+    NutrientNameCreate,
+    NutrientNameUpdate,
     NutrientUpdate,
     ProductAutoCreate,
     ProductCreate,
@@ -16,6 +18,8 @@ from api.v1.schemas import (
     SimpleBulkCreate,
     SimpleCreate,
     SimpleUpdate,
+    SubcategoryCreate,
+    SubcategoryUpdate,
 )
 from infrastructure.audit.food_audit import (
     FOOD_ENTITY,
@@ -25,10 +29,17 @@ from infrastructure.audit.food_audit import (
     snapshot_nutrient,
     snapshot_product,
 )
-from infrastructure.auth import get_current_user_optional
+from infrastructure.auth import get_current_user, get_current_user_optional
 from infrastructure.db import models
 from infrastructure.db.models import User
 from infrastructure.db.session import get_db
+
+
+async def require_editor(current: Annotated[User, Depends(get_current_user)]) -> User:
+    if current.role not in {"admin", "editor"}:
+        raise HTTPException(status_code=403, detail="Требуются права редактора.")
+    return current
+
 
 router = APIRouter(prefix="/api/v1")
 
@@ -55,7 +66,12 @@ async def create_simple_item(db: AsyncSession, model, data):
 
 
 # ==================== CATEGORIES ====================
-@router.post("/categories", status_code=201, tags=["Categories"])
+@router.post(
+    "/categories",
+    status_code=201,
+    tags=["Categories"],
+    dependencies=[Depends(require_editor)],
+)
 async def api_create_category(
     data: SimpleCreate, db: Annotated[AsyncSession, Depends(get_db)]
 ):
@@ -78,7 +94,9 @@ async def api_get_category(id: UUID, db: Annotated[AsyncSession, Depends(get_db)
     return await get_item(db, models.Category, id)
 
 
-@router.delete("/categories/{id}", tags=["Categories"])
+@router.delete(
+    "/categories/{id}", tags=["Categories"], dependencies=[Depends(require_editor)]
+)
 async def api_delete_category(id: UUID, db: Annotated[AsyncSession, Depends(get_db)]):
     item = await get_item(db, models.Category, id)
     try:
@@ -92,7 +110,9 @@ async def api_delete_category(id: UUID, db: Annotated[AsyncSession, Depends(get_
         )
 
 
-@router.patch("/categories/{id}", tags=["Categories"])
+@router.patch(
+    "/categories/{id}", tags=["Categories"], dependencies=[Depends(require_editor)]
+)
 async def api_update_category(
     id: UUID, data: SimpleUpdate, db: Annotated[AsyncSession, Depends(get_db)]
 ):
@@ -111,7 +131,12 @@ async def api_update_category(
     return item
 
 
-@router.post("/categories/bulk", status_code=201, tags=["Categories"])
+@router.post(
+    "/categories/bulk",
+    status_code=201,
+    tags=["Categories"],
+    dependencies=[Depends(require_editor)],
+)
 async def api_bulk_categories(
     data: SimpleBulkCreate, db: Annotated[AsyncSession, Depends(get_db)]
 ):
@@ -134,10 +159,16 @@ async def api_bulk_categories(
 
 
 # ==================== SUBCATEGORIES ====================
-@router.post("/subcategories", status_code=201, tags=["Subcategories"])
+@router.post(
+    "/subcategories",
+    status_code=201,
+    tags=["Subcategories"],
+    dependencies=[Depends(require_editor)],
+)
 async def api_create_subcategory(
-    data: SimpleCreate, db: Annotated[AsyncSession, Depends(get_db)]
+    data: SubcategoryCreate, db: Annotated[AsyncSession, Depends(get_db)]
 ):
+    await get_item(db, models.Category, data.category_id)
     return await create_simple_item(db, models.Subcategory, data)
 
 
@@ -152,7 +183,11 @@ async def api_get_subcategory(id: UUID, db: Annotated[AsyncSession, Depends(get_
     return await get_item(db, models.Subcategory, id)
 
 
-@router.delete("/subcategories/{id}", tags=["Subcategories"])
+@router.delete(
+    "/subcategories/{id}",
+    tags=["Subcategories"],
+    dependencies=[Depends(require_editor)],
+)
 async def api_delete_subcategory(
     id: UUID, db: Annotated[AsyncSession, Depends(get_db)]
 ):
@@ -168,31 +203,51 @@ async def api_delete_subcategory(
         )
 
 
-@router.patch("/subcategories/{id}", tags=["Subcategories"])
+@router.patch(
+    "/subcategories/{id}",
+    tags=["Subcategories"],
+    dependencies=[Depends(require_editor)],
+)
 async def api_update_subcategory(
-    id: UUID, data: SimpleUpdate, db: Annotated[AsyncSession, Depends(get_db)]
+    id: UUID, data: SubcategoryUpdate, db: Annotated[AsyncSession, Depends(get_db)]
 ):
     item = await get_item(db, models.Subcategory, id)
-    if data.name is not None and data.name != item.name:
-        res = await db.execute(
-            select(models.Subcategory).where(
-                models.Subcategory.category_id == item.category_id,
-                models.Subcategory.name == data.name,
-            )
+    if "category_id" in data.model_fields_set and data.category_id is None:
+        raise HTTPException(status_code=422, detail="Category is required")
+    category_id = data.category_id or item.category_id
+    await get_item(db, models.Category, category_id)
+    name = data.name if data.name is not None else item.name
+    duplicate = await db.scalar(
+        select(models.Subcategory).where(
+            models.Subcategory.category_id == category_id,
+            models.Subcategory.name == name,
+            models.Subcategory.id != id,
         )
-        if res.scalar_one_or_none():
-            raise HTTPException(
-                status_code=400,
-                detail="Subcategory with this name already exists in this category",
-            )
-        item.name = data.name
-    await db.commit()
+    )
+    if duplicate:
+        raise HTTPException(
+            status_code=400, detail="Subcategory already exists in this category"
+        )
+    item.name = name
+    item.category_id = category_id
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=400, detail="Subcategory already exists in this category"
+        )
     await db.refresh(item)
     return item
 
 
 # ==================== REGIONS ====================
-@router.post("/regions", status_code=201, tags=["Regions"])
+@router.post(
+    "/regions",
+    status_code=201,
+    tags=["Regions"],
+    dependencies=[Depends(require_editor)],
+)
 async def api_create_region(
     data: SimpleCreate, db: Annotated[AsyncSession, Depends(get_db)]
 ):
@@ -210,7 +265,9 @@ async def api_get_region(id: UUID, db: Annotated[AsyncSession, Depends(get_db)])
     return await get_item(db, models.Region, id)
 
 
-@router.delete("/regions/{id}", tags=["Regions"])
+@router.delete(
+    "/regions/{id}", tags=["Regions"], dependencies=[Depends(require_editor)]
+)
 async def api_delete_region(id: UUID, db: Annotated[AsyncSession, Depends(get_db)]):
     item = await get_item(db, models.Region, id)
     try:
@@ -224,7 +281,7 @@ async def api_delete_region(id: UUID, db: Annotated[AsyncSession, Depends(get_db
         )
 
 
-@router.patch("/regions/{id}", tags=["Regions"])
+@router.patch("/regions/{id}", tags=["Regions"], dependencies=[Depends(require_editor)])
 async def api_update_region(
     id: UUID, data: SimpleUpdate, db: Annotated[AsyncSession, Depends(get_db)]
 ):
@@ -243,7 +300,12 @@ async def api_update_region(
     return item
 
 
-@router.post("/regions/bulk", status_code=201, tags=["Regions"])
+@router.post(
+    "/regions/bulk",
+    status_code=201,
+    tags=["Regions"],
+    dependencies=[Depends(require_editor)],
+)
 async def api_bulk_regions(
     data: SimpleBulkCreate, db: Annotated[AsyncSession, Depends(get_db)]
 ):
@@ -264,7 +326,9 @@ async def api_bulk_regions(
 
 
 # ==================== UNITS ====================
-@router.post("/units", status_code=201, tags=["Units"])
+@router.post(
+    "/units", status_code=201, tags=["Units"], dependencies=[Depends(require_editor)]
+)
 async def api_create_unit(
     data: SimpleCreate, db: Annotated[AsyncSession, Depends(get_db)]
 ):
@@ -282,7 +346,7 @@ async def api_get_unit(id: UUID, db: Annotated[AsyncSession, Depends(get_db)]):
     return await get_item(db, models.Unit, id)
 
 
-@router.delete("/units/{id}", tags=["Units"])
+@router.delete("/units/{id}", tags=["Units"], dependencies=[Depends(require_editor)])
 async def api_delete_unit(id: UUID, db: Annotated[AsyncSession, Depends(get_db)]):
     item = await get_item(db, models.Unit, id)
     try:
@@ -296,7 +360,7 @@ async def api_delete_unit(id: UUID, db: Annotated[AsyncSession, Depends(get_db)]
         )
 
 
-@router.patch("/units/{id}", tags=["Units"])
+@router.patch("/units/{id}", tags=["Units"], dependencies=[Depends(require_editor)])
 async def api_update_unit(
     id: UUID, data: SimpleUpdate, db: Annotated[AsyncSession, Depends(get_db)]
 ):
@@ -313,7 +377,12 @@ async def api_update_unit(
     return item
 
 
-@router.post("/units/bulk", status_code=201, tags=["Units"])
+@router.post(
+    "/units/bulk",
+    status_code=201,
+    tags=["Units"],
+    dependencies=[Depends(require_editor)],
+)
 async def api_bulk_units(
     data: SimpleBulkCreate, db: Annotated[AsyncSession, Depends(get_db)]
 ):
@@ -334,7 +403,12 @@ async def api_bulk_units(
 
 
 # ==================== NUTRIENT TYPES ====================
-@router.post("/nutrient-types", status_code=201, tags=["Nutrient Types"])
+@router.post(
+    "/nutrient-types",
+    status_code=201,
+    tags=["Nutrient Types"],
+    dependencies=[Depends(require_editor)],
+)
 async def api_create_nutrient_type(
     data: SimpleCreate, db: Annotated[AsyncSession, Depends(get_db)]
 ):
@@ -352,7 +426,11 @@ async def api_get_nutrient_type(id: UUID, db: Annotated[AsyncSession, Depends(ge
     return await get_item(db, models.NutrientType, id)
 
 
-@router.delete("/nutrient-types/{id}", tags=["Nutrient Types"])
+@router.delete(
+    "/nutrient-types/{id}",
+    tags=["Nutrient Types"],
+    dependencies=[Depends(require_editor)],
+)
 async def api_delete_nutrient_type(
     id: UUID, db: Annotated[AsyncSession, Depends(get_db)]
 ):
@@ -369,7 +447,11 @@ async def api_delete_nutrient_type(
         )
 
 
-@router.patch("/nutrient-types/{id}", tags=["Nutrient Types"])
+@router.patch(
+    "/nutrient-types/{id}",
+    tags=["Nutrient Types"],
+    dependencies=[Depends(require_editor)],
+)
 async def api_update_nutrient_type(
     id: UUID, data: SimpleUpdate, db: Annotated[AsyncSession, Depends(get_db)]
 ):
@@ -388,7 +470,12 @@ async def api_update_nutrient_type(
     return item
 
 
-@router.post("/nutrient-types/bulk", status_code=201, tags=["Nutrient Types"])
+@router.post(
+    "/nutrient-types/bulk",
+    status_code=201,
+    tags=["Nutrient Types"],
+    dependencies=[Depends(require_editor)],
+)
 async def api_bulk_nutrient_types(
     data: SimpleBulkCreate, db: Annotated[AsyncSession, Depends(get_db)]
 ):
@@ -411,10 +498,16 @@ async def api_bulk_nutrient_types(
 
 
 # ==================== NUTRIENT NAMES ====================
-@router.post("/nutrient-names", status_code=201, tags=["Nutrient Names"])
+@router.post(
+    "/nutrient-names",
+    status_code=201,
+    tags=["Nutrient Names"],
+    dependencies=[Depends(require_editor)],
+)
 async def api_create_nutrient_name(
-    data: SimpleCreate, db: Annotated[AsyncSession, Depends(get_db)]
+    data: NutrientNameCreate, db: Annotated[AsyncSession, Depends(get_db)]
 ):
+    await get_item(db, models.NutrientType, data.nutrient_type_id)
     return await create_simple_item(db, models.NutrientName, data)
 
 
@@ -429,7 +522,11 @@ async def api_get_nutrient_name(id: UUID, db: Annotated[AsyncSession, Depends(ge
     return await get_item(db, models.NutrientName, id)
 
 
-@router.delete("/nutrient-names/{id}", tags=["Nutrient Names"])
+@router.delete(
+    "/nutrient-names/{id}",
+    tags=["Nutrient Names"],
+    dependencies=[Depends(require_editor)],
+)
 async def api_delete_nutrient_name(
     id: UUID, db: Annotated[AsyncSession, Depends(get_db)]
 ):
@@ -445,24 +542,50 @@ async def api_delete_nutrient_name(
         )
 
 
-@router.patch("/nutrient-names/{id}", tags=["Nutrient Names"])
+@router.patch(
+    "/nutrient-names/{id}",
+    tags=["Nutrient Names"],
+    dependencies=[Depends(require_editor)],
+)
 async def api_update_nutrient_name(
-    id: UUID, data: SimpleUpdate, db: Annotated[AsyncSession, Depends(get_db)]
+    id: UUID, data: NutrientNameUpdate, db: Annotated[AsyncSession, Depends(get_db)]
 ):
     item = await get_item(db, models.NutrientName, id)
-    if data.name is not None and data.name != item.name:
-        res = await db.execute(
-            select(models.NutrientName).where(models.NutrientName.name == data.name)
+    if "nutrient_type_id" in data.model_fields_set and data.nutrient_type_id is None:
+        raise HTTPException(status_code=422, detail="Nutrient type is required")
+    type_id = data.nutrient_type_id or item.nutrient_type_id
+    await get_item(db, models.NutrientType, type_id)
+    name = data.name if data.name is not None else item.name
+    duplicate = await db.scalar(
+        select(models.NutrientName).where(
+            models.NutrientName.nutrient_type_id == type_id,
+            models.NutrientName.name == name,
+            models.NutrientName.id != id,
         )
-        if res.scalar_one_or_none():
-            raise HTTPException(status_code=400, detail="Nutrient name already exists")
-        item.name = data.name
-    await db.commit()
+    )
+    if duplicate:
+        raise HTTPException(
+            status_code=400, detail="Nutrient name already exists in this type"
+        )
+    item.name = name
+    item.nutrient_type_id = type_id
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=400, detail="Nutrient name already exists in this type"
+        )
     await db.refresh(item)
     return item
 
 
-@router.post("/nutrient-names/bulk", status_code=201, tags=["Nutrient Names"])
+@router.post(
+    "/nutrient-names/bulk",
+    status_code=201,
+    tags=["Nutrient Names"],
+    dependencies=[Depends(require_editor)],
+)
 async def api_bulk_nutrient_names(
     data: SimpleBulkCreate, db: Annotated[AsyncSession, Depends(get_db)]
 ):
@@ -485,7 +608,12 @@ async def api_bulk_nutrient_names(
 
 
 # ==================== PRODUCTS ====================
-@router.post("/products", status_code=201, tags=["Products"])
+@router.post(
+    "/products",
+    status_code=201,
+    tags=["Products"],
+    dependencies=[Depends(require_editor)],
+)
 async def api_create_product(
     data: ProductCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -524,7 +652,9 @@ async def api_get_product(id: UUID, db: Annotated[AsyncSession, Depends(get_db)]
     return await get_item(db, models.Product, id)
 
 
-@router.delete("/products/{id}", tags=["Products"])
+@router.delete(
+    "/products/{id}", tags=["Products"], dependencies=[Depends(require_editor)]
+)
 async def api_delete_product(
     id: UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -545,7 +675,9 @@ async def api_delete_product(
     return {"status": "deleted"}
 
 
-@router.patch("/products/{id}", tags=["Products"])
+@router.patch(
+    "/products/{id}", tags=["Products"], dependencies=[Depends(require_editor)]
+)
 async def api_update_product(
     id: UUID,
     data: ProductUpdate,
@@ -585,7 +717,12 @@ async def api_update_product(
     return item
 
 
-@router.post("/products/bulk", status_code=201, tags=["Products"])
+@router.post(
+    "/products/bulk",
+    status_code=201,
+    tags=["Products"],
+    dependencies=[Depends(require_editor)],
+)
 async def api_bulk_products(
     data: list[ProductCreate],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -643,7 +780,12 @@ async def api_products_by_category(
     return res.scalars().all()
 
 
-@router.post("/products/auto", status_code=201, tags=["Products"])
+@router.post(
+    "/products/auto",
+    status_code=201,
+    tags=["Products"],
+    dependencies=[Depends(require_editor)],
+)
 async def api_auto_create_product(
     data: ProductAutoCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -687,7 +829,12 @@ async def api_auto_create_product(
         raise HTTPException(status_code=400, detail="Product already exists")
 
 
-@router.post("/products/auto/bulk", status_code=201, tags=["Products"])
+@router.post(
+    "/products/auto/bulk",
+    status_code=201,
+    tags=["Products"],
+    dependencies=[Depends(require_editor)],
+)
 async def api_auto_bulk_products(
     data: list[ProductAutoCreate],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -767,7 +914,12 @@ async def api_auto_bulk_products(
 
 
 # ==================== NUTRIENTS ====================
-@router.post("/nutrients", status_code=201, tags=["Nutrients"])
+@router.post(
+    "/nutrients",
+    status_code=201,
+    tags=["Nutrients"],
+    dependencies=[Depends(require_editor)],
+)
 async def api_create_nutrient(
     data: NutrientCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -808,7 +960,9 @@ async def api_get_nutrient(id: UUID, db: Annotated[AsyncSession, Depends(get_db)
     return await get_item(db, models.Nutrient, id)
 
 
-@router.delete("/nutrients/{id}", tags=["Nutrients"])
+@router.delete(
+    "/nutrients/{id}", tags=["Nutrients"], dependencies=[Depends(require_editor)]
+)
 async def api_delete_nutrient(
     id: UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -834,7 +988,9 @@ async def api_delete_nutrient(
     return {"status": "deleted"}
 
 
-@router.patch("/nutrients/{id}", tags=["Nutrients"])
+@router.patch(
+    "/nutrients/{id}", tags=["Nutrients"], dependencies=[Depends(require_editor)]
+)
 async def api_update_nutrient(
     id: UUID,
     data: NutrientUpdate,
@@ -851,6 +1007,11 @@ async def api_update_nutrient(
     )
     if not patch:
         return item
+    if "nutrient_name_id" in patch:
+        if patch["nutrient_name_id"] is None:
+            raise HTTPException(status_code=422, detail="Nutrient name is required")
+        name = await get_item(db, models.NutrientName, patch["nutrient_name_id"])
+        patch["nutrient_type_id"] = name.nutrient_type_id
     for field, value in patch.items():
         setattr(item, field, value)
     await db.commit()
@@ -880,7 +1041,12 @@ async def api_product_nutrients(id: UUID, db: Annotated[AsyncSession, Depends(ge
     return res.scalars().all()
 
 
-@router.post("/nutrients/bulk", status_code=201, tags=["Nutrients"])
+@router.post(
+    "/nutrients/bulk",
+    status_code=201,
+    tags=["Nutrients"],
+    dependencies=[Depends(require_editor)],
+)
 async def api_bulk_nutrients(
     data: NutrientBulkCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
