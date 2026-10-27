@@ -1007,6 +1007,11 @@ async def api_update_nutrient(
     )
     if not patch:
         return item
+    if "nutrient_name_id" in patch:
+        if patch["nutrient_name_id"] is None:
+            raise HTTPException(status_code=422, detail="Nutrient name is required")
+        name = await get_item(db, models.NutrientName, patch["nutrient_name_id"])
+        patch["nutrient_type_id"] = name.nutrient_type_id
     for field, value in patch.items():
         setattr(item, field, value)
     await db.commit()
