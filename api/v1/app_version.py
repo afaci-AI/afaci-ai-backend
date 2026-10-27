@@ -268,7 +268,7 @@ async def update_app_version(
         version.changelog = data.changelog
     if data.forceUpdate is not None:
         version.force_update = data.forceUpdate
-    if data.minSupportedVersionCode is not None:
+    if "minSupportedVersionCode" in data.model_fields_set:
         version.min_supported_version_code = data.minSupportedVersionCode
 
     await db.commit()
