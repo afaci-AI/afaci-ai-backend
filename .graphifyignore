@@ -1,0 +1,14 @@
+.env*
+**/.env*
+*.pem
+**/*.pem
+*.keystore
+**/*.keystore
+*credentials*
+**/*credentials*
+venv/
+.venv/
+backups/
+logs/
+scripts/
+infrastructure/db/import_part2.py

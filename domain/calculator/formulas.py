@@ -38,7 +38,7 @@ def _round(value: float | None, digits: int) -> float | None:
     return None if value is None else round(value, digits)
 
 
-def compute_report(items: list[dict], reference: dict) -> dict:
+def compute_report(items: list[dict], reference: dict, *, rounded: bool = True) -> dict:
     """
     items: [{product_id, name, region, subcategory, amount_g,
              chem: {"Массовая доля белка": x, "Массовая доля жира": x,
@@ -46,6 +46,10 @@ def compute_report(items: list[dict], reference: dict) -> dict:
              amino: {"Изолейцин": мг/100г, ...}}]
     reference: {id, name, year, description, values: {"ИЗО": 4.0, ...}}
     """
+
+    def display(value: float | None, digits: int) -> float | None:
+        return _round(value, digits) if rounded else value
+
     total_g = sum(it["amount_g"] for it in items)
 
     # ---- Этап 1. Макросостав, % ----
@@ -151,11 +155,11 @@ def compute_report(items: list[dict], reference: dict) -> dict:
                 "name": it["name"],
                 "region": it.get("region"),
                 "subcategory": it.get("subcategory"),
-                "amount_g": _round(it["amount_g"], 2),
+                "amount_g": display(it["amount_g"], 2),
             }
             for it in items
         ],
-        "sum_g": _round(total_g, 2),
+        "sum_g": display(total_g, 2),
         "reference": {
             "id": reference["id"],
             "name": reference["name"],
@@ -167,36 +171,39 @@ def compute_report(items: list[dict], reference: dict) -> dict:
             ],
         },
         "macro": {
-            "protein": _round(protein, 2),
-            "fat": _round(fat, 2),
-            "carb": _round(carb, 2),
-            "fiber": _round(fiber, 2),
-            "protein_fat_ratio": _round(fat / protein, 2) if protein else None,
+            "protein": display(protein, 2),
+            "fat": display(fat, 2),
+            "carb": display(carb, 2),
+            "fiber": display(fiber, 2),
+            "protein_fat_ratio": display(fat / protein, 2) if protein else None,
         },
-        "energy_kcal": _round(energy, 1),
+        "energy_kcal": display(energy, 1),
         "amino_acids": [
             {
                 "name": r["name"],
-                "m_j": _round(r["m_j"], 2),
+                "m_j": display(r["m_j"], 2),
                 "reference": r["reference"],
-                "score": _round(r["score"], 1),
-                "utility": _round(r.get("utility"), 2),
+                "score": display(r["score"], 1),
+                "utility": display(r.get("utility"), 2),
                 "is_limiting": r["is_limiting"],
                 "is_min": r["is_min"],
             }
             for r in amino_rows
         ],
-        "c_min": {"name": c_min_name, "score": _round(c_min_val, 1)}
+        "c_min": {"name": c_min_name, "score": display(c_min_val, 1)}
         if c_min_name
         else None,
         "limiting": limiting,
         "limiting_count": len(limiting),
         "quality": {
-            "kras": _round(kras, 1),
-            "bc": _round(bc, 1),
-            "V": _round(util_V, 2),
-            "G": _round(util_G, 2),
+            "kras": display(kras, 1),
+            "bc": display(bc, 1),
+            "V": display(util_V, 2),
+            "G": display(util_G, 2),
         },
+        # Raw values support numerical comparison without treating display rounding
+        # as evidence that the composition improved.
+        "quality_precise": {"kras": kras, "bc": bc, "V": util_V, "G": util_G},
         "amino_contributors": [it["name"] for it in contributors],
         "warnings": warnings,
         "verdict": verdict,
