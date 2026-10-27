@@ -11,6 +11,22 @@ class SimpleUpdate(BaseModel):
     name: str | None = None
 
 
+class SubcategoryCreate(SimpleCreate):
+    category_id: UUID
+
+
+class SubcategoryUpdate(SimpleUpdate):
+    category_id: UUID | None = None
+
+
+class NutrientNameCreate(SimpleCreate):
+    nutrient_type_id: UUID
+
+
+class NutrientNameUpdate(SimpleUpdate):
+    nutrient_type_id: UUID | None = None
+
+
 class ProductCreate(BaseModel):
     name: str
     category_id: UUID
