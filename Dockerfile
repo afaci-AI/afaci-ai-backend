@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 ARG REGISTRY_PROXY
 FROM ${REGISTRY_PROXY}/library/python:3.12-slim AS builder
 
@@ -10,11 +11,13 @@ RUN apt-get update \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
+# Зависимости — отдельный слой: пересобирается только при изменении requirements.txt,
+# а wheel-кеш pip живёт между сборками в cache mount.
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip \
+    && pip install -r requirements.txt
 
-ARG REGISTRY_PROXY
 FROM ${REGISTRY_PROXY}/library/python:3.12-slim AS runtime
 
 RUN apt-get update \
@@ -30,11 +33,13 @@ ENV PATH="/opt/venv/bin:$PATH" \
 
 WORKDIR /app
 
-COPY --chown=afaci:afaci . .
+# Редко меняющееся — выше, код приложения — в самом конце.
 COPY --chown=afaci:afaci docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
     && mkdir -p /app/uploads/apk \
-    && chown -R afaci:afaci /app/uploads
+    && chown -R afaci:afaci /app
+
+COPY --chown=afaci:afaci . .
 
 EXPOSE 8000
 
