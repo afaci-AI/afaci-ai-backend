@@ -1,13 +1,15 @@
 """
 Проверка версии мобильного приложения и управление версиями (админ).
 
-  GET    /api/v1/app/version                       — публично, текущая версия (rate-limited)
-  POST   /api/v1/admin/app-versions/upload-apk     — загрузить APK файл (админ)
+  GET    /api/v1/app/version                       — публично, последняя версия (rate-limited)
+  POST   /api/v1/admin/app-versions/upload-apk     — загрузить APK и опубликовать версию (админ)
   GET    /api/v1/admin/app-versions                — список всех версий (админ)
-  POST   /api/v1/admin/app-versions                — создать версию (админ)
-  PATCH  /api/v1/admin/app-versions/{id}           — отредактировать версию (админ)
+  PATCH  /api/v1/admin/app-versions/{id}           — изменить обязательность/описание (админ)
   PATCH  /api/v1/admin/app-versions/{id}/current   — назначить текущей (админ)
-  DELETE /api/v1/admin/app-versions/{id}           — удалить версию (админ)
+  DELETE /api/v1/admin/app-versions/{id}           — удалить версию и APK-файл (админ)
+
+versionName и versionCode берутся из AndroidManifest загружаемого APK; версия
+сохраняется, только если её versionCode выше максимального из уже опубликованных.
 """
 
 import os
@@ -16,9 +18,20 @@ from datetime import datetime, timezone
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
-from pydantic import BaseModel, Field
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+)
+from fastapi.concurrency import run_in_threadpool
+from pydantic import BaseModel
+from pyaxmlparser import APK
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import ClientDisconnect
 
@@ -44,18 +57,7 @@ class AppVersionPublic(BaseModel):
     minSupportedVersionCode: int | None = None
 
 
-class AppVersionCreate(BaseModel):
-    version: str = Field(min_length=1)
-    versionCode: int = Field(gt=0)
-    apkFilename: str = Field(min_length=1)
-    changelog: str | None = None
-    forceUpdate: bool = False
-    minSupportedVersionCode: int | None = None
-    isCurrent: bool = True
-
-
 class AppVersionUpdate(BaseModel):
-    version: str | None = None
     changelog: str | None = None
     forceUpdate: bool | None = None
     minSupportedVersionCode: int | None = None
@@ -72,12 +74,6 @@ class AppVersionAdmin(BaseModel):
     minSupportedVersionCode: int | None
     isCurrent: bool
     publishedAt: datetime
-
-
-class UploadApkResponse(BaseModel):
-    filename: str
-    url: str
-    size: int
 
 
 # -------------------------- сериализация --------------------------
@@ -125,14 +121,41 @@ async def get_app_version(
 
 
 # ------------------------- загрузка APK ---------------------------
+def _read_apk_meta(path: str) -> tuple[str, int]:
+    """versionName и versionCode из AndroidManifest.xml."""
+    try:
+        apk = APK(path)
+        name = apk.get_androidversion_name()
+        code = apk.get_androidversion_code()
+        return str(name).strip(), int(code)
+    except Exception:
+        raise HTTPException(
+            status_code=400,
+            detail="Не удалось прочитать версию из AndroidManifest.xml этого APK.",
+        )
+
+
+def _remove_quietly(path: str) -> None:
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass
+
+
 @router.post(
     "/api/v1/admin/app-versions/upload-apk",
     status_code=201,
-    summary="Загрузить APK файл",
+    summary="Загрузить APK и опубликовать версию",
 )
 async def upload_apk(
     _admin_user: Annotated[User, Depends(require_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
     file: Annotated[UploadFile, File()],
+    force_update: Annotated[bool, Form(alias="forceUpdate")] = False,
+    changelog: Annotated[str | None, Form()] = None,
+    min_supported_version_code: Annotated[
+        int | None, Form(alias="minSupportedVersionCode", gt=0)
+    ] = None,
 ):
     if not file.filename or not file.filename.lower().endswith(".apk"):
         raise HTTPException(
@@ -146,42 +169,102 @@ async def upload_apk(
     safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", file.filename)
     filename = f"{timestamp}-{safe_name}"
     path = os.path.join(base, filename)
+    # Пока метаданные не проверены, файл лежит под временным именем.
+    tmp_path = f"{path}.part"
 
     size = 0
     magic = b""
     try:
-        with open(path, "wb") as out:  # noqa: ASYNC230 (одноразовая загрузка APK)
+        with open(tmp_path, "wb") as out:  # noqa: ASYNC230 (одноразовая загрузка APK)
             while chunk := await file.read(1024 * 1024):
                 if not magic:
                     magic = chunk[:4]
                 size += len(chunk)
                 if size > MAX_APK_SIZE:
                     out.close()
-                    os.remove(path)
+                    _remove_quietly(tmp_path)
                     raise HTTPException(
                         status_code=413,
                         detail="Файл больше максимального размера (200 МБ).",
                     )
                 out.write(chunk)
     except ClientDisconnect:
-        if os.path.exists(path):
-            os.remove(path)
+        _remove_quietly(tmp_path)
         raise HTTPException(
             status_code=400, detail="Соединение прервано, файл не сохранён."
         )
 
     if size == 0:
-        os.remove(path)
+        _remove_quietly(tmp_path)
         raise HTTPException(status_code=400, detail="APK-файл пуст.")
 
     if magic != b"PK\x03\x04":
-        os.remove(path)
+        _remove_quietly(tmp_path)
         raise HTTPException(
             status_code=400, detail="Файл не является действительным APK архивом."
         )
 
-    url = f"{APK_BASE_URL.rstrip('/')}/{filename}"
-    return UploadApkResponse(filename=filename, url=url, size=size)
+    try:
+        version_name, version_code = await run_in_threadpool(_read_apk_meta, tmp_path)
+        if not version_name or version_code <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail="В APK не указаны versionName/versionCode.",
+            )
+        if (
+            min_supported_version_code is not None
+            and min_supported_version_code > version_code
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="minSupportedVersionCode не может быть выше versionCode.",
+            )
+
+        max_code = (
+            await db.execute(select(func.max(AppVersion.version_code)))
+        ).scalar_one_or_none()
+        if max_code is not None and version_code <= max_code:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"versionCode APK ({version_code}) должен быть выше "
+                    f"максимального из опубликованных ({max_code})."
+                ),
+            )
+
+        os.replace(tmp_path, path)
+        await db.execute(
+            AppVersion.__table__.update()
+            .where(AppVersion.is_current.is_(True))
+            .values(is_current=False)
+        )
+        version = AppVersion(
+            version=version_name,
+            version_code=version_code,
+            apk_url=f"{APK_BASE_URL.rstrip('/')}/{filename}",
+            apk_filename=filename,
+            changelog=(changelog or "").strip() or None,
+            force_update=force_update,
+            min_supported_version_code=min_supported_version_code,
+            is_current=True,
+            published_at=datetime.now(timezone.utc),
+        )
+        db.add(version)
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        _remove_quietly(path)
+        raise HTTPException(
+            status_code=409, detail="Версия с таким versionCode уже опубликована."
+        )
+    except BaseException:
+        await db.rollback()
+        _remove_quietly(tmp_path)
+        _remove_quietly(path)
+        raise
+
+    await db.refresh(version)
+    return _admin(version)
 
 
 # ------------------------- управление -----------------------------
@@ -198,59 +281,6 @@ async def list_app_versions(
     return [_admin(v) for v in rows]
 
 
-@router.post("/api/v1/admin/app-versions", status_code=201, summary="Создать версию")
-async def create_app_version(
-    data: AppVersionCreate,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    _admin_user: Annotated[User, Depends(require_admin)],
-):
-    max_code = (
-        await db.execute(select(func.max(AppVersion.version_code)))
-    ).scalar_one_or_none()
-    if max_code is not None and data.versionCode <= max_code:
-        raise HTTPException(
-            status_code=400,
-            detail=f"versionCode должен быть больше текущего максимального значения ({max_code}).",
-        )
-
-    if not data.apkFilename.startswith(("http://", "https://")):
-        apk_path = os.path.join(APK_STORAGE_PATH, data.apkFilename.lstrip("/"))
-        if not os.path.isfile(apk_path):
-            raise HTTPException(
-                status_code=400,
-                detail="Указанный APK-файл не найден в хранилище. Сначала загрузите файл.",
-            )
-
-    apk_url = (
-        f"{APK_BASE_URL.rstrip('/')}/{data.apkFilename.lstrip('/')}"
-        if not data.apkFilename.startswith(("http://", "https://"))
-        else data.apkFilename
-    )
-
-    if data.isCurrent:
-        await db.execute(
-            AppVersion.__table__.update()
-            .where(AppVersion.is_current.is_(True))
-            .values(is_current=False)
-        )
-
-    version = AppVersion(
-        version=data.version,
-        version_code=data.versionCode,
-        apk_url=apk_url,
-        apk_filename=data.apkFilename,
-        changelog=data.changelog,
-        force_update=data.forceUpdate,
-        min_supported_version_code=data.minSupportedVersionCode,
-        is_current=data.isCurrent,
-        published_at=datetime.now(timezone.utc),
-    )
-    db.add(version)
-    await db.commit()
-    await db.refresh(version)
-    return _admin(version)
-
-
 @router.patch("/api/v1/admin/app-versions/{id}", summary="Отредактировать версию")
 async def update_app_version(
     id: UUID,
@@ -262,8 +292,6 @@ async def update_app_version(
     if not version:
         raise HTTPException(status_code=404, detail="Версия не найдена.")
 
-    if data.version is not None:
-        version.version = data.version
     if data.changelog is not None:
         version.changelog = data.changelog
     if data.forceUpdate is not None:
@@ -309,8 +337,23 @@ async def delete_app_version(
     version = await db.get(AppVersion, id)
     if not version:
         raise HTTPException(status_code=404, detail="Версия не найдена.")
-    if version.is_current:
-        raise HTTPException(status_code=400, detail="Нельзя удалить текущую версию.")
+
+    was_current = version.is_current
+    apk_filename = version.apk_filename
     await db.delete(version)
+    await db.flush()
+
+    if was_current:
+        # Текущей становится версия с наибольшим versionCode из оставшихся.
+        latest = (
+            await db.execute(
+                select(AppVersion).order_by(AppVersion.version_code.desc()).limit(1)
+            )
+        ).scalar_one_or_none()
+        if latest is not None:
+            latest.is_current = True
     await db.commit()
+
+    if not apk_filename.startswith(("http://", "https://")):
+        _remove_quietly(os.path.join(APK_STORAGE_PATH, os.path.basename(apk_filename)))
     return {"status": "deleted"}
