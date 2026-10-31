@@ -14,6 +14,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
+# Зависимости — отдельный слой: пересобирается только при изменении requirements.txt,
+# а wheel-кеш pip живёт между сборками в cache mount.
 COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip \
