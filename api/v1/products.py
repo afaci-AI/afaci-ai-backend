@@ -2,7 +2,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +13,7 @@ from api.v1.schemas import (
     NutrientNameUpdate,
     NutrientUpdate,
     ProductAutoCreate,
+    ProductCount,
     ProductCreate,
     ProductUpdate,
     SimpleBulkCreate,
@@ -645,6 +646,21 @@ async def api_create_product(
 async def api_list_products(db: Annotated[AsyncSession, Depends(get_db)]):
     res = await db.execute(select(models.Product))
     return res.scalars().all()
+
+
+@router.get(
+    "/products/count",
+    tags=["Products"],
+    response_model=ProductCount,
+    summary="Общее количество продуктов питания",
+    description=(
+        "Возвращает число всех продуктов в базе. Не принимает фильтров, поиска "
+        'и пагинации; для пустой базы возвращает `{"count": 0}`.'
+    ),
+)
+async def api_count_products(db: Annotated[AsyncSession, Depends(get_db)]):
+    total = await db.scalar(select(func.count()).select_from(models.Product))
+    return ProductCount(count=total or 0)
 
 
 @router.get("/products/{id}", tags=["Products"])
