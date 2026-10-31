@@ -40,8 +40,21 @@ CREATE TABLE IF NOT EXISTS reference_proteins (
     name        varchar NOT NULL UNIQUE,
     year        integer,
     is_default  boolean NOT NULL DEFAULT false,
-    description text
+    description text,
+    source_title text,
+    source_authors text,
+    source_year integer,
+    source_location text,
+    source_url text,
+    source_pdf_filename varchar
 );
+
+ALTER TABLE reference_proteins ADD COLUMN IF NOT EXISTS source_title text;
+ALTER TABLE reference_proteins ADD COLUMN IF NOT EXISTS source_authors text;
+ALTER TABLE reference_proteins ADD COLUMN IF NOT EXISTS source_year integer;
+ALTER TABLE reference_proteins ADD COLUMN IF NOT EXISTS source_location text;
+ALTER TABLE reference_proteins ADD COLUMN IF NOT EXISTS source_url text;
+ALTER TABLE reference_proteins ADD COLUMN IF NOT EXISTS source_pdf_filename varchar;
 
 CREATE TABLE IF NOT EXISTS reference_protein_values (
     id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -71,14 +84,18 @@ CREATE TABLE IF NOT EXISTS recipe_items (
 -- ----------------------------------------------------------------------------
 -- 4. Эталонные белки ФАО/ВОЗ (1973 / 1985 / 1991)
 -- ----------------------------------------------------------------------------
-INSERT INTO reference_proteins (name, year, is_default, description) VALUES
- ('ФАО/ВОЗ 1973', 1973, true,
-  'Классический «идеальный» (провизорный) эталонный белок ФАО/ВОЗ 1973 г. Его аминокислотный профиль оптимально сбалансирован под потребности человека и исторически опирается на состав яичного и грудного молока — белков наивысшей биологической ценности. Сумма восьми незаменимых аминокислот равна 36 г/100 г белка. Именно эта шкала применена в исходном расчёте контрольного образца, поэтому выбрана эталоном по умолчанию.'),
- ('ФАО/ВОЗ 1985', 1985, false,
-  'Эталон ФАО/ВОЗ/УООН 1985 г., построенный на профиле потребностей детей дошкольного возраста (2–5 лет). Требования к ряду незаменимых кислот ниже, чем в шкале 1973 г., поэтому аминокислотные скоры по нему, как правило, выше.'),
- ('ФАО/ВОЗ 1991', 1991, false,
-  'Эталон ФАО/ВОЗ 1991 г. (Expert Consultation on Protein Quality Evaluation). Подтверждает профиль потребностей детей дошкольного возраста (2–5 лет) и лежит в основе метода PDCAAS — современного стандарта оценки качества белка.')
-ON CONFLICT (name) DO NOTHING;
+INSERT INTO reference_proteins (name, year, is_default, description, source_title, source_authors, source_year, source_location, source_url, source_pdf_filename) VALUES
+ ('ФАО/ВОЗ 1973', 1973, true, 'Провизорная шкала аминокислотного скора ФАО/ВОЗ 1973 г., основанная на данных о потребностях человека. Значения приведены по вторичному источнику Young и Pellett (1991), таблица 1, колонка FAO-WHO (1973). Сумма восьми незаменимых аминокислот равна 36 г/100 г белка. Шкала используется по умолчанию для воспроизведения исходного контрольного расчёта.', 'Protein Evaluation, Amino Acid Scoring and the Food and Drug Administration''s Proposed Food Labeling Regulations', 'Vernon R. Young; Peter L. Pellett. The Journal of Nutrition 121(1):145–150. DOI: 10.1093/jn/121.1.145', 1991, 'Таблица 1, с. 147 (стр. 4 PDF), колонка FAO-WHO (1973). Вторичный источник.', 'https://downloads.regulations.gov/FDA-1990-N-0007-0213/attachment_1.pdf', NULL),
+ ('ФАО/ВОЗ 1985', 1985, false, 'Эталон ФАО/ВОЗ/УООН 1985 г., построенный на профиле потребностей детей дошкольного возраста (2–5 лет). Значения воспроизведены в отчёте FAO 1991 г., таблица 7, колонка Pre-School Child (2–5 years). Требования к ряду незаменимых кислот ниже, чем в шкале 1973 г., поэтому аминокислотные скоры по нему, как правило, выше.', 'Protein quality evaluation. Report of the Joint FAO/WHO Expert Consultation. FAO Food and Nutrition Paper 51', 'Food and Agriculture Organization of the United Nations; World Health Organization', 1991, 'Таблица 7, с. 23 (стр. 29 PDF), Pre-School Child (2–5 years).', 'https://www.fao.org/4/t0501e/t0501e00.pdf', NULL),
+ ('ФАО/ВОЗ 1991', 1991, false, 'Эталон ФАО/ВОЗ 1991 г. для оценки качества белка методом PDCAAS. Консультация рекомендовала профиль потребностей детей 2–5 лет для всех возрастов, кроме младенцев. Значения идентичны шкале ФАО/ВОЗ/УООН 1985 г. для детей 2–5 лет (таблица 7; разделы 6.2–6.3 отчёта).', 'Protein quality evaluation. Report of the Joint FAO/WHO Expert Consultation. FAO Food and Nutrition Paper 51', 'Food and Agriculture Organization of the United Nations; World Health Organization', 1991, 'Таблица 7, с. 23 (стр. 29 PDF); разделы 6.2–6.3, с. 23–25.', 'https://www.fao.org/4/t0501e/t0501e00.pdf', NULL)
+ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    source_title = EXCLUDED.source_title,
+    source_authors = EXCLUDED.source_authors,
+    source_year = EXCLUDED.source_year,
+    source_location = EXCLUDED.source_location,
+    source_url = EXCLUDED.source_url,
+    source_pdf_filename = EXCLUDED.source_pdf_filename;
 
 -- Значения эталонов (г/100 г белка)
 INSERT INTO reference_protein_values (reference_protein_id, amino_acid, value, sort_order)

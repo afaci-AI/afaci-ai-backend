@@ -33,3 +33,6 @@ backups/
 # Аудит-логи (ротация по дням)
 logs/*
 !logs/.gitkeep
+
+# PDF источников размещаются вне git
+uploads/reference-documents/

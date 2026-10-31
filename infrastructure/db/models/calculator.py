@@ -26,6 +26,12 @@ class ReferenceProtein(Base):
     year = Column(Integer, nullable=True)
     is_default = Column(Boolean, nullable=False, default=False)
     description = Column(Text, nullable=True)
+    source_title = Column(Text, nullable=True)
+    source_authors = Column(Text, nullable=True)
+    source_year = Column(Integer, nullable=True)
+    source_location = Column(Text, nullable=True)
+    source_url = Column(Text, nullable=True)
+    source_pdf_filename = Column(String, nullable=True)
 
     values = relationship(
         "ReferenceProteinValue",
