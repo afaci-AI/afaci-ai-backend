@@ -11,7 +11,7 @@ permissions:
 jobs:
   ruff-sca:
     name: ruff
-    runs-on: ubuntu-latest
+    runs-on: afaci-runner-01
     steps:
       - name: Checkout code by ruff
         uses: actions/checkout@v4
@@ -35,22 +35,36 @@ jobs:
 
   build:
     name: build
-    runs-on: ubuntu-latest
+    runs-on: afaci-runner-01
     needs:
       - ruff-sca
+  
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
+  
       - name: Extract Tag Name
-        id: vars
         run: echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-
-      - run: docker build -f Dockerfile.prod -t afaci-ai-backend:${{ env.TAG_NAME }} -t afaci-ai-backend:prod .
+  
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+  
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.prod
+          push: false
+          load: true
+          tags: |
+            afaci-ai-backend:${{ env.TAG_NAME }}
+            afaci-ai-backend:prod
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
 
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: afaci-runner-01
     needs: build
     steps:
       - name: Execute remote SSH commands
@@ -73,7 +87,7 @@ jobs:
 
   create-release:
     name: Create GitHub Release
-    runs-on: ubuntu-latest
+    runs-on: afaci-runner-01
     needs: deploy
     steps:
       - name: Check out repository
