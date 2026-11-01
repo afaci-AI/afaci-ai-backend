@@ -6,7 +6,6 @@
   POST   /api/v1/users            — создать
   PATCH  /api/v1/users/{id}       — редактировать (роль, статус, срок доступа)
   DELETE /api/v1/users/{id}           — деактивировать
-  DELETE /api/v1/users/{id}/permanent — удалить безвозвратно вместе с сохранёнными рецептурами
 """
 
 from datetime import datetime, timezone
@@ -187,25 +186,3 @@ async def deactivate_user(
     user.is_active = False
     await db.commit()
     return {"status": "deactivated"}
-
-
-@router.delete(
-    "/{id}/permanent", summary="Удалить пользователя безвозвратно вместе с рецептурами"
-)
-async def delete_user_permanently(
-    id: UUID,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    admin: Annotated[User, Depends(require_admin)],
-):
-    if id == admin.id:
-        raise HTTPException(
-            status_code=400, detail="Нельзя удалить собственную учётную запись."
-        )
-    user = await db.get(User, id)
-    if not user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден.")
-    # cascade="all, delete-orphan" на User.groups/saved_recipes удаляет группы,
-    # рецептуры и их ингредиенты (SavedRecipeItem каскадится от SavedRecipe).
-    await db.delete(user)
-    await db.commit()
-    return {"status": "deleted"}

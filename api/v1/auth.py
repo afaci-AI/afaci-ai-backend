@@ -1,7 +1,6 @@
 """
 Эндпоинты аутентификации.
 
-  POST /api/v1/auth/register  — регистрация (email, name, password)
   POST /api/v1/auth/login     — вход, возвращает JWT
   GET  /api/v1/auth/me        — текущий пользователь
 """
@@ -28,38 +27,9 @@ from infrastructure.db.session import get_db
 router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
 
 
-class RegisterRequest(BaseModel):
-    email: str = Field(min_length=3)
-    name: str = Field(min_length=1)
-    password: str = Field(min_length=6)
-
-
 class LoginRequest(BaseModel):
     email: str
     password: str
-
-
-@router.post("/register", summary="Регистрация пользователя")
-async def register(req: RegisterRequest, db: Annotated[AsyncSession, Depends(get_db)]):
-    email = req.email.lower()
-    exists = (
-        await db.execute(select(User).where(User.email == email))
-    ).scalar_one_or_none()
-    if exists is not None:
-        raise HTTPException(
-            status_code=409, detail="Пользователь с таким email уже существует."
-        )
-
-    user = User(
-        email=email,
-        name=req.name.strip(),
-        password_hash=hash_password(req.password),
-        role="viewer",
-    )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-    return {"access_token": create_access_token(user.id), "user": user_public(user)}
 
 
 @router.post("/login", summary="Вход")
