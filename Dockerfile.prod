@@ -20,7 +20,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 FROM python:3.12-slim AS runtime
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl util-linux \
+    && apt-get install -y --no-install-recommends curl util-linux aapt \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 1000 afaci \
     && useradd --uid 1000 --gid afaci --shell /bin/bash --create-home afaci
