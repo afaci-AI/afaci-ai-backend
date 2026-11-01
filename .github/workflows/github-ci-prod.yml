@@ -35,7 +35,7 @@ jobs:
 
   build:
     name: build
-    runs-on: afaci-runner-01
+    runs-on: [self-hosted, ci-runner]
     needs:
       - ruff-sca
     steps:
@@ -50,7 +50,7 @@ jobs:
 
 
   deploy:
-    runs-on: afaci-runner-01
+    runs-on: [self-hosted, ci-runner]
     needs: build
     steps:
       - name: Execute remote SSH commands
@@ -73,7 +73,7 @@ jobs:
 
   create-release:
     name: Create GitHub Release
-    runs-on: afaci-runner-01
+    runs-on: [self-hosted, ci-runner]
     needs: deploy
     steps:
       - name: Check out repository
