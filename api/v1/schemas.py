@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SimpleCreate(BaseModel):
@@ -39,6 +39,10 @@ class ProductUpdate(BaseModel):
     category_id: UUID | None = None
     subcategory_id: UUID | None = None
     region_id: UUID | None = None
+
+
+class ProductCount(BaseModel):
+    count: int = Field(ge=0, description="Общее количество продуктов питания в базе")
 
 
 class NutrientCreate(BaseModel):

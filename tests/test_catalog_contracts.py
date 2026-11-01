@@ -118,6 +118,26 @@ class DictionaryContractChecks(unittest.IsolatedAsyncioTestCase):
                 db.commit.assert_not_awaited()
 
 
+class ProductCountChecks(unittest.IsolatedAsyncioTestCase):
+    async def test_returns_total_and_zero_for_empty_database(self):
+        for total, expected in ((115, 115), (0, 0), (None, 0)):
+            with self.subTest(total=total):
+                db = Mock(scalar=AsyncMock(return_value=total))
+                result = await products.api_count_products(db)
+                self.assertEqual(result.count, expected)
+
+    def test_route_is_public_parameterless_and_not_shadowed_by_item_route(self):
+        app = FastAPI()
+        app.include_router(products.router)
+        operation = app.openapi()["paths"]["/api/v1/products/count"]["get"]
+        self.assertNotIn("parameters", operation)
+        self.assertNotIn("security", operation)
+        paths = [route.path for route in app.routes]
+        self.assertLess(
+            paths.index("/api/v1/products/count"), paths.index("/api/v1/products/{id}")
+        )
+
+
 class NutrientUpdateChecks(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.old_type = uuid4()

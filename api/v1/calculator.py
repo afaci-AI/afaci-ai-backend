@@ -10,11 +10,12 @@
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.v1.reference_documents import document_path
 from application.calculator.calculator_service import compute_recipe
 from application.calculator.cost_optimizer import optimize_recipe_cost
 from application.calculator.recipe_optimizer import optimize_recipe_composition
@@ -27,6 +28,30 @@ router = APIRouter(prefix="/api/v1/calculator", tags=[TAG])
 
 
 # ----------------------------- схемы -----------------------------
+class ReferenceSourceOut(BaseModel):
+    title: str
+    authors: str | None = None
+    year: int | None = None
+    location: str | None = None
+    url: str | None = None
+    pdf_url: str | None = None
+
+
+class ReferenceValueOut(BaseModel):
+    amino_acid: str
+    value: float
+
+
+class ReferenceProteinOut(BaseModel):
+    id: UUID
+    name: str
+    year: int | None
+    is_default: bool
+    description: str | None
+    values: list[ReferenceValueOut]
+    source: ReferenceSourceOut | None = None
+
+
 class CalcItem(BaseModel):
     product_id: UUID
     amount_g: float
@@ -94,12 +119,16 @@ class OptimizeRecipeRequest(BaseModel):
 
 
 @router.get("/reference-proteins", summary="Эталонные белки ФАО/ВОЗ")
-async def list_reference_proteins(db: Annotated[AsyncSession, Depends(get_db)]):
+async def list_reference_proteins(
+    request: Request, db: Annotated[AsyncSession, Depends(get_db)]
+) -> list[ReferenceProteinOut]:
     rows = (
         (
             await db.execute(
                 text(
-                    "SELECT id, name, year, is_default, description FROM reference_proteins "
+                    "SELECT id, name, year, is_default, description, "
+                    "source_title, source_authors, source_year, source_location, "
+                    "source_url, source_pdf_filename FROM reference_proteins "
                     "ORDER BY year"
                 )
             )
@@ -122,6 +151,22 @@ async def list_reference_proteins(db: Annotated[AsyncSession, Depends(get_db)]):
             .mappings()
             .all()
         )
+        source = None
+        if rp["source_title"]:
+            filename = rp["source_pdf_filename"]
+            pdf_url = (
+                str(request.url_for("get_reference_document", filename=filename))
+                if filename and document_path(filename) is not None
+                else None
+            )
+            source = ReferenceSourceOut(
+                title=rp["source_title"],
+                authors=rp["source_authors"],
+                year=rp["source_year"],
+                location=rp["source_location"],
+                url=rp["source_url"],
+                pdf_url=pdf_url,
+            )
         result.append(
             {
                 "id": str(rp["id"]),
@@ -129,6 +174,7 @@ async def list_reference_proteins(db: Annotated[AsyncSession, Depends(get_db)]):
                 "year": rp["year"],
                 "is_default": rp["is_default"],
                 "description": rp["description"],
+                "source": source,
                 "values": [
                     {"amino_acid": v["amino_acid"], "value": v["value"]} for v in vals
                 ],

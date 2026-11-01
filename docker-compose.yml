@@ -28,12 +28,14 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-10080}
+      REFERENCE_DOCUMENT_STORAGE_PATH: /app/uploads/reference-documents
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - ./logs:/app/logs
       - afaci-apk-storage:/app/uploads/apk
+      - afaci-reference-documents:/app/uploads/reference-documents
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     networks:
@@ -47,3 +49,4 @@ networks:
 volumes:
   afaci-pgdata:
   afaci-apk-storage:
+  afaci-reference-documents:
