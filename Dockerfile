@@ -28,7 +28,7 @@ RUN rm -f /etc/apt/apt.conf.d/docker-clean \
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update \
-    && apt-get install -y --no-install-recommends curl util-linux \
+    && apt-get install -y --no-install-recommends curl util-linux aapt \
     && groupadd --gid 1000 afaci \
     && useradd --uid 1000 --gid afaci --shell /bin/bash --create-home afaci
 
