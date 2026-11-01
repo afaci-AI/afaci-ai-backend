@@ -1,0 +1,39 @@
+name: base-ci
+
+on:
+  pull_request:
+    branches: ["develop"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: base-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOCKER_BUILDKIT: "1"
+
+jobs:
+  ruff-sca:
+    name: ruff
+    runs-on: afaci-runner-01
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Run Ruff (Linting)
+        run: ruff check .
+
+      - name: Run Ruff (Format Check)
+        run: ruff format --check .
