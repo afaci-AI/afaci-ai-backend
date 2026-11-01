@@ -12,14 +12,16 @@
 
 import os
 import re
-from datetime import datetime, timezone
+import subprocess
+from datetime import UTC, datetime
 from typing import Annotated
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 from starlette.requests import ClientDisconnect
 
 from api.rate_limit import limiter
@@ -74,10 +76,32 @@ class AppVersionAdmin(BaseModel):
     publishedAt: datetime
 
 
-class UploadApkResponse(BaseModel):
-    filename: str
-    url: str
-    size: int
+def _apk_version(path: str) -> tuple[str, int]:
+    """Read the compiled Android manifest with Android's packaging tool."""
+    try:
+        result = subprocess.run(
+            [os.getenv("AAPT_PATH", "aapt"), "dump", "badging", path],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=True,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(503, "На сервере не настроено чтение APK (aapt).") from exc
+    except (subprocess.SubprocessError, UnicodeError) as exc:
+        raise HTTPException(
+            400, "Не удалось прочитать AndroidManifest.xml из APK."
+        ) from exc
+    package = next(
+        (line for line in result.stdout.splitlines() if line.startswith("package:")), ""
+    )
+    name = re.search(r" versionName='([^']+)'", package)
+    code = re.search(r" versionCode='(\d+)'", package)
+    if not name or not code or not 0 < int(code[1]) <= 2100000000:
+        raise HTTPException(
+            400, "В APK отсутствуют корректные versionName и versionCode."
+        )
+    return name[1], int(code[1])
 
 
 # -------------------------- сериализация --------------------------
@@ -128,11 +152,16 @@ async def get_app_version(
 @router.post(
     "/api/v1/admin/app-versions/upload-apk",
     status_code=201,
-    summary="Загрузить APK файл",
+    summary="Загрузить APK и опубликовать версию",
+    response_model=AppVersionAdmin,
 )
 async def upload_apk(
     _admin_user: Annotated[User, Depends(require_admin)],
     file: Annotated[UploadFile, File()],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    forceUpdate: Annotated[bool, Form()] = False,
+    changelog: Annotated[str | None, Form()] = None,
+    minSupportedVersionCode: Annotated[int | None, Form(ge=0)] = None,
 ):
     if not file.filename or not file.filename.lower().endswith(".apk"):
         raise HTTPException(
@@ -142,9 +171,9 @@ async def upload_apk(
     base = APK_STORAGE_PATH
     os.makedirs(base, exist_ok=True)
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
     safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", file.filename)
-    filename = f"{timestamp}-{safe_name}"
+    filename = f"{timestamp}-{uuid4().hex}-{safe_name}"
     path = os.path.join(base, filename)
 
     size = 0
@@ -180,8 +209,25 @@ async def upload_apk(
             status_code=400, detail="Файл не является действительным APK архивом."
         )
 
-    url = f"{APK_BASE_URL.rstrip('/')}/{filename}"
-    return UploadApkResponse(filename=filename, url=url, size=size)
+    try:
+        version, version_code = await run_in_threadpool(_apk_version, path)
+        return await create_app_version(
+            AppVersionCreate(
+                version=version,
+                versionCode=version_code,
+                apkFilename=filename,
+                changelog=changelog,
+                forceUpdate=forceUpdate,
+                minSupportedVersionCode=minSupportedVersionCode,
+            ),
+            db,
+            _admin_user,
+        )
+    except BaseException:
+        await db.rollback()
+        if os.path.exists(path):
+            os.remove(path)
+        raise
 
 
 # ------------------------- управление -----------------------------
@@ -204,6 +250,8 @@ async def create_app_version(
     db: Annotated[AsyncSession, Depends(get_db)],
     _admin_user: Annotated[User, Depends(require_admin)],
 ):
+    # Serialize publications, including concurrent uploads and legacy creates.
+    await db.execute(text("SELECT pg_advisory_xact_lock(86422107)"))
     max_code = (
         await db.execute(select(func.max(AppVersion.version_code)))
     ).scalar_one_or_none()
@@ -243,7 +291,7 @@ async def create_app_version(
         force_update=data.forceUpdate,
         min_supported_version_code=data.minSupportedVersionCode,
         is_current=data.isCurrent,
-        published_at=datetime.now(timezone.utc),
+        published_at=datetime.now(UTC),
     )
     db.add(version)
     await db.commit()

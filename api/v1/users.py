@@ -8,7 +8,7 @@
   DELETE /api/v1/users/{id}           — деактивировать
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -50,7 +50,7 @@ def _validate_role(role: str) -> None:
 
 
 def _validate_expiry(expires_at: datetime | None) -> None:
-    if expires_at is not None and expires_at <= datetime.now(timezone.utc):
+    if expires_at is not None and expires_at <= datetime.now(UTC):
         raise HTTPException(
             status_code=400, detail="Дата окончания доступа не может быть в прошлом."
         )
