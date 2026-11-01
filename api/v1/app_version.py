@@ -12,7 +12,7 @@
 
 import os
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -142,7 +142,7 @@ async def upload_apk(
     base = APK_STORAGE_PATH
     os.makedirs(base, exist_ok=True)
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
     safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", file.filename)
     filename = f"{timestamp}-{safe_name}"
     path = os.path.join(base, filename)
@@ -243,7 +243,7 @@ async def create_app_version(
         force_update=data.forceUpdate,
         min_supported_version_code=data.minSupportedVersionCode,
         is_current=data.isCurrent,
-        published_at=datetime.now(timezone.utc),
+        published_at=datetime.now(UTC),
     )
     db.add(version)
     await db.commit()
