@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -41,7 +41,7 @@ NUTRIENT_ENTITY = "Product"  # Nutrient считается частью прод
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _sanitize_value(value: Any) -> Any:

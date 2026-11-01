@@ -5,7 +5,7 @@
   GET  /api/v1/auth/me        — текущий пользователь
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -48,7 +48,7 @@ async def login(req: LoginRequest, db: Annotated[AsyncSession, Depends(get_db)])
             detail="Срок действия учётной записи истёк. Обратитесь в техническую поддержку.",
         )
 
-    user.last_login_at = datetime.now(timezone.utc)
+    user.last_login_at = datetime.now(UTC)
     await db.commit()
     await db.refresh(user)
     return {"access_token": create_access_token(user.id), "user": user_public(user)}
