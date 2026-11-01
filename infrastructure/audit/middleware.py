@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
@@ -153,7 +153,7 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
                 level = logging.ERROR
 
             payload = {
-                "timestamp": datetime.now(UTC).isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "user": user,
                 "ip": ip,
                 "method": method,

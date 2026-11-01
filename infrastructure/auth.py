@@ -4,7 +4,7 @@
 """
 
 import os
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 from uuid import UUID
 
@@ -38,7 +38,7 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 # ----------------------------- токены -----------------------------
 def create_access_token(user_id: UUID) -> str:
-    expire = datetime.now(UTC) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {"sub": str(user_id), "exp": expire}
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
@@ -66,7 +66,7 @@ def is_expired(user: User) -> bool:
     """access_expires_at = null значит безлимитный доступ."""
     return (
         user.access_expires_at is not None
-        and user.access_expires_at <= datetime.now(UTC)
+        and user.access_expires_at <= datetime.now(timezone.utc)
     )
 
 

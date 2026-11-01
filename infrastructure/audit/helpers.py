@@ -28,7 +28,7 @@ import functools
 import json
 import logging
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -94,7 +94,7 @@ def log_audit_change(
     try:
         logger = get_audit_logger()
         payload: dict[str, Any] = {
-            "timestamp": datetime.now(UTC).isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "event": "audit.change",
             "action": action,
             "target_type": target_type,

@@ -125,6 +125,6 @@ def get_audit_logger() -> logging.Logger:
 
 
 def _utc_now_iso() -> str:
-    from datetime import UTC, datetime
+    from datetime import datetime, timezone
 
-    return datetime.now(UTC).isoformat()
+    return datetime.now(timezone.utc).isoformat()
