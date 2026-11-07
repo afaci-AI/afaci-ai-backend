@@ -11,7 +11,7 @@
   Этап 2. НАК и скор:         Mⱼ = Σ(Sᵢ·Xᵢ·Mᵢⱼ) / Σ(Sᵢ·Xᵢ),  C = Mⱼ/эталон·100
   Этап 3. Энергоценность:     ЭЦ = 4·Б + 9·Ж + 4·У
   Этап 4. Качество:           КРАС = Σ(Cⱼ−Cmin)/n,  БЦ = 100−КРАС,
-                              αⱼ = Cmin/Cⱼ,  V = Σ(αⱼ·Aⱼ)/ΣAⱼ,
+                              αⱼ = Cmin/Cⱼ,  U = Σ(αⱼ·Aⱼ)/ΣAⱼ,
                               G = Σ(Aⱼ·(1−αⱼ)) / (Cmin/100)
 """
 
@@ -97,7 +97,7 @@ def compute_report(items: list[dict], reference: dict, *, rounded: bool = True) 
     c_min_name = next((r["name"] for r in scored if r["score"] == c_min_val), None)
 
     # ---- Этап 4. Качественные показатели ----
-    kras = bc = util_V = util_G = None
+    kras = bc = util_U = util_G = None
     if scored and c_min_val is not None:
         n = len(scored)
         kras = sum(r["score"] - c_min_val for r in scored) / n
@@ -113,7 +113,7 @@ def compute_report(items: list[dict], reference: dict, *, rounded: bool = True) 
             sum_alpha_A += alpha * A
             sum_A += A
             sum_excess += A * (1 - alpha)
-        util_V = sum_alpha_A / sum_A if sum_A else None
+        util_U = sum_alpha_A / sum_A if sum_A else None
         util_G = sum_excess / (c_min_val / 100.0) if c_min_val else None
 
     # Пометить лимитирующие и минимальную НАК
@@ -157,7 +157,7 @@ def compute_report(items: list[dict], reference: dict, *, rounded: bool = True) 
             "данным; отсутствие значения не означает нулевое содержание."
         )
 
-    verdict = _build_verdict(amino_rows, reference, kras, bc, util_V, util_G)
+    verdict = _build_verdict(amino_rows, reference, kras, bc, util_U, util_G)
 
     return {
         "recipe": [
@@ -209,12 +209,20 @@ def compute_report(items: list[dict], reference: dict, *, rounded: bool = True) 
         "quality": {
             "kras": display(kras, 1),
             "bc": display(bc, 1),
-            "V": display(util_V, 2),
+            "U": display(util_U, 2),
+            # Устаревший псевдоним U для выпущенных клиентов; будет удалён.
+            "V": display(util_U, 2),
             "G": display(util_G, 2),
         },
         # Raw values support numerical comparison without treating display rounding
         # as evidence that the composition improved.
-        "quality_precise": {"kras": kras, "bc": bc, "V": util_V, "G": util_G},
+        "quality_precise": {
+            "kras": kras,
+            "bc": bc,
+            "U": util_U,
+            "V": util_U,  # устаревший псевдоним U
+            "G": util_G,
+        },
         "amino_contributors": [it["name"] for it in contributors],
         "warnings": warnings,
         "verdict": verdict,
@@ -238,7 +246,7 @@ def _build_verdict(
     reference: dict,
     kras: float | None,
     bc: float | None,
-    util_V: float | None,
+    util_U: float | None,
     util_G: float | None,
 ) -> dict | None:
     """
@@ -299,9 +307,9 @@ def _build_verdict(
             for d in deficits
         )
     points.append(f"Расчётные показатели: КРАС = {_fmt(kras)} %, БЦ = {_fmt(bc)} %.")
-    if util_V is not None and util_G is not None:
+    if util_U is not None and util_G is not None:
         points.append(
-            f"Справочно: коэффициент утилитарности U = {_fmt(util_V, 2)}; "
+            f"Справочно: коэффициент утилитарности U = {_fmt(util_U, 2)}; "
             f"сопоставимая избыточность G = {_fmt(util_G, 2)} г/100 г белка."
         )
 

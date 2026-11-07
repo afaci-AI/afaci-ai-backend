@@ -78,7 +78,7 @@ class OptimizationChecks(unittest.TestCase):
         result = optimize_recipe(candidates, reference, [50, 50], "basic")
         self.assertEqual(result["status"], "goal_not_achieved")
         self.assert_valid(result, candidates, reference)
-        self.assertEqual({v["metric"] for v in result["violations"]}, {"bc", "V", "G"})
+        self.assertEqual({v["metric"] for v in result["violations"]}, {"bc", "U", "G"})
         self.assertTrue(all(v["amount"] > 0 for v in result["violations"]))
 
     def test_fixed_composition_zero_price_is_not_saving(self):
@@ -220,7 +220,7 @@ class OptimizationChecks(unittest.TestCase):
                 with (
                     self.subTest(mode=mode, missing_chem=missing_chem),
                     self.assertRaisesRegex(
-                        RecipeOptimizationError, "Невозможно рассчитать БЦ, V и G"
+                        RecipeOptimizationError, "Невозможно рассчитать БЦ, U и G"
                     ),
                 ):
                     optimize_recipe(unknown, reference, [50, 50], mode)
@@ -235,7 +235,7 @@ class OptimizationChecks(unittest.TestCase):
         original = compute_report(_build_items(candidates, baseline), reference)
         for metric, expected in (
             ("bc", 78.2668201),
-            ("V", 0.78524439),
+            ("U", 0.78524439),
             ("G", 9.84559986),
         ):
             self.assertAlmostEqual(
