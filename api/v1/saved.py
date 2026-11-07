@@ -67,8 +67,15 @@ class SavedRecipeUpdate(BaseModel):
 class Weights(BaseModel):
     bc: float = 0.25
     kras: float = 0.25
-    v: float = 0.25
+    u: float | None = None
+    v: float | None = None  # устаревшее имя u; используется, если u не задан
     g: float = 0.25
+
+    @property
+    def utility(self) -> float:
+        if self.u is not None:
+            return self.u
+        return self.v if self.v is not None else 0.25
 
 
 class RankingRequest(BaseModel):
@@ -97,7 +104,8 @@ def _recipe_public(r: SavedRecipe, with_items: bool = False) -> dict:
         "metrics": {
             "bc": r.bc,
             "kras": r.kras,
-            "V": r.v_coef,
+            "U": r.u_coef,
+            "V": r.u_coef,  # устаревший псевдоним U
             "G": r.g_coef,
             "energy_kcal": r.energy_kcal,
             "c_min_name": r.c_min_name,
@@ -123,7 +131,7 @@ def _apply_metrics(r: SavedRecipe, report: dict) -> None:
     c_min = report.get("c_min") or {}
     r.bc = q.get("bc")
     r.kras = q.get("kras")
-    r.v_coef = q.get("V")
+    r.u_coef = q.get("U")
     r.g_coef = q.get("G")
     r.energy_kcal = report.get("energy_kcal")
     r.c_min_name = c_min.get("name")
@@ -132,7 +140,7 @@ def _apply_metrics(r: SavedRecipe, report: dict) -> None:
 
 def _clear_metrics(r: SavedRecipe) -> None:
     """Сбросить показатели (рецептура-черновик без расчёта)."""
-    r.bc = r.kras = r.v_coef = r.g_coef = r.energy_kcal = r.c_min_score = None
+    r.bc = r.kras = r.u_coef = r.g_coef = r.energy_kcal = r.c_min_score = None
     r.c_min_name = None
 
 
@@ -449,12 +457,18 @@ async def ranking(
     }
 
     w = req.weights or Weights()
-    wsum = (w.bc + w.kras + w.v + w.g) or 1.0
-    wn = {"bc": w.bc / wsum, "kras": w.kras / wsum, "v": w.v / wsum, "g": w.g / wsum}
+    wsum = (w.bc + w.kras + w.utility + w.g) or 1.0
+    wn = {
+        "bc": w.bc / wsum,
+        "kras": w.kras / wsum,
+        "u": w.utility / wsum,
+        "v": w.utility / wsum,  # устаревший псевдоним u
+        "g": w.g / wsum,
+    }
 
     n_bc = _normalize([r.bc for r in recipes], higher_is_better=True)
     n_kras = _normalize([r.kras for r in recipes], higher_is_better=False)
-    n_v = _normalize([r.v_coef for r in recipes], higher_is_better=True)
+    n_u = _normalize([r.u_coef for r in recipes], higher_is_better=True)
     n_g = _normalize([r.g_coef for r in recipes], higher_is_better=False)
 
     results = []
@@ -462,7 +476,7 @@ async def ranking(
         composite = (
             wn["bc"] * n_bc[i]
             + wn["kras"] * n_kras[i]
-            + wn["v"] * n_v[i]
+            + wn["u"] * n_u[i]
             + wn["g"] * n_g[i]
         )
         results.append(
@@ -472,12 +486,14 @@ async def ranking(
                 "group": group_names.get(r.group_id) if r.group_id else None,
                 "bc": r.bc,
                 "kras": r.kras,
-                "V": r.v_coef,
+                "U": r.u_coef,
+                "V": r.u_coef,  # устаревший псевдоним U
                 "G": r.g_coef,
                 "normalized": {
                     "bc": round(n_bc[i], 4),
                     "kras": round(n_kras[i], 4),
-                    "V": round(n_v[i], 4),
+                    "U": round(n_u[i], 4),
+                    "V": round(n_u[i], 4),  # устаревший псевдоним U
                     "G": round(n_g[i], 4),
                 },
                 "composite": round(composite, 4),

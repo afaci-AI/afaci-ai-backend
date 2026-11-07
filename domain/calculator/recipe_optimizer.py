@@ -18,7 +18,7 @@ from domain.calculator.formulas import NAK_GROUPS, compute_report
 from domain.calculator.optimizer import CandidateItem, _build_items
 
 COMPARISON_TOLERANCE = 1e-6
-METRICS = ("bc", "V", "G")
+METRICS = ("bc", "U", "G")
 
 
 class RecipeOptimizationError(ValueError):
@@ -123,7 +123,7 @@ def optimize_recipe(
     original = original_report["quality_precise"]
     if not all(_finite(original.get(metric)) for metric in (*METRICS, "kras")):
         raise RecipeOptimizationError(
-            "Невозможно рассчитать БЦ, V и G исходной рецептуры: проверьте данные НАК и белок."
+            "Невозможно рассчитать БЦ, U и G исходной рецептуры: проверьте данные НАК и белок."
         )
     base_quality = np.array([original[m] for m in METRICS])
     # No arbitrary weights: each violation is divided by its own baseline.
@@ -273,7 +273,7 @@ def optimize_recipe(
 
     report = compute_report(_build_items(candidates, selected.amounts), reference)
     comparison = {}
-    for metric in ("bc", "V", "kras", "G"):
+    for metric in ("bc", "U", "kras", "G"):
         before, after = original[metric], selected.quality[metric]
         delta = after - before
         signed = -delta if metric in ("G", "kras") else delta
@@ -287,6 +287,8 @@ def optimize_recipe(
             if signed < -tol
             else "unchanged",
         }
+    # Устаревший псевдоним U для выпущенных клиентов; будет удалён.
+    comparison["V"] = comparison["U"]
     violations = []
     for i, metric in enumerate(METRICS):
         amount = max(
@@ -328,7 +330,8 @@ def optimize_recipe(
         "report": report,
         "thresholds": {
             "bc_min": original["bc"],
-            "v_min": original["V"],
+            "u_min": original["U"],
+            "v_min": original["U"],  # устаревший псевдоним u_min
             "g_max": original["G"],
         },
         "comparison": comparison,

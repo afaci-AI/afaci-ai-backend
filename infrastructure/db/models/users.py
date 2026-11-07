@@ -80,7 +80,7 @@ class SavedRecipe(Base):
 
     bc = Column(Double, nullable=True)
     kras = Column(Double, nullable=True)
-    v_coef = Column(Double, nullable=True)
+    u_coef = Column(Double, nullable=True)
     g_coef = Column(Double, nullable=True)
     energy_kcal = Column(Double, nullable=True)
     c_min_name = Column(String, nullable=True)
