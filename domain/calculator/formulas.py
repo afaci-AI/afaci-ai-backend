@@ -157,17 +157,7 @@ def compute_report(items: list[dict], reference: dict, *, rounded: bool = True) 
             "данным; отсутствие значения не означает нулевое содержание."
         )
 
-    verdict = _build_verdict(
-        c_min_name,
-        c_min_val,
-        kras,
-        bc,
-        util_V,
-        util_G,
-        len(limiting),
-        protein,
-        fat,
-    )
+    verdict = _build_verdict(amino_rows, reference, kras, bc, util_V, util_G)
 
     return {
         "recipe": [
@@ -231,90 +221,99 @@ def compute_report(items: list[dict], reference: dict, *, rounded: bool = True) 
     }
 
 
-# Пороговые уровни итогового уровня качества
-_LEVEL_ORDER = {"good": 0, "moderate": 1, "poor": 2}
-_LEVEL_HEADLINE = {
-    "good": "Белок высокого качества",
-    "moderate": "Белок удовлетворительного качества",
-    "poor": "Белок низкого качества",
-}
+EXPERIMENTAL_NOTE = (
+    "Экспериментальная функция. Заключение строится только по аминокислотному "
+    "составу белка в сравнении с выбранным эталоном ФАО/ВОЗ; усвояемость и другие "
+    "факторы не учитываются."
+)
+
+
+def _fmt(value: float, digits: int = 1) -> str:
+    """Число с десятичной запятой для текста заключения."""
+    return f"{value:.{digits}f}".replace(".", ",")
 
 
 def _build_verdict(
-    c_min_name, c_min_val, kras, bc, util_V, util_G, limiting_count, protein, fat
+    amino_rows: list[dict],
+    reference: dict,
+    kras: float | None,
+    bc: float | None,
+    util_V: float | None,
+    util_G: float | None,
 ) -> dict | None:
     """
-    Текстовый вердикт по качеству белка — интерпретация уже посчитанных
-    показателей (Cmin, КРАС/БЦ, V, G) словами. БЕЗ обращения к банку продуктов.
-    Возвращает {level, headline, points[]}.
+    Заключение о белке строго по выбранному эталону ФАО/ВОЗ — без условных порогов.
+
+    Критерий один: белок полноценен по эталону, если содержание каждой из
+    8 групп НАК не ниже эталона (скор ≥ 100 %). Иначе перечисляются НАК ниже
+    эталона с их скором и недостачей в г/100 г белка. КРАС, БЦ, U и G выводятся
+    числами, без оценочных слов. Усвояемость белка не учитывается.
+
+    Возвращает {level, headline, points[], reference, deficits[], experimental_note}
+    или None, если расчёт скоров невозможен. Без обращения к банку продуктов.
     """
-    if c_min_val is None or kras is None:
+    scored = [r for r in amino_rows if r["score"] is not None]
+    if not scored or kras is None or bc is None:
         return None
 
-    points: list[str] = []
+    ref_name = reference["name"]
+    deficits = sorted(
+        (
+            {
+                "name": r["name"],
+                "score": round(r["score"], 1),
+                "m_j": round(r["m_j"], 2),
+                "reference": r["reference"],
+                "deficit": round(r["reference"] - r["m_j"], 2),
+            }
+            for r in scored
+            if r["score"] < 100
+        ),
+        key=lambda d: d["score"],
+    )
+    complete = not deficits
 
-    # 1. Полноценность — по минимальному скору (Cmin)
-    if c_min_val >= 95:
-        completeness = "good"
-        points.append(
-            f"Белок практически полноценный: минимальный аминокислотный скор "
-            f"{c_min_val:.0f}% — все незаменимые аминокислоты близки к эталону или выше."
+    points: list[str] = [
+        (
+            f"Оценка выполнена по эталону «{ref_name}»: содержание каждой группы "
+            f"незаменимых аминокислот в белке рецептуры сравнивается со значением "
+            f"эталона (г на 100 г белка). Усвояемость белка не учитывается."
         )
-    elif c_min_val >= 70:
-        completeness = "moderate"
+    ]
+    if complete:
         points.append(
-            f"Лимитирующая аминокислота — {c_min_name} (скор {c_min_val:.0f}%). "
-            f"Именно она ограничивает биологическую ценность белка"
-            + (
-                f"; всего лимитирующих НАК: {limiting_count}."
-                if limiting_count
-                else "."
-            )
+            f"Все {len(scored)} групп незаменимых аминокислот не ниже эталона "
+            f"(аминокислотный скор ≥ 100 %): по эталону белок полноценный."
         )
     else:
-        completeness = "poor"
+        lowest = deficits[0]
         points.append(
-            f"Выраженный дефицит по аминокислоте {c_min_name} (скор {c_min_val:.0f}%): "
-            f"белок неполноценный, биологическая ценность сильно ограничена."
+            f"Ниже эталона {len(deficits)} из {len(scored)} групп незаменимых "
+            f"аминокислот. Лимитирующая — {lowest['name']}: скор "
+            f"{_fmt(lowest['score'])} %."
         )
-
-    # 2. Сбалансированность — по КРАС/БЦ
-    if kras < 10:
-        balance = "good"
-        points.append(
-            f"Аминокислотный состав хорошо сбалансирован: КРАС {kras:.1f}%, "
-            f"биологическая ценность {bc:.1f}% — близко к идеальному белку."
+        points.extend(
+            f"{d['name']}: скор {_fmt(d['score'])} % — {_fmt(d['m_j'], 2)} г против "
+            f"{_fmt(d['reference'], 2)} г на 100 г белка, недостаёт "
+            f"{_fmt(d['deficit'], 2)} г."
+            for d in deficits
         )
-    elif kras < 25:
-        balance = "moderate"
-        points.append(
-            f"Умеренный дисбаланс: КРАС {kras:.1f}%, БЦ {bc:.1f}%. Часть незаменимых "
-            f"аминокислот в избытке относительно лимитирующей и используется не полностью."
-        )
-    else:
-        balance = "poor"
-        points.append(
-            f"Сильный дисбаланс: КРАС {kras:.1f}%, БЦ {bc:.1f}% — много «избыточных» "
-            f"аминокислот, не подкреплённых лимитирующей."
-        )
-
-    # 3. Утилизация и избыточность (V, G)
+    points.append(f"Расчётные показатели: КРАС = {_fmt(kras)} %, БЦ = {_fmt(bc)} %.")
     if util_V is not None and util_G is not None:
         points.append(
-            f"Коэффициент утилитарности U = {util_V:.2f}: незаменимые аминокислоты "
-            f"используются примерно на {util_V * 100:.0f}%. Сопоставимая избыточность "
-            f"G = {util_G:.1f} г/100 г белка не идёт на пластические нужды."
+            f"Справочно: коэффициент утилитарности U = {_fmt(util_V, 2)}; "
+            f"сопоставимая избыточность G = {_fmt(util_G, 2)} г/100 г белка."
         )
 
-    # 4. Краткая заметка по макросоставу (тоже только текст, без банка)
-    if protein and fat:
-        ratio = fat / protein
-        if protein < 12:
-            points.append(
-                f"Доля белка невысокая ({protein:.1f}%) при соотношении белок:жир "
-                f"1:{ratio:.2f} — для повышения пищевой ценности есть смысл увеличить "
-                f"белковую часть и снизить жировую."
-            )
-
-    level = max([completeness, balance], key=lambda x: _LEVEL_ORDER[x])
-    return {"level": level, "headline": _LEVEL_HEADLINE[level], "points": points}
+    return {
+        "level": "complete" if complete else "incomplete",
+        "headline": (
+            f"Белок полноценный по эталону {ref_name}"
+            if complete
+            else f"Белок неполноценный по эталону {ref_name}"
+        ),
+        "points": points,
+        "reference": {"name": ref_name, "year": reference.get("year")},
+        "deficits": deficits,
+        "experimental_note": EXPERIMENTAL_NOTE,
+    }
