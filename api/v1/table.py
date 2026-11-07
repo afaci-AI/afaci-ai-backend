@@ -1,6 +1,7 @@
 import csv
 import io
 from typing import Annotated, Literal
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
@@ -8,6 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from infrastructure.db.session import get_db
+from infrastructure.db.text_filters import contains_clause
 
 TAG = "Table (Flat)"
 
@@ -47,22 +49,26 @@ _PRODUCT_COLS = {
 async def table_nutrients(
     db: Annotated[AsyncSession, Depends(get_db)],
     region: Annotated[
-        str | None, Query(description="Фильтр по региону (ILIKE)")
+        str | None, Query(description="Фильтр по региону (часть, без учёта регистра)")
     ] = None,
     category: Annotated[
-        str | None, Query(description="Фильтр по категории (ILIKE)")
+        str | None, Query(description="Фильтр по категории (часть, без учёта регистра)")
     ] = None,
     subcategory: Annotated[
-        str | None, Query(description="Фильтр по подкатегории (ILIKE)")
+        str | None,
+        Query(description="Фильтр по подкатегории (часть, без учёта регистра)"),
     ] = None,
     product: Annotated[
-        str | None, Query(description="Фильтр по названию продукта (ILIKE)")
+        str | None,
+        Query(description="Фильтр по названию продукта (часть, без учёта регистра)"),
     ] = None,
     nutrient_type: Annotated[
-        str | None, Query(description="Фильтр по типу нутриента (ILIKE)")
+        str | None,
+        Query(description="Фильтр по типу нутриента (часть, без учёта регистра)"),
     ] = None,
     nutrient_name: Annotated[
-        str | None, Query(description="Фильтр по названию нутриента (ILIKE)")
+        str | None,
+        Query(description="Фильтр по названию нутриента (часть, без учёта регистра)"),
     ] = None,
     sort_by: Annotated[
         str, Query(description="Колонка для сортировки")
@@ -111,7 +117,7 @@ async def table_nutrients(
         JOIN nutrients_types nt     ON n.id_type_component  = nt.id
         JOIN units u                ON n.unit_id            = u.id
         {where}
-        ORDER BY {sort_by} {sort_order}
+        ORDER BY {sort_by} {sort_order}, p.id, n.id
         LIMIT :_limit OFFSET :_offset
     """)
 
@@ -132,16 +138,27 @@ async def table_nutrients(
 async def table_products(
     db: Annotated[AsyncSession, Depends(get_db)],
     region: Annotated[
-        str | None, Query(description="Фильтр по региону (ILIKE)")
+        str | None, Query(description="Фильтр по региону (часть, без учёта регистра)")
     ] = None,
     category: Annotated[
-        str | None, Query(description="Фильтр по категории (ILIKE)")
+        str | None, Query(description="Фильтр по категории (часть, без учёта регистра)")
     ] = None,
     subcategory: Annotated[
-        str | None, Query(description="Фильтр по подкатегории (ILIKE)")
+        str | None,
+        Query(description="Фильтр по подкатегории (часть, без учёта регистра)"),
     ] = None,
     product: Annotated[
-        str | None, Query(description="Фильтр по названию продукта (ILIKE)")
+        str | None,
+        Query(description="Фильтр по названию продукта (часть, без учёта регистра)"),
+    ] = None,
+    category_id: Annotated[
+        UUID | None, Query(description="Точный фильтр по категории (ID)")
+    ] = None,
+    subcategory_id: Annotated[
+        UUID | None, Query(description="Точный фильтр по подкатегории (ID)")
+    ] = None,
+    region_id: Annotated[
+        UUID | None, Query(description="Точный фильтр по региону (ID)")
     ] = None,
     sort_by: Annotated[
         str, Query(description="Колонка для сортировки")
@@ -164,6 +181,16 @@ async def table_products(
         }
     )
 
+    where = _add_exact_ids(
+        where,
+        params,
+        {
+            "p.category_id": category_id,
+            "p.subcategory_id": subcategory_id,
+            "p.region_id": region_id,
+        },
+    )
+
     params["_limit"] = limit
     params["_offset"] = offset
 
@@ -179,7 +206,7 @@ async def table_products(
         LEFT JOIN subcategories sc  ON p.subcategory_id = sc.id
         JOIN regions r              ON p.region_id      = r.id
         {where}
-        ORDER BY {sort_by} {sort_order}
+        ORDER BY {sort_by} {sort_order}, p.id
         LIMIT :_limit OFFSET :_offset
     """)
 
@@ -199,19 +226,22 @@ async def table_products(
 async def table_nutrients_pivot(
     db: Annotated[AsyncSession, Depends(get_db)],
     region: Annotated[
-        str | None, Query(description="Фильтр по региону (ILIKE)")
+        str | None, Query(description="Фильтр по региону (часть, без учёта регистра)")
     ] = None,
     category: Annotated[
-        str | None, Query(description="Фильтр по категории (ILIKE)")
+        str | None, Query(description="Фильтр по категории (часть, без учёта регистра)")
     ] = None,
     subcategory: Annotated[
-        str | None, Query(description="Фильтр по подкатегории (ILIKE)")
+        str | None,
+        Query(description="Фильтр по подкатегории (часть, без учёта регистра)"),
     ] = None,
     product: Annotated[
-        str | None, Query(description="Фильтр по названию продукта (ILIKE)")
+        str | None,
+        Query(description="Фильтр по названию продукта (часть, без учёта регистра)"),
     ] = None,
     nutrient_type: Annotated[
-        str | None, Query(description="Фильтр по типу нутриента (ILIKE)")
+        str | None,
+        Query(description="Фильтр по типу нутриента (часть, без учёта регистра)"),
     ] = None,
 ):
     where, params = _build_where(
@@ -279,22 +309,26 @@ async def table_nutrients_pivot(
 async def table_nutrients_map(
     db: Annotated[AsyncSession, Depends(get_db)],
     region: Annotated[
-        str | None, Query(description="Фильтр по региону (ILIKE)")
+        str | None, Query(description="Фильтр по региону (часть, без учёта регистра)")
     ] = None,
     category: Annotated[
-        str | None, Query(description="Фильтр по категории (ILIKE)")
+        str | None, Query(description="Фильтр по категории (часть, без учёта регистра)")
     ] = None,
     subcategory: Annotated[
-        str | None, Query(description="Фильтр по подкатегории (ILIKE)")
+        str | None,
+        Query(description="Фильтр по подкатегории (часть, без учёта регистра)"),
     ] = None,
     product: Annotated[
-        str | None, Query(description="Фильтр по названию продукта (ILIKE)")
+        str | None,
+        Query(description="Фильтр по названию продукта (часть, без учёта регистра)"),
     ] = None,
     nutrient_type: Annotated[
-        str | None, Query(description="Фильтр по типу нутриента (ILIKE)")
+        str | None,
+        Query(description="Фильтр по типу нутриента (часть, без учёта регистра)"),
     ] = None,
     nutrient_name: Annotated[
-        str | None, Query(description="Фильтр по названию нутриента (ILIKE)")
+        str | None,
+        Query(description="Фильтр по названию нутриента (часть, без учёта регистра)"),
     ] = None,
     sort_by: Annotated[
         str,
@@ -370,16 +404,18 @@ async def table_nutrients_map(
 async def table_products_map(
     db: Annotated[AsyncSession, Depends(get_db)],
     region: Annotated[
-        str | None, Query(description="Фильтр по региону (ILIKE)")
+        str | None, Query(description="Фильтр по региону (часть, без учёта регистра)")
     ] = None,
     category: Annotated[
-        str | None, Query(description="Фильтр по категории (ILIKE)")
+        str | None, Query(description="Фильтр по категории (часть, без учёта регистра)")
     ] = None,
     subcategory: Annotated[
-        str | None, Query(description="Фильтр по подкатегории (ILIKE)")
+        str | None,
+        Query(description="Фильтр по подкатегории (часть, без учёта регистра)"),
     ] = None,
     product: Annotated[
-        str | None, Query(description="Фильтр по названию продукта (ILIKE)")
+        str | None,
+        Query(description="Фильтр по названию продукта (часть, без учёта регистра)"),
     ] = None,
 ):
     where, params = _build_where(
@@ -435,19 +471,22 @@ async def table_products_map(
 async def table_nutrients_csv(
     db: Annotated[AsyncSession, Depends(get_db)],
     region: Annotated[
-        str | None, Query(description="Фильтр по региону (ILIKE)")
+        str | None, Query(description="Фильтр по региону (часть, без учёта регистра)")
     ] = None,
     category: Annotated[
-        str | None, Query(description="Фильтр по категории (ILIKE)")
+        str | None, Query(description="Фильтр по категории (часть, без учёта регистра)")
     ] = None,
     product: Annotated[
-        str | None, Query(description="Фильтр по названию продукта (ILIKE)")
+        str | None,
+        Query(description="Фильтр по названию продукта (часть, без учёта регистра)"),
     ] = None,
     nutrient_type: Annotated[
-        str | None, Query(description="Фильтр по типу нутриента (ILIKE)")
+        str | None,
+        Query(description="Фильтр по типу нутриента (часть, без учёта регистра)"),
     ] = None,
     nutrient_name: Annotated[
-        str | None, Query(description="Фильтр по названию нутриента (ILIKE)")
+        str | None,
+        Query(description="Фильтр по названию нутриента (часть, без учёта регистра)"),
     ] = None,
     sort_by: Annotated[
         str, Query(description="product_name / region_name / nutrient_name / quantity")
@@ -511,12 +550,32 @@ async def table_nutrients_csv(
 
 
 def _build_where(filters: dict[str, str | None]) -> tuple[str, dict]:
+    """
+    Условия по названиям: без учёта регистра, `ё/е` и пробелов (см. text_filters).
+    Значение, состоящее из одних пробелов, фильтр не включает.
+    """
     clauses = []
     params: dict = {}
     for i, (col, val) in enumerate(filters.items()):
-        if val is not None:
-            key = f"p{i}"
-            clauses.append(f"{col} ILIKE :{key}")
-            params[key] = f"%{val}%"
+        if val is None:
+            continue
+        clause, clause_params = contains_clause(col, val, f"p{i}")
+        if clause:
+            clauses.append(clause)
+            params.update(clause_params)
     where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
     return where, params
+
+
+def _add_exact_ids(where: str, params: dict, ids: dict[str, UUID | None]) -> str:
+    """Добавляет точные условия по ID справочников (применяются до пагинации)."""
+    clauses = []
+    for i, (col, val) in enumerate(ids.items()):
+        if val is not None:
+            key = f"id{i}"
+            clauses.append(f"{col} = CAST(:{key} AS uuid)")
+            params[key] = str(val)
+    if not clauses:
+        return where
+    joined = " AND ".join(clauses)
+    return f"{where} AND {joined}" if where else f"WHERE {joined}"
