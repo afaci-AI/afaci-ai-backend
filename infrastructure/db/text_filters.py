@@ -155,18 +155,37 @@ def search_match_sql(
 
 
 def relevance_sql(
-    norm: str, query: SearchQuery, key: str
+    norm: str,
+    query: SearchQuery,
+    key: str,
+    *,
+    word_clause: str | None = None,
+    near_param: str | None = None,
 ) -> tuple[str, dict[str, str | int]]:
-    """CASE-выражение приоритета: 0 точное, 1 начало, 2 слитно внутри, 3 слова."""
+    """
+    CASE-выражение приоритета: 0 точное, 1 начало, 2 слитно внутри, 3 слова.
+
+    С `word_clause` (условие совпадения по словам) и `near_param` (список
+    идентификаторов с одной ошибкой) добавляются приоритеты нечёткого поиска:
+    4 — одна ошибка, 5 — остальные (в выдачу они попадают только из списка
+    нечётких совпадений). Идентификаторы сравниваются как текст.
+    """
     params: dict[str, str | int] = {
         f"{key}_eq": query.needle,
         f"{key}_pre": f"{escape_like(query.needle)}%",
         f"{key}_in": f"%{escape_like(query.needle)}%",
     }
+    tail = "ELSE 3 END"
+    if word_clause and near_param:
+        tail = (
+            f"WHEN {word_clause} THEN 3 "
+            f"WHEN CAST(p.id AS text) = ANY(CAST(:{near_param} AS text[])) THEN 4 "
+            "ELSE 5 END"
+        )
     case = (
         f"CASE WHEN {norm} = :{key}_eq THEN 0 "
         f"WHEN {norm} LIKE :{key}_pre ESCAPE '\\' THEN 1 "
-        f"WHEN {norm} LIKE :{key}_in ESCAPE '\\' THEN 2 ELSE 3 END"
+        f"WHEN {norm} LIKE :{key}_in ESCAPE '\\' THEN 2 {tail}"
     )
     return case, params
 
