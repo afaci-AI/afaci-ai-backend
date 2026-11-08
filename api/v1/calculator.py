@@ -15,10 +15,13 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.v1.norms import pdf_url_builder
 from api.v1.reference_documents import document_path
 from application.calculator.calculator_service import compute_recipe
 from application.calculator.cost_optimizer import optimize_recipe_cost
 from application.calculator.recipe_optimizer import optimize_recipe_composition
+from application.products.daily_norms_service import daily_norms_payload
+from domain.products.daily_norms import amounts_from_macros
 from infrastructure.auth import get_current_user
 from infrastructure.db.models import User
 from infrastructure.db.session import get_db
@@ -242,11 +245,27 @@ async def list_recipes(db: Annotated[AsyncSession, Depends(get_db)]):
 @router.post("/compute", summary="Рассчитать пищевую и биологическую ценность")
 async def compute(
     req: CalcRequest,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     _user: Annotated[User, Depends(get_current_user)],
 ):
     items = [{"product_id": it.product_id, "amount_g": it.amount_g} for it in req.items]
-    return await compute_recipe(db, req.reference_protein_id, items)
+    result = await compute_recipe(db, req.reference_protein_id, items)
+    # Доля от суточной нормы считается здесь же; сумма рецептуры равна 100 г,
+    # поэтому макросостав — это содержание на 100 г рецептуры.
+    macro = result["macro"]
+    result["daily_norms"] = await daily_norms_payload(
+        db,
+        pdf_url_builder(request),
+        amounts_from_macros(
+            macro["protein"],
+            macro["fat"],
+            macro["carb"],
+            macro["fiber"],
+            energy=result["energy_kcal"],
+        ),
+    )
+    return result
 
 
 @router.post("/optimize-cost", summary="Оптимизировать стоимость рецептуры")
