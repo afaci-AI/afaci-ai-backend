@@ -21,7 +21,9 @@ async def load_reference(db: AsyncSession, ref_id: UUID) -> dict | None:
         (
             await db.execute(
                 text(
-                    "SELECT id, name, year, description FROM reference_proteins WHERE id = :id"
+                    "SELECT id, name, year, description, source_title, source_authors, "
+                    "source_year, source_location, source_url "
+                    "FROM reference_proteins WHERE id = :id"
                 ),
                 {"id": ref_id},
             )
@@ -49,6 +51,17 @@ async def load_reference(db: AsyncSession, ref_id: UUID) -> dict | None:
         "name": rp["name"],
         "year": rp["year"],
         "description": rp["description"],
+        "source": (
+            {
+                "title": rp["source_title"],
+                "authors": rp["source_authors"],
+                "year": rp["source_year"],
+                "location": rp["source_location"],
+                "url": rp["source_url"],
+            }
+            if rp["source_title"]
+            else None
+        ),
         "values": {v["amino_acid"]: v["value"] for v in vals},
     }
 
