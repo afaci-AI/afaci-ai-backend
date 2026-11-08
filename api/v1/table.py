@@ -9,7 +9,15 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from infrastructure.db.session import get_db
-from infrastructure.db.text_filters import contains_clause
+from infrastructure.db.text_filters import (
+    contains_clause,
+    fold_sql,
+    parse_search_query,
+    relevance_sql,
+    search_match_sql,
+    strip_sql,
+    tokens_sql,
+)
 
 TAG = "Table (Flat)"
 
@@ -177,9 +185,29 @@ async def table_products(
             "r.name": region,
             "c.name": category,
             "sc.name": subcategory,
-            "p.name": product,
         }
     )
+
+    # Поиск по названию: слова в любом порядке и ранжирование по релевантности.
+    # Приоритет идёт перед выбранной сортировкой, внутри приоритета — сортировка.
+    search = parse_search_query(product)
+    lateral = ""
+    relevance_order = ""
+    if search:
+        folded, fold_params = fold_sql("p.name", "pf_")
+        stripped, strip_params = strip_sql("pf.s", "pn_")
+        tokens, token_params = tokens_sql("pf.s", "pk")
+        match_clause, match_params = search_match_sql("pn.n", "pn.tk", search, "pq")
+        relevance, relevance_params = relevance_sql("pn.n", search, "pq")
+        params.update(
+            fold_params | strip_params | token_params | match_params | relevance_params
+        )
+        lateral = (
+            f"CROSS JOIN LATERAL (SELECT {folded} AS s) pf "
+            f"CROSS JOIN LATERAL (SELECT {stripped} AS n, {tokens} AS tk) pn"
+        )
+        where = f"{where} AND {match_clause}" if where else f"WHERE {match_clause}"
+        relevance_order = f"{relevance}, "
 
     where = _add_exact_ids(
         where,
@@ -202,11 +230,12 @@ async def table_products(
             sc.name                AS subcategory_name,
             r.name                 AS region_name
         FROM products p
+        {lateral}
         JOIN categories c           ON p.category_id    = c.id
         LEFT JOIN subcategories sc  ON p.subcategory_id = sc.id
         JOIN regions r              ON p.region_id      = r.id
         {where}
-        ORDER BY {sort_by} {sort_order}, p.id
+        ORDER BY {relevance_order}{sort_by} {sort_order}, p.id
         LIMIT :_limit OFFSET :_offset
     """)
 
