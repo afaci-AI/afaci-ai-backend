@@ -21,10 +21,13 @@ class SubcategoryUpdate(SimpleUpdate):
 
 class NutrientNameCreate(SimpleCreate):
     nutrient_type_id: UUID
+    # Не указана — единица берётся по правилу типа состава.
+    unit_id: UUID | None = None
 
 
 class NutrientNameUpdate(SimpleUpdate):
     nutrient_type_id: UUID | None = None
+    unit_id: UUID | None = None
 
 
 class ProductCreate(BaseModel):
@@ -48,7 +51,9 @@ class ProductCount(BaseModel):
 class NutrientCreate(BaseModel):
     product_id: UUID
     nutrient_name_id: UUID
-    unit_id: UUID
+    # Не указана — единицу назначает сервер по названию нутриента; если указана,
+    # она должна совпадать с единицей названия.
+    unit_id: UUID | None = None
     quantity: float
     error_rate: float | None = None
 

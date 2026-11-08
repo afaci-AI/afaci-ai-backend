@@ -59,9 +59,13 @@ class NutrientName(Base):
         UUID(as_uuid=True), ForeignKey("nutrients_types.id"), nullable=False
     )
     name = Column(String, nullable=False)
+    # Фиксированная единица измерения. NULL только у названий, для которых
+    # единицу не удалось определить по данным (миграция их не угадывает).
+    unit_id = Column(UUID(as_uuid=True), ForeignKey("units.id"), nullable=True)
 
     nutrient_type = relationship("NutrientType", back_populates="nutrient_names")
     nutrients = relationship("Nutrient", back_populates="name_component")
+    unit = relationship("Unit")
     __table_args__ = (
         UniqueConstraint("nutrient_type_id", "name", name="uq_nutrient_name_type_name"),
     )
