@@ -17,6 +17,8 @@
 
 from __future__ import annotations
 
+from domain.products.daily_norms import energy_kcal
+
 # Порядок и состав групп незаменимых аминокислот (НАК).
 # Группа -> список названий аминокислот в БД, которые её формируют.
 NAK_GROUPS: list[tuple[str, list[str]]] = [
@@ -62,7 +64,7 @@ def compute_report(items: list[dict], reference: dict, *, rounded: bool = True) 
     fiber = macro("Пищевые волокна")
 
     # ---- Этап 3. Энергетическая ценность ----
-    energy = 4 * protein + 9 * fat + 4 * carb
+    energy = energy_kcal(protein, fat, carb)
 
     # ---- Этап 2. НАК суммарного белка и аминокислотный скор ----
     # Вклад в белок учитывают только ингредиенты, у которых есть данные по НАК.
