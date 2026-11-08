@@ -11,6 +11,8 @@ from fastapi import FastAPI, HTTPException
 from pydantic import ValidationError
 
 from api.v1.schemas import (
+    NutrientBulkCreate,
+    NutrientCreate,
     NutrientNameCreate,
     NutrientNameUpdate,
     NutrientUpdate,
@@ -71,11 +73,14 @@ class DictionaryContractChecks(unittest.IsolatedAsyncioTestCase):
                 parent_id = uuid4()
                 db = Mock(get=AsyncMock(return_value=Mock()), commit=AsyncMock())
                 db.refresh = AsyncMock()
+                extra = {"unit_id": uuid4()} if field == "nutrient_type_id" else {}
                 result = await endpoint(
-                    schema(name="Example", **{field: parent_id}), db
+                    schema(name="Example", **{field: parent_id}, **extra), db
                 )
                 self.assertEqual(getattr(result, field), parent_id)
-                db.get.assert_awaited_once_with(parent_model, parent_id)
+                self.assertEqual(
+                    db.get.await_args_list[0].args, (parent_model, parent_id)
+                )
                 db.commit.assert_awaited_once()
 
     async def test_patch_changes_parent_and_preserves_omitted_parent(self):
@@ -154,7 +159,9 @@ class NutrientUpdateChecks(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(patch.stopall)
 
     async def test_new_name_uses_its_type_and_audits_change(self):
-        new_name = products.models.NutrientName(id=uuid4(), nutrient_type_id=uuid4())
+        new_name = products.models.NutrientName(
+            id=uuid4(), nutrient_type_id=uuid4(), unit_id=self.item.unit_id
+        )
         self.db.get.side_effect = [self.item, new_name]
         await products.api_update_nutrient(
             self.item.id, NutrientUpdate(nutrient_name_id=new_name.id), self.db
@@ -190,6 +197,253 @@ class NutrientUpdateChecks(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(self.item.nutrient_name_id, previous_name)
                 self.assertEqual(self.item.quantity, 1)
                 self.db.commit.assert_not_awaited()
+
+
+def make_name(unit_id=None, type_name=None):
+    return products.models.NutrientName(
+        id=uuid4(), nutrient_type_id=uuid4(), name="Test", unit_id=unit_id
+    )
+
+
+class FixedUnitChecks(unittest.IsolatedAsyncioTestCase):
+    """Единица нутриента назначается сервером по названию и не принимает чужую."""
+
+    def setUp(self):
+        self.audit = patch.object(products, "log_food_event").start()
+        self.addCleanup(patch.stopall)
+        self.unit = uuid4()
+        self.other_unit = uuid4()
+
+    def db_with(self, *rows):
+        return Mock(
+            get=AsyncMock(side_effect=list(rows)),
+            add=Mock(),
+            commit=AsyncMock(),
+            refresh=AsyncMock(),
+        )
+
+    def test_name_unit_is_used_when_client_omits_it(self):
+        name = make_name(self.unit)
+        self.assertEqual(products.nutrient_unit_for(name, None), self.unit)
+        self.assertEqual(products.nutrient_unit_for(name, self.unit), self.unit)
+
+    def test_other_unit_is_rejected(self):
+        with self.assertRaises(HTTPException) as caught:
+            products.nutrient_unit_for(make_name(self.unit), self.other_unit)
+        self.assertEqual(caught.exception.status_code, 400)
+        self.assertEqual(caught.exception.detail, products.UNIT_MISMATCH)
+
+    def test_name_without_fixed_unit_still_needs_explicit_unit(self):
+        name = make_name(None)
+        self.assertEqual(products.nutrient_unit_for(name, self.unit), self.unit)
+        with self.assertRaises(HTTPException) as caught:
+            products.nutrient_unit_for(name, None)
+        self.assertEqual(caught.exception.status_code, 422)
+
+    def test_unit_is_optional_in_create_schema(self):
+        payload = {"product_id": uuid4(), "nutrient_name_id": uuid4(), "quantity": 1}
+        self.assertIsNone(NutrientCreate(**payload).unit_id)
+
+    async def test_create_assigns_unit_from_name(self):
+        name = make_name(self.unit)
+        db = self.db_with(name)
+        data = NutrientCreate(product_id=uuid4(), nutrient_name_id=name.id, quantity=2)
+        result = await products.api_create_nutrient(data, db)
+        self.assertEqual(result.unit_id, self.unit)
+        self.assertEqual(result.nutrient_type_id, name.nutrient_type_id)
+
+    async def test_create_rejects_incompatible_unit_without_saving(self):
+        name = make_name(self.unit)
+        db = self.db_with(name)
+        data = NutrientCreate(
+            product_id=uuid4(),
+            nutrient_name_id=name.id,
+            unit_id=self.other_unit,
+            quantity=2,
+        )
+        with self.assertRaises(HTTPException) as caught:
+            await products.api_create_nutrient(data, db)
+        self.assertEqual(caught.exception.status_code, 400)
+        db.commit.assert_not_awaited()
+
+    async def test_update_switching_name_takes_new_name_unit(self):
+        old_unit, new_unit = uuid4(), uuid4()
+        item = products.models.Nutrient(
+            id=uuid4(),
+            product_id=uuid4(),
+            nutrient_name_id=uuid4(),
+            nutrient_type_id=uuid4(),
+            unit_id=old_unit,
+            quantity=1,
+        )
+        new_name = make_name(new_unit)
+        db = self.db_with(item, new_name)
+        await products.api_update_nutrient(
+            item.id, NutrientUpdate(nutrient_name_id=new_name.id), db
+        )
+        self.assertEqual(item.unit_id, new_unit)
+
+    async def test_update_rejects_unit_of_another_name(self):
+        item = products.models.Nutrient(
+            id=uuid4(),
+            product_id=uuid4(),
+            nutrient_name_id=uuid4(),
+            nutrient_type_id=uuid4(),
+            unit_id=self.unit,
+            quantity=1,
+        )
+        new_name = make_name(self.unit)
+        db = self.db_with(item, new_name)
+        with self.assertRaises(HTTPException) as caught:
+            await products.api_update_nutrient(
+                item.id,
+                NutrientUpdate(nutrient_name_id=new_name.id, unit_id=self.other_unit),
+                db,
+            )
+        self.assertEqual(caught.exception.status_code, 400)
+        self.assertEqual(item.unit_id, self.unit)
+        db.commit.assert_not_awaited()
+
+    async def test_update_quantity_only_keeps_unit_and_skips_lookup(self):
+        item = products.models.Nutrient(
+            id=uuid4(),
+            product_id=uuid4(),
+            nutrient_name_id=uuid4(),
+            nutrient_type_id=uuid4(),
+            unit_id=self.unit,
+            quantity=1,
+        )
+        db = self.db_with(item)
+        await products.api_update_nutrient(item.id, NutrientUpdate(quantity=5), db)
+        self.assertEqual(item.unit_id, self.unit)
+        self.assertEqual(db.get.await_count, 1)
+
+    async def test_bulk_assigns_units_and_rejects_mismatch(self):
+        name = make_name(self.unit)
+        db = Mock(
+            scalars=AsyncMock(return_value=[name]),
+            add_all=Mock(),
+            commit=AsyncMock(),
+            refresh=AsyncMock(),
+            rollback=AsyncMock(),
+        )
+        good = NutrientBulkCreate(
+            items=[
+                NutrientCreate(product_id=uuid4(), nutrient_name_id=name.id, quantity=1)
+            ]
+        )
+        self.assertEqual((await products.api_bulk_nutrients(good, db))["inserted"], 1)
+        added = db.add_all.call_args.args[0][0]
+        self.assertEqual(added.unit_id, self.unit)
+        bad = NutrientBulkCreate(
+            items=[
+                NutrientCreate(
+                    product_id=uuid4(),
+                    nutrient_name_id=name.id,
+                    unit_id=self.other_unit,
+                    quantity=1,
+                )
+            ]
+        )
+        with self.assertRaises(HTTPException) as caught:
+            await products.api_bulk_nutrients(bad, db)
+        self.assertEqual(caught.exception.status_code, 400)
+
+
+class NutrientNameUnitChecks(unittest.IsolatedAsyncioTestCase):
+    """Единица нового названия — по правилу типа; менять её с несовместимыми значениями нельзя."""
+
+    def type_with(self, name):
+        return products.models.NutrientType(id=uuid4(), name=name)
+
+    async def test_create_uses_unit_of_the_type_rule(self):
+        for type_name, unit_name in (
+            ("Химический состав", "%/100г"),
+            ("Аминокислотный состав", "мг/100г"),
+            ("Минеральный состав", "мг/100г"),
+        ):
+            with self.subTest(type=type_name):
+                unit_id = uuid4()
+                nutrient_type = self.type_with(type_name)
+                db = Mock(
+                    get=AsyncMock(return_value=nutrient_type),
+                    scalar=AsyncMock(return_value=unit_id),
+                    commit=AsyncMock(),
+                    refresh=AsyncMock(),
+                    add=Mock(),
+                )
+                result = await products.api_create_nutrient_name(
+                    NutrientNameCreate(name="X", nutrient_type_id=nutrient_type.id), db
+                )
+                self.assertEqual(result.unit_id, unit_id)
+
+    async def test_create_for_type_without_rule_requires_unit(self):
+        nutrient_type = self.type_with("Пользовательский тип")
+        db = Mock(
+            get=AsyncMock(return_value=nutrient_type),
+            scalar=AsyncMock(return_value=None),
+            commit=AsyncMock(),
+        )
+        with self.assertRaises(HTTPException) as caught:
+            await products.api_create_nutrient_name(
+                NutrientNameCreate(name="X", nutrient_type_id=nutrient_type.id), db
+            )
+        self.assertEqual(caught.exception.status_code, 422)
+        db.commit.assert_not_awaited()
+
+    async def test_create_with_explicit_unit_checks_it_exists(self):
+        db = Mock(
+            get=AsyncMock(side_effect=[Mock(), None]),
+            commit=AsyncMock(),
+        )
+        with self.assertRaises(HTTPException) as caught:
+            await products.api_create_nutrient_name(
+                NutrientNameCreate(name="X", nutrient_type_id=uuid4(), unit_id=uuid4()),
+                db,
+            )
+        self.assertEqual(caught.exception.status_code, 404)
+
+    async def test_unit_change_is_blocked_when_values_use_another_unit(self):
+        item = make_name(uuid4())
+        db = Mock(
+            get=AsyncMock(side_effect=[item, Mock(), Mock()]),
+            scalar=AsyncMock(side_effect=[None, uuid4()]),
+            commit=AsyncMock(),
+            refresh=AsyncMock(),
+        )
+        with self.assertRaises(HTTPException) as caught:
+            await products.api_update_nutrient_name(
+                item.id, NutrientNameUpdate(unit_id=uuid4()), db
+            )
+        self.assertEqual(caught.exception.status_code, 400)
+        db.commit.assert_not_awaited()
+
+    async def test_unit_can_be_set_when_no_value_conflicts(self):
+        item = make_name(None)
+        new_unit = uuid4()
+        db = Mock(
+            get=AsyncMock(side_effect=[item, Mock(), Mock()]),
+            scalar=AsyncMock(side_effect=[None, None]),
+            commit=AsyncMock(),
+            refresh=AsyncMock(),
+        )
+        await products.api_update_nutrient_name(
+            item.id, NutrientNameUpdate(unit_id=new_unit), db
+        )
+        self.assertEqual(item.unit_id, new_unit)
+
+    async def test_null_unit_is_rejected(self):
+        item = make_name(uuid4())
+        db = Mock(
+            get=AsyncMock(side_effect=[item, Mock()]),
+            scalar=AsyncMock(return_value=None),
+            commit=AsyncMock(),
+        )
+        with self.assertRaises(HTTPException) as caught:
+            await products.api_update_nutrient_name(
+                item.id, NutrientNameUpdate(unit_id=None), db
+            )
+        self.assertEqual(caught.exception.status_code, 422)
 
 
 if __name__ == "__main__":

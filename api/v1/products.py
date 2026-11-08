@@ -22,6 +22,7 @@ from api.v1.schemas import (
     SubcategoryCreate,
     SubcategoryUpdate,
 )
+from domain.products.nutrient_units import default_unit_name
 from infrastructure.audit.food_audit import (
     FOOD_ENTITY,
     compute_diff,
@@ -64,6 +65,37 @@ async def create_simple_item(db: AsyncSession, model, data):
     except IntegrityError:
         await db.rollback()
         raise HTTPException(status_code=400, detail=f"{model.__name__} already exists")
+
+
+UNIT_REQUIRED = "Unit is required"
+UNIT_MISMATCH = "Unit does not match nutrient name"
+UNIT_REQUIRED_FOR_TYPE = "Unit is required for this nutrient type"
+UNIT_CHANGE_FORBIDDEN = "Cannot change unit: nutrient name has values in another unit"
+
+
+async def default_unit_id(db: AsyncSession, nutrient_type) -> UUID | None:
+    """Идентификатор единицы по правилу типа состава или None, если правила нет."""
+    unit_name = default_unit_name(nutrient_type.name)
+    if unit_name is None:
+        return None
+    return await db.scalar(select(models.Unit.id).where(models.Unit.name == unit_name))
+
+
+def nutrient_unit_for(name, requested: UUID | None) -> UUID:
+    """
+    Единица значения нутриента: фиксированная единица названия.
+
+    Если клиент передал единицу (прежние клиенты передают её всегда), она должна
+    совпадать с единицей названия. У названия без фиксированной единицы
+    (единицу не удалось определить по данным) её по-прежнему нужно указать.
+    """
+    if name.unit_id is None:
+        if requested is None:
+            raise HTTPException(status_code=422, detail=UNIT_REQUIRED)
+        return requested
+    if requested is not None and requested != name.unit_id:
+        raise HTTPException(status_code=400, detail=UNIT_MISMATCH)
+    return name.unit_id
 
 
 # ==================== CATEGORIES ====================
@@ -508,7 +540,13 @@ async def api_bulk_nutrient_types(
 async def api_create_nutrient_name(
     data: NutrientNameCreate, db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    await get_item(db, models.NutrientType, data.nutrient_type_id)
+    nutrient_type = await get_item(db, models.NutrientType, data.nutrient_type_id)
+    if data.unit_id is not None:
+        await get_item(db, models.Unit, data.unit_id)
+    else:
+        data.unit_id = await default_unit_id(db, nutrient_type)
+        if data.unit_id is None:
+            raise HTTPException(status_code=422, detail=UNIT_REQUIRED_FOR_TYPE)
     return await create_simple_item(db, models.NutrientName, data)
 
 
@@ -568,8 +606,28 @@ async def api_update_nutrient_name(
         raise HTTPException(
             status_code=400, detail="Nutrient name already exists in this type"
         )
+    unit_id = item.unit_id
+    if "unit_id" in data.model_fields_set:
+        if data.unit_id is None:
+            raise HTTPException(status_code=422, detail=UNIT_REQUIRED)
+        if data.unit_id != item.unit_id:
+            await get_item(db, models.Unit, data.unit_id)
+            # Значения не пересчитываются: единицу можно менять, только если ни одно
+            # сохранённое значение не записано в другой единице.
+            conflicting = await db.scalar(
+                select(models.Nutrient.id)
+                .where(
+                    models.Nutrient.nutrient_name_id == id,
+                    models.Nutrient.unit_id != data.unit_id,
+                )
+                .limit(1)
+            )
+            if conflicting is not None:
+                raise HTTPException(status_code=400, detail=UNIT_CHANGE_FORBIDDEN)
+        unit_id = data.unit_id
     item.name = name
     item.nutrient_type_id = type_id
+    item.unit_id = unit_id
     try:
         await db.commit()
     except IntegrityError:
@@ -947,6 +1005,7 @@ async def api_create_nutrient(
     if not name:
         raise HTTPException(status_code=404, detail="Nutrient name not found")
     payload["nutrient_type_id"] = name.nutrient_type_id
+    payload["unit_id"] = nutrient_unit_for(name, payload.get("unit_id"))
     item = models.Nutrient(**payload)
     db.add(item)
     await db.commit()
@@ -1023,11 +1082,18 @@ async def api_update_nutrient(
     )
     if not patch:
         return item
+    # Явный null вместо единицы означает «не менять».
+    requested_unit = patch.pop("unit_id", None)
+    name = None
     if "nutrient_name_id" in patch:
         if patch["nutrient_name_id"] is None:
             raise HTTPException(status_code=422, detail="Nutrient name is required")
         name = await get_item(db, models.NutrientName, patch["nutrient_name_id"])
         patch["nutrient_type_id"] = name.nutrient_type_id
+    elif requested_unit is not None:
+        name = await get_item(db, models.NutrientName, item.nutrient_name_id)
+    if name is not None:
+        patch["unit_id"] = nutrient_unit_for(name, requested_unit)
     for field, value in patch.items():
         setattr(item, field, value)
     await db.commit()
@@ -1083,6 +1149,7 @@ async def api_bulk_nutrients(
             if not name:
                 raise HTTPException(status_code=404, detail="Nutrient name not found")
             p["nutrient_type_id"] = name.nutrient_type_id
+            p["unit_id"] = nutrient_unit_for(name, p.get("unit_id"))
         items = [models.Nutrient(**n) for n in payloads]
         db.add_all(items)
         await db.commit()
