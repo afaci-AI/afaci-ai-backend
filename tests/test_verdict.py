@@ -18,9 +18,20 @@ def control():
     return candidates, data["reference"], data["baseline_amounts"]
 
 
-def verdict_for(reference):
+def known_items():
+    """Рецептура контроля без белоксодержащих ингредиентов без данных по НАК."""
     candidates, _, amounts = control()
-    return compute_report(_build_items(candidates, amounts), reference)["verdict"]
+    return [
+        it
+        for it in _build_items(candidates, amounts)
+        if it.get("amino") or it["chem"].get("Массовая доля белка", 0.0) <= 0
+    ]
+
+
+def verdict_for(reference, *, complete_data=False):
+    candidates, _, amounts = control()
+    items = known_items() if complete_data else _build_items(candidates, amounts)
+    return compute_report(items, reference)["verdict"]
 
 
 def scaled(reference, factor, name):
@@ -52,7 +63,9 @@ class VerdictByReferenceChecks(unittest.TestCase):
 
     def test_complete_when_every_score_reaches_reference(self):
         _, reference, _ = control()
-        verdict = verdict_for(scaled(reference, 0.5, "Мягкий эталон"))
+        verdict = verdict_for(
+            scaled(reference, 0.5, "Мягкий эталон"), complete_data=True
+        )
         self.assertEqual(verdict["level"], "complete")
         self.assertEqual(
             verdict["headline"], "Белок полноценный по эталону Мягкий эталон"
@@ -68,9 +81,47 @@ class VerdictByReferenceChecks(unittest.TestCase):
         self.assertEqual(strict["reference"]["name"], "Строгий эталон")
         self.assertIn("«Строгий эталон»", strict["points"][0])
 
+    def _items_with_missing_amino(self):
+        _, reference, _ = control()
+        items = known_items()
+        # Добавляем белковый ингредиент без данных по НАК.
+        extra = {
+            **items[0],
+            "name": "Без аминокислот",
+            "amino": {},
+            "amount_g": 20.0,
+        }
+        return items, extra, reference
+
+    def test_missing_amino_data_is_reported_as_limitation(self):
+        items, extra, reference = self._items_with_missing_amino()
+        verdict = compute_report([*items, extra], reference)["verdict"]
+        self.assertEqual(len(verdict["limitations"]), 1)
+        self.assertIn("Без аминокислот", verdict["limitations"][0])
+        self.assertIn("не учтены", verdict["limitations"][0])
+        self.assertIn(verdict["limitations"][0], verdict["points"])
+
+    def test_complete_with_missing_data_is_unconfirmed(self):
+        items, extra, reference = self._items_with_missing_amino()
+        soft = scaled(reference, 0.5, "Мягкий эталон")
+        verdict = compute_report([*items, extra], soft)["verdict"]
+        self.assertEqual(verdict["level"], "unconfirmed")
+        self.assertNotIn("полноценный по эталону", verdict["headline"].split(":")[0])
+        self.assertIn("не подтверждена", verdict["headline"])
+
+    def test_full_data_has_no_limitations_and_has_explanation(self):
+        _, reference, _ = control()
+        verdict = verdict_for(reference, complete_data=True)
+        self.assertEqual(verdict["limitations"], [])
+        self.assertEqual(
+            [row["code"] for row in verdict["explanation"]], ["КРАС", "БЦ", "U", "G"]
+        )
+        self.assertIn("100 %", verdict["criterion"])
+        self.assertIn("source", verdict["reference"])
+
     def test_boundary_score_exactly_100_is_not_a_deficit(self):
-        candidates, reference, amounts = control()
-        items = _build_items(candidates, amounts)
+        _, reference, _ = control()
+        items = known_items()
         raw = compute_report(items, reference, rounded=False)
         exact = {
             **reference,
@@ -91,7 +142,10 @@ class VerdictByReferenceChecks(unittest.TestCase):
             "experimental_note",
         ):
             self.assertIn(key, verdict)
-        self.assertEqual(verdict["reference"], {"name": "ФАО/ВОЗ 1973", "year": 1973})
+        self.assertEqual(
+            verdict["reference"],
+            {"name": "ФАО/ВОЗ 1973", "year": 1973, "source": None},
+        )
         self.assertTrue(
             verdict["experimental_note"].startswith("Экспериментальная функция")
         )

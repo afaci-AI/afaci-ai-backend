@@ -159,7 +159,22 @@ def compute_report(items: list[dict], reference: dict, *, rounded: bool = True) 
             "данным; отсутствие значения не означает нулевое содержание."
         )
 
-    verdict = _build_verdict(amino_rows, reference, kras, bc, util_U, util_G)
+    total_protein_base = sum(
+        it["chem"].get("Массовая доля белка", 0.0) * it["amount_g"] for it in items
+    )
+    amino_coverage = (
+        min(protein_base / total_protein_base, 1.0) if total_protein_base > 0 else None
+    )
+    verdict = _build_verdict(
+        amino_rows,
+        reference,
+        kras,
+        bc,
+        util_U,
+        util_G,
+        missing_amino=no_amino_protein,
+        amino_coverage=amino_coverage,
+    )
 
     return {
         "recipe": [
@@ -250,6 +265,8 @@ def _build_verdict(
     bc: float | None,
     util_U: float | None,
     util_G: float | None,
+    missing_amino: list[str] | None = None,
+    amino_coverage: float | None = None,
 ) -> dict | None:
     """
     Заключение о белке строго по выбранному эталону ФАО/ВОЗ — без условных порогов.
@@ -281,7 +298,26 @@ def _build_verdict(
         ),
         key=lambda d: d["score"],
     )
+    missing_amino = missing_amino or []
+    limitations: list[str] = []
+    if missing_amino:
+        share = (
+            f" Данные по аминокислотам есть у {_fmt(amino_coverage * 100, 0)} % белка "
+            f"рецептуры."
+            if amino_coverage is not None
+            else ""
+        )
+        limitations.append(
+            "Нет данных об аминокислотном составе у белоксодержащих ингредиентов: "
+            + ", ".join(missing_amino)
+            + "."
+            + share
+            + " Они не учтены в расчёте скоров."
+        )
     complete = not deficits
+    # Без части данных «полноценный» не подтверждён; недостачи по известной части
+    # остаются верными как минимум для неё.
+    confirmed = complete and not missing_amino
 
     points: list[str] = [
         (
@@ -290,10 +326,16 @@ def _build_verdict(
             f"эталона (г на 100 г белка). Усвояемость белка не учитывается."
         )
     ]
+    points.extend(limitations)
     if complete:
         points.append(
             f"Все {len(scored)} групп незаменимых аминокислот не ниже эталона "
-            f"(аминокислотный скор ≥ 100 %): по эталону белок полноценный."
+            f"(аминокислотный скор ≥ 100 %)"
+            + (
+                " — для учтённой части белка; полноценность всей рецептуры не подтверждена."
+                if missing_amino
+                else ": по эталону белок полноценный."
+            )
         )
     else:
         lowest = deficits[0]
@@ -315,15 +357,84 @@ def _build_verdict(
             f"сопоставимая избыточность G = {_fmt(util_G, 2)} г/100 г белка."
         )
 
+    if confirmed:
+        level, headline = "complete", f"Белок полноценный по эталону {ref_name}"
+    elif complete:
+        level = "unconfirmed"
+        headline = f"Полноценность по эталону {ref_name} не подтверждена: мало данных"
+    else:
+        level, headline = "incomplete", f"Белок неполноценный по эталону {ref_name}"
+
+    source = reference.get("source")
     return {
-        "level": "complete" if complete else "incomplete",
-        "headline": (
-            f"Белок полноценный по эталону {ref_name}"
-            if complete
-            else f"Белок неполноценный по эталону {ref_name}"
-        ),
+        "level": level,
+        "headline": headline,
         "points": points,
-        "reference": {"name": ref_name, "year": reference.get("year")},
+        "reference": {
+            "name": ref_name,
+            "year": reference.get("year"),
+            "source": source,
+        },
+        "criterion": (
+            "Внутреннее правило программы: белок полноценен по эталону, если "
+            "аминокислотный скор каждой из 8 групп НАК не ниже 100 %. "
+            "Значения эталона взяты из источника, указанного ниже."
+        ),
         "deficits": deficits,
+        "limitations": limitations,
+        "explanation": _explain_indicators(kras, bc, util_U, util_G),
         "experimental_note": EXPERIMENTAL_NOTE,
     }
+
+
+def _explain_indicators(
+    kras: float, bc: float, util_U: float | None, util_G: float | None
+) -> list[dict]:
+    """Словами: что означает каждый показатель; числа — из расчёта, оценок нет."""
+    rows = [
+        {
+            "code": "КРАС",
+            "title": "Коэффициент различия аминокислотного скора",
+            "value": round(kras, 1),
+            "unit": "%",
+            "text": (
+                "Среднее превышение скоров остальных аминокислот над скором "
+                "лимитирующей. Чем меньше, тем ближе состав к сбалансированному. "
+                "Пороговых значений для оценки в программе нет."
+            ),
+        },
+        {
+            "code": "БЦ",
+            "title": "Биологическая ценность",
+            "value": round(bc, 1),
+            "unit": "%",
+            "text": "БЦ = 100 − КРАС. Чем выше, тем лучше сбалансирован белок.",
+        },
+    ]
+    if util_U is not None:
+        rows.append(
+            {
+                "code": "U",
+                "title": "Коэффициент утилитарности",
+                "value": round(util_U, 2),
+                "unit": None,
+                "text": (
+                    "Доля незаменимых аминокислот, которую организм может "
+                    "использовать при данной лимитирующей аминокислоте."
+                ),
+            }
+        )
+    if util_G is not None:
+        rows.append(
+            {
+                "code": "G",
+                "title": "Сопоставимая избыточность",
+                "value": round(util_G, 2),
+                "unit": "г/100 г белка",
+                "text": (
+                    "Масса аминокислот, которые при лимитирующей аминокислоте "
+                    "не используются для построения белка организма."
+                ),
+            }
+        )
+    return rows
