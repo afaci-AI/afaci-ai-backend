@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from infrastructure.db.fuzzy_search import fuzzy_matches
 from infrastructure.db.session import get_db
 from infrastructure.db.text_filters import (
     contains_clause,
@@ -194,11 +195,17 @@ async def table_products(
     lateral = ""
     relevance_order = ""
     if search:
+        # Похожие названия (с опечатками) считаются в Python: в БД с локалью C
+        # pg_trgm и levenshtein не работают с кириллицей (см. fuzzy_search.py).
+        names = await db.execute(text("SELECT CAST(id AS text), name FROM products"))
+        near, far = fuzzy_matches(product or "", names.all())
         folded, fold_params = fold_sql("p.name", "pf_")
         stripped, strip_params = strip_sql("pf.s", "pn_")
         tokens, token_params = tokens_sql("pf.s", "pk")
         match_clause, match_params = search_match_sql("pn.n", "pn.tk", search, "pq")
-        relevance, relevance_params = relevance_sql("pn.n", search, "pq")
+        relevance, relevance_params = relevance_sql(
+            "pn.n", search, "pq", word_clause=match_clause, near_param="fz_near"
+        )
         params.update(
             fold_params | strip_params | token_params | match_params | relevance_params
         )
@@ -206,7 +213,17 @@ async def table_products(
             f"CROSS JOIN LATERAL (SELECT {folded} AS s) pf "
             f"CROSS JOIN LATERAL (SELECT {stripped} AS n, {tokens} AS tk) pn"
         )
-        where = f"{where} AND {match_clause}" if where else f"WHERE {match_clause}"
+        condition = match_clause
+        if near or far:
+            params["fz_near"] = near
+            params["fz_all"] = near + far
+            condition = (
+                f"({match_clause} OR CAST(p.id AS text) = ANY(CAST(:fz_all AS text[])))"
+            )
+        else:
+            # Нечётких совпадений нет: список пустой, приоритеты 4–5 не нужны.
+            params["fz_near"] = []
+        where = f"{where} AND {condition}" if where else f"WHERE {condition}"
         relevance_order = f"{relevance}, "
 
     where = _add_exact_ids(
