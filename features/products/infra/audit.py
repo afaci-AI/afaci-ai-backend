@@ -1,10 +1,10 @@
-"""Адаптер бизнес-аудита продуктов поверх журнала `infrastructure.audit`."""
+"""Адаптер бизнес-аудита продуктов поверх журнала `core.audit`."""
 
 from __future__ import annotations
 
 from uuid import UUID
 
-from infrastructure.audit.food_audit import (
+from core.audit.food_audit import (
     FOOD_ENTITY,
     compute_diff,
     log_food_event,

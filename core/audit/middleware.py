@@ -16,7 +16,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.requests import Request
 from starlette.responses import Response
 
-from infrastructure.audit.logger import get_audit_logger
+from core.audit.logger import get_audit_logger
 
 # Эндпоинты-исключения — не засоряем логи служебным трафиком
 EXCLUDE_PATHS: set[str] = {
@@ -105,7 +105,7 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
     - duration_ms
 
     Использование:
-        from infrastructure.audit.middleware import AuditLogMiddleware
+        from core.audit.middleware import AuditLogMiddleware
         app.add_middleware(AuditLogMiddleware)
     """
 

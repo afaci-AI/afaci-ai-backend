@@ -44,6 +44,14 @@ class UnprocessableError(AppError):
     status_code = 422
 
 
+class PayloadTooLargeError(AppError):
+    status_code = 413
+
+
+class ServiceUnavailableError(AppError):
+    status_code = 503
+
+
 async def _handle_app_error(_request: Request, exc: AppError) -> JSONResponse:
     return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
 

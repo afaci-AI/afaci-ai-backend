@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PACKAGES = ("api", "application", "domain", "infrastructure", "core", "features")
+PACKAGES = ("core", "features")
 MAX_LINES = 400
 
 OVERSIZED = {}

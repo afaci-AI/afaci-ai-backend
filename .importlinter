@@ -1,7 +1,5 @@
 [importlinter]
 root_packages =
-    api
-    infrastructure
     core
     features
     sqlalchemy
@@ -14,16 +12,20 @@ name = Слои фичи: api -> infra -> app -> domain
 type = layers
 layers =
     api
-    infra
-    app
+    (infra)
+    (app)
     (domain)
 containers =
+    features.app_versions
+    features.audit
+    features.auth
     features.calculator
     features.catalog
     features.norms
     features.products
     features.recipes
     features.table
+    features.users
 
 [importlinter:contract:feature-domain-is-pure]
 name = Feature domain не зависит от остальных слоёв и фреймворков
@@ -35,8 +37,6 @@ forbidden_modules =
     features.*.infra
     features.*.api
     core
-    api
-    infrastructure
     sqlalchemy
     fastapi
 ignore_imports =
@@ -51,8 +51,6 @@ forbidden_modules =
     features.*.infra
     features.*.api
     core.db
-    api
-    infrastructure
     sqlalchemy
     fastapi
 allow_indirect_imports = True
@@ -64,7 +62,6 @@ source_modules =
     features.*.infra
 forbidden_modules =
     features.*.api
-    api
     fastapi
 allow_indirect_imports = True
 
@@ -87,12 +84,16 @@ ignore_imports =
 name = Фичи независимы, кроме явно разрешённых связей
 type = independence
 modules =
+    features.app_versions
+    features.audit
+    features.auth
     features.calculator
     features.catalog
     features.norms
     features.products
     features.recipes
     features.table
+    features.users
 ignore_imports =
     features.norms.domain.** -> features.calculator.domain.**
     features.calculator.api.router -> features.norms.api.deps
@@ -102,31 +103,3 @@ ignore_imports =
     features.recipes.api.deps -> features.calculator.api.deps
     features.recipes.api.deps -> features.calculator.app
     features.products.app.service -> features.catalog.domain.rules
-
-# ------------------------------------------------------------ legacy api
-[importlinter:contract:api-no-direct-db]
-name = Старый api не обращается к core.db напрямую
-type = forbidden
-source_modules =
-    api
-forbidden_modules =
-    core.db
-allow_indirect_imports = True
-# Baseline: существующие нарушения. Список только сокращается.
-ignore_imports =
-    api.deps -> core.db.session
-    api.v1.app_version -> core.db.models
-    api.v1.app_version -> core.db.session
-    api.v1.auth -> core.db.models
-    api.v1.auth -> core.db.session
-    api.v1.users -> core.db.models
-    api.v1.users -> core.db.session
-
-[importlinter:contract:legacy-api-not-features-infra]
-name = Старый api не использует infra фич
-type = forbidden
-source_modules =
-    api
-forbidden_modules =
-    features.*.infra
-allow_indirect_imports = True

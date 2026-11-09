@@ -30,7 +30,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from infrastructure.audit.logger import get_audit_logger
+from core.audit.logger import get_audit_logger
 
 # Ограничение для bulk — не пишем тысячи UUID в лог целиком
 MAX_IDS_IN_LOG = 100

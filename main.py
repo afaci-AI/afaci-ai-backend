@@ -7,12 +7,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from slowapi.middleware import SlowAPIMiddleware
 
-from api.router import register_routers
+from core.audit.logger import setup_audit_logging
+from core.audit.middleware import AuditLogMiddleware
 from core.errors import register_error_handlers
 from core.openapi import OPENAPI_TAGS
 from core.rate_limit import limiter
-from infrastructure.audit.logger import setup_audit_logging
-from infrastructure.audit.middleware import AuditLogMiddleware
+from routes import register_routers
 
 load_dotenv()
 

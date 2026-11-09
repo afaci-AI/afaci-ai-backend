@@ -11,11 +11,18 @@ from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 import core.security as authentication
-from api.v1 import auth, users
 from core.db import models
 from core.db.session import get_db
+from features.auth.api import router as auth_router
 from features.catalog.api import router as catalog_router
 from features.products.api import router as products_router
+from features.users.api import router as users_router
+from features.users.app import UserService
+from features.users.infra.sql_repo import (
+    BcryptHasher,
+    SqlUserRepository,
+    UserChangeAudit,
+)
 
 _catalog = APIRouter()
 _catalog.include_router(catalog_router)
@@ -26,9 +33,14 @@ products = SimpleNamespace(router=_catalog, models=models)
 class AccessPolicyChecks(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.app = FastAPI()
-        for router in (products.router, auth.router, users.router):
+        for router in (products.router, auth_router, users_router):
             self.app.include_router(router)
-        self.db = Mock(execute=AsyncMock(), commit=AsyncMock(), delete=AsyncMock())
+        self.db = Mock(
+            execute=AsyncMock(),
+            commit=AsyncMock(),
+            delete=AsyncMock(),
+            refresh=AsyncMock(),
+        )
         self.app.dependency_overrides[get_db] = lambda: self.db
         self.client = TestClient(self.app)
         self.addCleanup(self.client.close)
@@ -111,7 +123,10 @@ class AccessPolicyChecks(unittest.IsolatedAsyncioTestCase):
             id=uuid4(), is_active=True, groups=[group], saved_recipes=[recipe]
         )
         self.db.get = AsyncMock(return_value=user)
-        result = await users.deactivate_user(user.id, self.db, Mock(id=uuid4()))
+        service = UserService(
+            SqlUserRepository(self.db), BcryptHasher(), UserChangeAudit()
+        )
+        result = await service.deactivate(user.id, uuid4())
         self.assertEqual(result, {"status": "deactivated"})
         self.assertFalse(user.is_active)
         self.assertEqual(user.groups, [group])

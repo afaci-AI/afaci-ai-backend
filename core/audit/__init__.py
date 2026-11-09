@@ -1,6 +1,8 @@
 """Пакет аудита и логирования."""
 
-from infrastructure.audit.food_audit import (
+from core.audit.decorator import audit_log
+from core.audit.events import log_audit_change
+from core.audit.food_audit import (
     FOOD_ENTITY,
     compute_diff,
     log_food_event,
@@ -8,9 +10,8 @@ from infrastructure.audit.food_audit import (
     snapshot_nutrient,
     snapshot_product,
 )
-from infrastructure.audit.helpers import audit_log, log_audit_change
-from infrastructure.audit.logger import get_audit_logger, setup_audit_logging
-from infrastructure.audit.middleware import AuditLogMiddleware
+from core.audit.logger import get_audit_logger, setup_audit_logging
+from core.audit.middleware import AuditLogMiddleware
 
 __all__ = [
     "FOOD_ENTITY",

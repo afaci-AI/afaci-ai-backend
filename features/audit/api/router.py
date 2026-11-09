@@ -12,7 +12,7 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from infrastructure.audit.helpers import audit_log, log_audit_change
+from core.audit import audit_log, log_audit_change
 
 router = APIRouter(prefix="/api/v1/demo", tags=["Audit Demo"])
 

@@ -8,10 +8,6 @@ max-complexity = 10
 max-branches = 12
 max-statements = 50
 
-# Baseline: существующие нарушения порогов сложности (см. реестр файлов-«богов»
-# в docs/architecture-god-files-solid.md). Список только сокращается; новые
-# записи добавлять нельзя — файл убирается отсюда, когда его разделили.
+# Разовые скрипты (scripts/) не входят в приложение: пороги сложности к ним не применяются.
 [lint.per-file-ignores]
-"api/v1/app_version.py" = ["C901"]
-"infrastructure/audit/helpers.py" = ["C901", "PLR0912", "PLR0915"]
-"scripts/import_part2.py" = ["C901", "PLR0912", "PLR0915"]
+"scripts/*" = ["C901", "PLR0912", "PLR0915"]
