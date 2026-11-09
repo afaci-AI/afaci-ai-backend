@@ -11,7 +11,6 @@ from uuid import uuid4
 from fastapi import FastAPI, HTTPException
 
 from application.products import daily_norms_service as service
-from domain.calculator import compute_report
 from domain.products.daily_norms import (
     NORM_ORDER,
     NORMS_INFO,
@@ -20,6 +19,7 @@ from domain.products.daily_norms import (
     energy_kcal,
     percent_of_norm,
 )
+from features.calculator.domain import compute_report
 
 MIGRATION = (
     Path(__file__).resolve().parents[1]
@@ -247,9 +247,9 @@ async def unused_db():
 
 class RouteTests(unittest.IsolatedAsyncioTestCase):
     def load_norms_api(self):
-        session_stub = ModuleType("infrastructure.db.session")
+        session_stub = ModuleType("core.db.session")
         session_stub.get_db = unused_db
-        with patch.dict(sys.modules, {"infrastructure.db.session": session_stub}):
+        with patch.dict(sys.modules, {"core.db.session": session_stub}):
             import importlib
 
             return importlib.import_module("api.v1.norms")

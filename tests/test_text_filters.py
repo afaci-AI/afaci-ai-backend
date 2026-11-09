@@ -7,7 +7,7 @@ from types import ModuleType
 from unittest.mock import patch
 from uuid import UUID
 
-from infrastructure.db.text_filters import (
+from core.db.text_filters import (
     SQL_REPLACEMENTS,
     contains_clause,
     escape_like,
@@ -20,9 +20,9 @@ async def unused_db():
     raise AssertionError("Search normalization tests must not connect to a database")
 
 
-session_stub = ModuleType("infrastructure.db.session")
+session_stub = ModuleType("core.db.session")
 session_stub.get_db = unused_db
-with patch.dict(sys.modules, {"infrastructure.db.session": session_stub}):
+with patch.dict(sys.modules, {"core.db.session": session_stub}):
     table = importlib.import_module("api.v1.table")
 
 

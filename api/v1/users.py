@@ -17,10 +17,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.db.models import User
+from core.db.session import get_db
+from core.security import hash_password, require_admin, user_public
 from infrastructure.audit.helpers import log_audit_change
-from infrastructure.auth import hash_password, require_admin, user_public
-from infrastructure.db.models import User
-from infrastructure.db.session import get_db
 
 router = APIRouter(prefix="/api/v1/users", tags=["Users"])
 

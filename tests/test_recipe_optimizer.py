@@ -7,9 +7,13 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
-from domain.calculator.formulas import NAK_GROUPS, compute_report
-from domain.calculator.optimizer import CandidateItem, _build_items
-from domain.calculator.recipe_optimizer import RecipeOptimizationError, optimize_recipe
+from features.calculator.domain import CandidateItem
+from features.calculator.domain import build_items as _build_items
+from features.calculator.domain.formulas import NAK_GROUPS, compute_report
+from features.calculator.domain.recipe_optimizer import (
+    RecipeOptimizationError,
+    optimize_recipe,
+)
 
 
 def fixture():
@@ -332,7 +336,7 @@ class OptimizationChecks(unittest.TestCase):
     def test_solver_failure_returns_only_verified_composition(self):
         candidates, reference = fixture()
         with patch(
-            "domain.calculator.recipe_optimizer.minimize",
+            "features.calculator.domain.recipe_optimizer.search.minimize",
             side_effect=RuntimeError("control"),
         ):
             result = optimize_recipe(candidates, reference, [80, 20], "basic")

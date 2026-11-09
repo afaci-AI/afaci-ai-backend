@@ -22,6 +22,10 @@ from api.v1.schemas import (
     SubcategoryCreate,
     SubcategoryUpdate,
 )
+from core.db import models
+from core.db.models import User
+from core.db.session import get_db
+from core.security import get_current_user, get_current_user_optional
 from domain.products.nutrient_units import default_unit_name
 from infrastructure.audit.food_audit import (
     FOOD_ENTITY,
@@ -31,10 +35,6 @@ from infrastructure.audit.food_audit import (
     snapshot_nutrient,
     snapshot_product,
 )
-from infrastructure.auth import get_current_user, get_current_user_optional
-from infrastructure.db import models
-from infrastructure.db.models import User
-from infrastructure.db.session import get_db
 
 
 async def require_editor(current: Annotated[User, Depends(get_current_user)]) -> User:

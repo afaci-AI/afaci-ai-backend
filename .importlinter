@@ -4,10 +4,68 @@ root_packages =
     application
     domain
     infrastructure
+    core
+    features
     sqlalchemy
     fastapi
 include_external_packages = True
 
+# ---------------------------------------------------------------- features
+[importlinter:contract:feature-domain-is-pure]
+name = Feature domain не зависит от остальных слоёв и фреймворков
+type = forbidden
+source_modules =
+    features.*.domain
+forbidden_modules =
+    features.*.app
+    features.*.infra
+    features.*.api
+    core
+    api
+    application
+    infrastructure
+    sqlalchemy
+    fastapi
+
+[importlinter:contract:feature-app-no-frameworks]
+name = Feature app не зависит от infra, api и фреймворков
+type = forbidden
+source_modules =
+    features.*.app
+forbidden_modules =
+    features.*.infra
+    features.*.api
+    core.db
+    api
+    infrastructure
+    sqlalchemy
+    fastapi
+allow_indirect_imports = True
+
+[importlinter:contract:feature-infra-not-api]
+name = Feature infra не зависит от api
+type = forbidden
+source_modules =
+    features.*.infra
+forbidden_modules =
+    features.*.api
+    api
+    fastapi
+
+[importlinter:contract:feature-api-no-infra]
+name = Feature api получает infra только через deps.py
+type = forbidden
+source_modules =
+    features.*.api
+forbidden_modules =
+    features.*.infra
+    core.db.text_filters
+    core.db.fuzzy_search
+allow_indirect_imports = True
+ignore_imports =
+    features.*.api.deps -> features.*.infra.**
+
+# ------------------------------------------------------------- legacy layers
 [importlinter:contract:domain-is-pure]
 name = Domain не зависит от остальных слоёв и фреймворков
 type = forbidden
@@ -17,6 +75,8 @@ forbidden_modules =
     application
     infrastructure
     api
+    core
+    features
     sqlalchemy
     fastapi
 
@@ -28,49 +88,50 @@ source_modules =
 forbidden_modules =
     api
     infrastructure
+    features
     sqlalchemy
     fastapi
 allow_indirect_imports = True
 # Baseline: существующие нарушения. Список только сокращается; новые
 # записи добавлять нельзя (убираются при разборе соответствующих файлов).
 ignore_imports =
-    application.calculator.calculator_service -> fastapi
-    application.calculator.calculator_service -> sqlalchemy
-    application.calculator.calculator_service -> sqlalchemy.ext.asyncio
-    application.calculator.cost_optimizer -> fastapi
-    application.calculator.cost_optimizer -> sqlalchemy.ext.asyncio
-    application.calculator.recipe_optimizer -> fastapi
-    application.calculator.recipe_optimizer -> sqlalchemy.ext.asyncio
     application.products.daily_norms_service -> sqlalchemy
     application.products.daily_norms_service -> sqlalchemy.ext.asyncio
 
 [importlinter:contract:api-no-direct-db]
-name = Api не обращается к infrastructure.db напрямую
+name = Api не обращается к core.db напрямую
 type = forbidden
 source_modules =
     api
 forbidden_modules =
-    infrastructure.db
+    core.db
 allow_indirect_imports = True
 # Baseline: существующие нарушения. Список только сокращается.
 ignore_imports =
-    api.deps -> infrastructure.db.session
-    api.v1.app_version -> infrastructure.db.models
-    api.v1.app_version -> infrastructure.db.session
-    api.v1.auth -> infrastructure.db.models
-    api.v1.auth -> infrastructure.db.session
-    api.v1.calculator -> infrastructure.db.models
-    api.v1.calculator -> infrastructure.db.session
-    api.v1.norms -> infrastructure.db.session
-    api.v1.products -> infrastructure.db.models
-    api.v1.products -> infrastructure.db.session
-    api.v1.saved -> infrastructure.db.models
-    api.v1.saved -> infrastructure.db.session
-    api.v1.table -> infrastructure.db.fuzzy_search
-    api.v1.table -> infrastructure.db.session
-    api.v1.table -> infrastructure.db.text_filters
-    api.v1.users -> infrastructure.db.models
-    api.v1.users -> infrastructure.db.session
+    api.deps -> core.db.session
+    api.v1.app_version -> core.db.models
+    api.v1.app_version -> core.db.session
+    api.v1.auth -> core.db.models
+    api.v1.auth -> core.db.session
+    api.v1.norms -> core.db.session
+    api.v1.products -> core.db.models
+    api.v1.products -> core.db.session
+    api.v1.saved -> core.db.models
+    api.v1.saved -> core.db.session
+    api.v1.table -> core.db.fuzzy_search
+    api.v1.table -> core.db.session
+    api.v1.table -> core.db.text_filters
+    api.v1.users -> core.db.models
+    api.v1.users -> core.db.session
+
+[importlinter:contract:legacy-api-not-features-infra]
+name = Старый api не использует infra фич
+type = forbidden
+source_modules =
+    api
+forbidden_modules =
+    features.*.infra
+allow_indirect_imports = True
 
 [importlinter:contract:layers]
 name = Направление зависимостей api -> infrastructure -> application -> domain

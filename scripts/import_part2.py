@@ -3,7 +3,7 @@ Import script for Part 2 Excel data into the AFACI database.
 Adds 52 new products with their nutrients.
 
 Run from afaci/ directory:
-    python -m infrastructure.db.import_part2
+    python -m scripts.import_part2
 """
 
 import asyncio

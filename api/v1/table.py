@@ -8,9 +8,9 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from infrastructure.db.fuzzy_search import fuzzy_matches
-from infrastructure.db.session import get_db
-from infrastructure.db.text_filters import (
+from core.db.fuzzy_search import fuzzy_matches
+from core.db.session import get_db
+from core.db.text_filters import (
     contains_clause,
     fold_sql,
     parse_search_query,

@@ -31,7 +31,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from functools import lru_cache
 
-from infrastructure.db.text_filters import normalize_search_text
+from core.db.text_filters import normalize_search_text
 
 _SPLIT = re.compile(r"[\s\-‐‑–—]+")
 

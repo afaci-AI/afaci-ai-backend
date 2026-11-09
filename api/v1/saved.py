@@ -28,10 +28,10 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from application.calculator.calculator_service import compute_recipe
-from infrastructure.auth import get_current_user
-from infrastructure.db.models import RecipeGroup, SavedRecipe, SavedRecipeItem, User
-from infrastructure.db.session import get_db
+from core.db.models import RecipeGroup, SavedRecipe, SavedRecipeItem, User
+from core.db.session import get_db
+from core.security import get_current_user
+from features.calculator.api.deps import compute_recipe_in_session as compute_recipe
 
 router = APIRouter(prefix="/api/v1/saved", tags=["Saved"])
 

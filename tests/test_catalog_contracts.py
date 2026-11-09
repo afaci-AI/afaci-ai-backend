@@ -27,9 +27,9 @@ async def unused_db():
 
 # The production session module loads .env at import time. Use a dependency stub
 # so these checks remain independent of developer credentials and database state.
-session_stub = ModuleType("infrastructure.db.session")
+session_stub = ModuleType("core.db.session")
 session_stub.get_db = unused_db
-with patch.dict(sys.modules, {"infrastructure.db.session": session_stub}):
+with patch.dict(sys.modules, {"core.db.session": session_stub}):
     products = importlib.import_module("api.v1.products")
 
 

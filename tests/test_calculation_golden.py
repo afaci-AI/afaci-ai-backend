@@ -12,14 +12,16 @@ import os
 import unittest
 from pathlib import Path
 
-from domain.calculator.formulas import compute_report
-from domain.calculator.optimizer import (
+from features.calculator.domain import (
     CandidateItem,
     CostOptimizationConstraints,
-    _build_items,
+    compute_report,
     optimize_cost,
+    optimize_recipe,
 )
-from domain.calculator.recipe_optimizer import optimize_recipe
+from features.calculator.domain import (
+    build_items as _build_items,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 GOLDEN = FIXTURES / "calculation_golden.json"

@@ -8,19 +8,23 @@ from pathlib import Path
 from types import ModuleType
 from unittest.mock import patch
 
-from domain.calculator.formulas import compute_report
-from domain.calculator.optimizer import CandidateItem, _build_items
-from domain.calculator.recipe_optimizer import optimize_recipe
+from features.calculator.domain import CandidateItem
+from features.calculator.domain import build_items as _build_items
+from features.calculator.domain.formulas import compute_report
+from features.calculator.domain.recipe_optimizer import optimize_recipe
 
 
 async def unused_db():
     raise AssertionError("Rename tests must not connect to a database")
 
 
-session_stub = ModuleType("infrastructure.db.session")
+session_stub = ModuleType("core.db.session")
 session_stub.get_db = unused_db
-with patch.dict(sys.modules, {"infrastructure.db.session": session_stub}):
+with patch.dict(sys.modules, {"core.db.session": session_stub}):
     saved = importlib.import_module("api.v1.saved")
+    # Держим модели по ссылке: реестр SQLAlchemy хранит классы слабо, а
+    # patch.dict убирает модули из sys.modules при выходе из блока.
+    models = importlib.import_module("core.db.models")
 
 
 def control():

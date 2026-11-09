@@ -17,10 +17,10 @@ async def unused_db():
     raise AssertionError("Contract tests must not connect to a database")
 
 
-session_stub = ModuleType("infrastructure.db.session")
+session_stub = ModuleType("core.db.session")
 session_stub.get_db = unused_db
-with patch.dict(sys.modules, {"infrastructure.db.session": session_stub}):
-    calculator = importlib.import_module("api.v1.calculator")
+with patch.dict(sys.modules, {"core.db.session": session_stub}):
+    calculator = importlib.import_module("features.calculator.api.router")
 from api.v1.reference_documents import router as documents_router
 
 

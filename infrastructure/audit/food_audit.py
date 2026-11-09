@@ -121,7 +121,7 @@ def _resolve_user(current_user: Any | None, authorization: str | None) -> str:
     if not token:
         return "InvalidToken"
     try:
-        from infrastructure.auth import decode_token
+        from core.security import decode_token
 
         sub = decode_token(token)
         if sub is None:

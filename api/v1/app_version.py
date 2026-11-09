@@ -24,10 +24,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import ClientDisconnect
 
-from api.rate_limit import limiter
-from infrastructure.auth import require_admin
-from infrastructure.db.models import AppVersion, User
-from infrastructure.db.session import get_db
+from core.db.models import AppVersion, User
+from core.db.session import get_db
+from core.rate_limit import limiter
+from core.security import require_admin
 
 router = APIRouter(tags=["App Version"])
 

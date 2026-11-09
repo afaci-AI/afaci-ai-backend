@@ -19,9 +19,9 @@ async def unused_db():
     raise AssertionError("Tests must not connect to a database")
 
 
-session_stub = ModuleType("infrastructure.db.session")
+session_stub = ModuleType("core.db.session")
 session_stub.get_db = unused_db
-with patch.dict(sys.modules, {"infrastructure.db.session": session_stub}):
+with patch.dict(sys.modules, {"core.db.session": session_stub}):
     versions = importlib.import_module("api.v1.app_version")
 
 

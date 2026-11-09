@@ -22,7 +22,7 @@ from application.products.daily_norms_service import (
     load_sources,
     product_amounts,
 )
-from infrastructure.db.session import get_db
+from core.db.session import get_db
 
 TAG = "Sources and daily norms"
 router = APIRouter(prefix="/api/v1", tags=[TAG])
