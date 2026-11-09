@@ -1,0 +1,20 @@
+[lint]
+extend-select = ["C901", "PLR0912", "PLR0915"]
+
+[lint.mccabe]
+max-complexity = 10
+
+[lint.pylint]
+max-branches = 12
+max-statements = 50
+
+# Baseline: существующие нарушения порогов сложности (см. реестр файлов-«богов»
+# в docs/architecture-god-files-solid.md). Список только сокращается; новые
+# записи добавлять нельзя — файл убирается отсюда, когда его разделили.
+[lint.per-file-ignores]
+"api/v1/app_version.py" = ["C901"]
+"domain/calculator/formulas.py" = ["C901", "PLR0915"]
+"domain/calculator/optimizer.py" = ["C901"]
+"domain/calculator/recipe_optimizer.py" = ["C901", "PLR0912", "PLR0915"]
+"infrastructure/audit/helpers.py" = ["C901", "PLR0912", "PLR0915"]
+"infrastructure/db/import_part2.py" = ["C901", "PLR0912", "PLR0915"]
