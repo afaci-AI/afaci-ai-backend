@@ -1,10 +1,6 @@
 """Typo-tolerant search rules: no database connection is required."""
 
-import importlib
-import sys
 import unittest
-from types import ModuleType
-from unittest.mock import patch
 
 from core.db.fuzzy_search import (
     UNIT,
@@ -16,16 +12,6 @@ from core.db.fuzzy_search import (
     word_cost,
 )
 from core.db.text_filters import parse_search_query, relevance_sql
-
-
-async def unused_db():
-    raise AssertionError("Fuzzy search tests must not connect to a database")
-
-
-session_stub = ModuleType("core.db.session")
-session_stub.get_db = unused_db
-with patch.dict(sys.modules, {"core.db.session": session_stub}):
-    importlib.import_module("api.v1.table")
 
 PRODUCTS = [
     ("1", "Молоко"),

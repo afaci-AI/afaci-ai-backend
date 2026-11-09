@@ -1,8 +1,6 @@
 [importlinter]
 root_packages =
     api
-    application
-    domain
     infrastructure
     core
     features
@@ -10,7 +8,23 @@ root_packages =
     fastapi
 include_external_packages = True
 
-# ---------------------------------------------------------------- features
+# Внутри фичи: api -> infra -> app -> domain (внутрь), фреймворки только снаружи.
+[importlinter:contract:feature-layers]
+name = Слои фичи: api -> infra -> app -> domain
+type = layers
+layers =
+    api
+    infra
+    app
+    (domain)
+containers =
+    features.calculator
+    features.catalog
+    features.norms
+    features.products
+    features.recipes
+    features.table
+
 [importlinter:contract:feature-domain-is-pure]
 name = Feature domain не зависит от остальных слоёв и фреймворков
 type = forbidden
@@ -22,10 +36,11 @@ forbidden_modules =
     features.*.api
     core
     api
-    application
     infrastructure
     sqlalchemy
     fastapi
+ignore_imports =
+    features.norms.domain.** -> features.calculator.domain.**
 
 [importlinter:contract:feature-app-no-frameworks]
 name = Feature app не зависит от infra, api и фреймворков
@@ -51,6 +66,7 @@ forbidden_modules =
     features.*.api
     api
     fastapi
+allow_indirect_imports = True
 
 [importlinter:contract:feature-api-no-infra]
 name = Feature api получает infra только через deps.py
@@ -65,39 +81,31 @@ allow_indirect_imports = True
 ignore_imports =
     features.*.api.deps -> features.*.infra.**
 
-# ------------------------------------------------------------- legacy layers
-[importlinter:contract:domain-is-pure]
-name = Domain не зависит от остальных слоёв и фреймворков
-type = forbidden
-source_modules =
-    domain
-forbidden_modules =
-    application
-    infrastructure
-    api
-    core
-    features
-    sqlalchemy
-    fastapi
-
-[importlinter:contract:application-no-frameworks]
-name = Application не зависит от api, infrastructure и фреймворков
-type = forbidden
-source_modules =
-    application
-forbidden_modules =
-    api
-    infrastructure
-    features
-    sqlalchemy
-    fastapi
-allow_indirect_imports = True
-# Baseline: существующие нарушения. Список только сокращается; новые
-# записи добавлять нельзя (убираются при разборе соответствующих файлов).
+# Фичи не знают устройство друг друга; разрешены только перечисленные связи
+# через публичные app/domain/api.deps чужой фичи.
+[importlinter:contract:features-independent]
+name = Фичи независимы, кроме явно разрешённых связей
+type = independence
+modules =
+    features.calculator
+    features.catalog
+    features.norms
+    features.products
+    features.recipes
+    features.table
 ignore_imports =
+    features.norms.domain.** -> features.calculator.domain.**
+    features.calculator.api.router -> features.norms.api.deps
+    features.calculator.api.router -> features.norms.api.documents
+    features.calculator.api.router -> features.norms.app
+    features.calculator.api.router -> features.norms.domain.daily_norms
+    features.recipes.api.deps -> features.calculator.api.deps
+    features.recipes.api.deps -> features.calculator.app
+    features.products.app.service -> features.catalog.domain.rules
 
+# ------------------------------------------------------------ legacy api
 [importlinter:contract:api-no-direct-db]
-name = Api не обращается к core.db напрямую
+name = Старый api не обращается к core.db напрямую
 type = forbidden
 source_modules =
     api
@@ -111,11 +119,6 @@ ignore_imports =
     api.v1.app_version -> core.db.session
     api.v1.auth -> core.db.models
     api.v1.auth -> core.db.session
-    api.v1.products -> core.db.models
-    api.v1.products -> core.db.session
-    api.v1.table -> core.db.fuzzy_search
-    api.v1.table -> core.db.session
-    api.v1.table -> core.db.text_filters
     api.v1.users -> core.db.models
     api.v1.users -> core.db.session
 
@@ -127,12 +130,3 @@ source_modules =
 forbidden_modules =
     features.*.infra
 allow_indirect_imports = True
-
-[importlinter:contract:layers]
-name = Направление зависимостей api -> infrastructure -> application -> domain
-type = layers
-layers =
-    api
-    infrastructure
-    application
-    domain

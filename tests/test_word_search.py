@@ -1,12 +1,8 @@
 """Word search and relevance rules: no database connection is required."""
 
-import importlib
 import re
-import sys
 import unittest
 from collections import Counter
-from types import ModuleType
-from unittest.mock import patch
 
 from core.db.text_filters import (
     SEPARATOR_REGEX,
@@ -17,16 +13,7 @@ from core.db.text_filters import (
     search_match_sql,
     tokens_sql,
 )
-
-
-async def unused_db():
-    raise AssertionError("Word search tests must not connect to a database")
-
-
-session_stub = ModuleType("core.db.session")
-session_stub.get_db = unused_db
-with patch.dict(sys.modules, {"core.db.session": session_stub}):
-    table = importlib.import_module("api.v1.table")
+from features.table.infra.sql_queries import SqlTableQueries
 
 
 def tokens(name):
@@ -160,7 +147,7 @@ class SqlChecks(unittest.TestCase):
     def test_relevance_goes_before_selected_sort_in_products_route(self):
         import inspect
 
-        source = inspect.getsource(table.table_products)
+        source = inspect.getsource(SqlTableQueries.products)
         self.assertIn("ORDER BY {relevance_order}{sort_by} {sort_order}, p.id", source)
 
 

@@ -12,10 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent
 PACKAGES = ("api", "application", "domain", "infrastructure", "core", "features")
 MAX_LINES = 400
 
-OVERSIZED = {
-    "api/v1/products.py": 1178,
-    "api/v1/table.py": 627,
-}
+OVERSIZED = {}
 
 
 def line_count(path: Path) -> int:

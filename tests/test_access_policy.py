@@ -1,29 +1,26 @@
 """Access policy regressions without local secrets or a database connection."""
 
-import importlib
-import sys
 import unittest
-from types import ModuleType
-from unittest.mock import AsyncMock, Mock, patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.responses import Response
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
+import core.security as authentication
+from api.v1 import auth, users
+from core.db import models
+from core.db.session import get_db
+from features.catalog.api import router as catalog_router
+from features.products.api import router as products_router
 
-async def unused_db():
-    raise AssertionError("Access tests must not connect to a database")
-
-
-session_stub = ModuleType("core.db.session")
-session_stub.get_db = unused_db
-with patch.dict(sys.modules, {"core.db.session": session_stub}):
-    products = importlib.import_module("api.v1.products")
-    auth = importlib.import_module("api.v1.auth")
-    users = importlib.import_module("api.v1.users")
-    authentication = importlib.import_module("core.security")
+_catalog = APIRouter()
+_catalog.include_router(catalog_router)
+_catalog.include_router(products_router)
+products = SimpleNamespace(router=_catalog, models=models)
 
 
 class AccessPolicyChecks(unittest.IsolatedAsyncioTestCase):
@@ -32,8 +29,7 @@ class AccessPolicyChecks(unittest.IsolatedAsyncioTestCase):
         for router in (products.router, auth.router, users.router):
             self.app.include_router(router)
         self.db = Mock(execute=AsyncMock(), commit=AsyncMock(), delete=AsyncMock())
-        for module in (products, auth, users, authentication):
-            self.app.dependency_overrides[module.get_db] = lambda: self.db
+        self.app.dependency_overrides[get_db] = lambda: self.db
         self.client = TestClient(self.app)
         self.addCleanup(self.client.close)
 

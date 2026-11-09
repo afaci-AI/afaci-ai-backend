@@ -115,6 +115,12 @@ async def require_admin(current: Annotated[User, Depends(get_current_user)]) -> 
     return current
 
 
+async def require_editor(current: Annotated[User, Depends(get_current_user)]) -> User:
+    if current.role not in {"admin", "editor"}:
+        raise HTTPException(status_code=403, detail="Требуются права редактора.")
+    return current
+
+
 async def get_current_user_optional(
     db: Annotated[AsyncSession, Depends(get_db)],
     authorization: str | None = Header(default=None),
