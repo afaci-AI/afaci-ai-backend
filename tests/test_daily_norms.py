@@ -8,18 +8,21 @@ from types import ModuleType, SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 
-from application.products import daily_norms_service as service
-from domain.products.daily_norms import (
+from core.errors import NotFoundError
+from features.calculator.domain import compute_report
+from features.calculator.domain.formulas import energy_kcal
+from features.norms.app import NormsService
+from features.norms.domain.daily_norms import (
     NORM_ORDER,
     NORMS_INFO,
     amounts_from_macros,
     build_norm_rows,
-    energy_kcal,
     percent_of_norm,
 )
-from features.calculator.domain import compute_report
+from features.norms.domain.sources import merge_sources
+from features.norms.infra.sql_repo import SqlNormsRepository
 
 MIGRATION = (
     Path(__file__).resolve().parents[1]
@@ -140,8 +143,28 @@ class SeededValuesTests(unittest.TestCase):
             self.assertTrue(norm["unit"])
 
 
+class FakeNormsRepository:
+    def __init__(self, norms=(), registry=(), references=(), macros=None):
+        self._norms = list(norms)
+        self._registry = list(registry)
+        self._references = list(references)
+        self._macros = macros
+
+    async def registry_sources(self):
+        return self._registry
+
+    async def reference_sources(self):
+        return self._references
+
+    async def norms(self):
+        return self._norms
+
+    async def product_macros(self, product_id):
+        return self._macros
+
+
 class ServiceTests(unittest.IsolatedAsyncioTestCase):
-    async def test_sources_registry_merges_reference_documents(self):
+    def test_sources_registry_merges_reference_documents(self):
         sources = [
             {
                 "id": uuid4(),
@@ -176,10 +199,7 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
             {"name": "ФАО/ВОЗ 1985", **shared},
             {"name": "ФАО/ВОЗ 1991", **shared},
         ]
-        db = Mock(
-            execute=AsyncMock(side_effect=[FakeResult(sources), FakeResult(references)])
-        )
-        result = await service.load_sources(db, lambda name: None)
+        result = merge_sources(sources, references, lambda name: None)
         self.assertEqual(len(result), 3)
         by_title = {s["title"]: s for s in result}
         self.assertEqual(by_title["Young"]["kind"], "article")
@@ -202,31 +222,39 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
                 "basis": "b",
             }
         ]
-        with (
-            patch.object(service, "load_norms", AsyncMock(return_value=norms)),
-            patch.object(
-                service,
-                "load_sources",
-                AsyncMock(
-                    return_value=[
-                        {"id": str(source_id), "title": "МР"},
-                        {"id": "other", "title": "Не используется"},
-                    ]
-                ),
-            ),
-        ):
-            payload = await service.daily_norms_payload(
-                Mock(), lambda name: None, {"protein": 41.5}
+
+        def registry_row(sid, title):
+            return {
+                "id": sid,
+                "kind": "document",
+                "title": title,
+                "authors": None,
+                "year": None,
+                "location": None,
+                "url": None,
+                "pdf_filename": None,
+                "used_for": None,
+            }
+
+        service = NormsService(
+            FakeNormsRepository(
+                norms=norms,
+                registry=[
+                    registry_row(source_id, "МР"),
+                    registry_row(uuid4(), "Не используется"),
+                ],
             )
+        )
+        payload = await service.payload(lambda name: None, {"protein": 41.5})
         self.assertEqual(payload["norms"][0]["percent"], 50.0)
         self.assertEqual([s["title"] for s in payload["sources"]], ["МР"])
         self.assertEqual(payload["info"], NORMS_INFO)
 
-    async def test_product_amounts_none_for_missing_product(self):
+    async def test_product_macros_none_for_missing_product(self):
         db = Mock(scalar=AsyncMock(return_value=None))
-        self.assertIsNone(await service.product_amounts(db, uuid4()))
+        self.assertIsNone(await SqlNormsRepository(db).product_macros(uuid4()))
 
-    async def test_product_amounts_reads_chemical_composition(self):
+    async def test_product_macros_reads_chemical_composition(self):
         rows = [
             {"nutrient": "Массовая доля белка", "quantity": 10.0},
             {"nutrient": "Массовая доля жира", "quantity": 5.0},
@@ -236,26 +264,51 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
             scalar=AsyncMock(return_value=1),
             execute=AsyncMock(return_value=FakeResult(rows)),
         )
-        amounts = await service.product_amounts(db, uuid4())
-        self.assertEqual(amounts["energy"], 165.0)
-        self.assertIsNone(amounts["fiber"])
+        macros = await SqlNormsRepository(db).product_macros(uuid4())
+        self.assertEqual(macros["Углеводы"], 20.0)
+
+    async def test_product_payload_computes_energy_and_skips_missing_fiber(self):
+        norm = {
+            "key": "energy",
+            "name": "Энергия",
+            "unit": "ккал",
+            "value": 2000.0,
+            "source_id": None,
+            "basis": "b",
+        }
+        macros = {
+            "Массовая доля белка": 10.0,
+            "Массовая доля жира": 5.0,
+            "Углеводы": 20.0,
+        }
+        service = NormsService(FakeNormsRepository(norms=[norm], macros=macros))
+        payload = await service.product_payload(uuid4(), lambda name: None)
+        self.assertEqual(payload["norms"][0]["amount"], 165.0)
+
+    async def test_product_payload_missing_product_is_not_found(self):
+        service = NormsService(FakeNormsRepository(macros=None))
+        with self.assertRaises(NotFoundError) as caught:
+            await service.product_payload(uuid4(), lambda name: None)
+        self.assertEqual(caught.exception.status_code, 404)
 
 
 async def unused_db():
     raise AssertionError("Route tests must not connect to a database")
 
 
-class RouteTests(unittest.IsolatedAsyncioTestCase):
+class RouteTests(unittest.TestCase):
     def load_norms_api(self):
         session_stub = ModuleType("core.db.session")
         session_stub.get_db = unused_db
         with patch.dict(sys.modules, {"core.db.session": session_stub}):
             import importlib
 
-            return importlib.import_module("api.v1.norms")
+            module = importlib.import_module("features.norms.api.router")
+            models = importlib.import_module("core.db.models")
+        return module, models
 
     def test_routes_are_public_and_documented(self):
-        norms = self.load_norms_api()
+        norms, _models = self.load_norms_api()
         app = FastAPI()
         app.include_router(norms.router)
         paths = app.openapi()["paths"]
@@ -266,15 +319,6 @@ class RouteTests(unittest.IsolatedAsyncioTestCase):
         ):
             operation = paths[path]["get"]
             self.assertNotIn("security", operation, path)
-
-    async def test_missing_product_is_404(self):
-        norms = self.load_norms_api()
-        with (
-            patch.object(norms, "product_amounts", AsyncMock(return_value=None)),
-            self.assertRaises(HTTPException) as caught,
-        ):
-            await norms.get_product_daily_norms(uuid4(), Mock(), Mock())
-        self.assertEqual(caught.exception.status_code, 404)
 
 
 if __name__ == "__main__":

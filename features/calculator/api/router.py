@@ -11,15 +11,13 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.v1.norms import pdf_url_builder
-from api.v1.reference_documents import document_path
-from application.products.daily_norms_service import daily_norms_payload
 from core.db.models import User
-from core.db.session import get_db
 from core.security import get_current_user
-from domain.products.daily_norms import amounts_from_macros
+from features.norms.api.deps import get_norms_service
+from features.norms.api.documents import document_path, pdf_url_builder
+from features.norms.app import NormsService
+from features.norms.domain.daily_norms import amounts_from_macros
 
 from ..app import RecipeCalculator, ReferenceCatalog
 from .deps import get_calculator, get_reference_catalog
@@ -77,8 +75,8 @@ async def list_recipes(
 async def compute(
     req: CalcRequest,
     request: Request,
-    db: Annotated[AsyncSession, Depends(get_db)],
     calculator: Annotated[RecipeCalculator, Depends(get_calculator)],
+    norms: Annotated[NormsService, Depends(get_norms_service)],
     _user: Annotated[User, Depends(get_current_user)],
 ):
     items = [{"product_id": it.product_id, "amount_g": it.amount_g} for it in req.items]
@@ -86,8 +84,7 @@ async def compute(
     # Доля от суточной нормы считается здесь же; сумма рецептуры равна 100 г,
     # поэтому макросостав — это содержание на 100 г рецептуры.
     macro = result["macro"]
-    result["daily_norms"] = await daily_norms_payload(
-        db,
+    result["daily_norms"] = await norms.payload(
         pdf_url_builder(request),
         amounts_from_macros(
             macro["protein"],

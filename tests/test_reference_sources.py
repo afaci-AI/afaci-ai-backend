@@ -1,27 +1,23 @@
 """Reference API contracts without reading .env or connecting to the live DB."""
 
-import importlib
-import sys
 import tempfile
 import unittest
 from pathlib import Path
-from types import ModuleType
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from features.calculator.api import router as calculator_router
+from features.calculator.api.deps import get_reference_catalog
+from features.calculator.infra.sql_reader import SqlCalculatorData
+from features.norms.api.documents import router as documents_router
 
-async def unused_db():
-    raise AssertionError("Contract tests must not connect to a database")
 
-
-session_stub = ModuleType("core.db.session")
-session_stub.get_db = unused_db
-with patch.dict(sys.modules, {"core.db.session": session_stub}):
-    calculator = importlib.import_module("features.calculator.api.router")
-from api.v1.reference_documents import router as documents_router
+def override_catalog(app, db):
+    """Подменяет сессию БД в каталоге эталонов на мок."""
+    app.dependency_overrides[get_reference_catalog] = lambda: SqlCalculatorData(db)
 
 
 class ReferenceSourceChecks(unittest.TestCase):
@@ -60,9 +56,9 @@ class ReferenceSourceChecks(unittest.TestCase):
                 side_effect=[row_result] + [value_result] * len(rows)
             )
             app = FastAPI()
-            app.include_router(calculator.router)
+            app.include_router(calculator_router)
             app.include_router(documents_router)
-            app.dependency_overrides[calculator.get_db] = lambda: db
+            override_catalog(app, db)
             with patch.dict(
                 "os.environ", {"REFERENCE_DOCUMENT_STORAGE_PATH": directory}
             ):
@@ -103,8 +99,8 @@ class ReferenceSourceChecks(unittest.TestCase):
         db = Mock()
         db.execute = AsyncMock(side_effect=[rows, values])
         app = FastAPI()
-        app.include_router(calculator.router)
-        app.dependency_overrides[calculator.get_db] = lambda: db
+        app.include_router(calculator_router)
+        override_catalog(app, db)
         with (
             tempfile.TemporaryDirectory() as directory,
             patch.dict("os.environ", {"REFERENCE_DOCUMENT_STORAGE_PATH": directory}),

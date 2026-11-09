@@ -22,11 +22,3 @@ async def get_reference_catalog(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ReferenceCatalog:
     return SqlCalculatorData(db)
-
-
-async def compute_recipe_in_session(
-    db: AsyncSession, reference_id, items: list[dict]
-) -> dict:
-    """Расчёт для кода, у которого уже есть сессия БД (сохранение рецептур)."""
-    data = SqlCalculatorData(db)
-    return await RecipeCalculator(data, data).compute(reference_id, items)

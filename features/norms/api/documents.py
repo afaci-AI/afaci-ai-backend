@@ -4,7 +4,7 @@ import os
 import re
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse
 
 router = APIRouter(prefix="/api/v1/calculator", tags=["Calculator"])
@@ -22,6 +22,17 @@ def document_path(filename: str) -> Path | None:
     if candidate.parent != root or not candidate.is_file():
         return None
     return candidate
+
+
+def pdf_url_builder(request: Request):
+    """Ссылка на локально хранимый PDF источника или None, если файла нет."""
+
+    def build(filename: str | None) -> str | None:
+        if filename and document_path(filename) is not None:
+            return str(request.url_for("get_reference_document", filename=filename))
+        return None
+
+    return build
 
 
 @router.get(

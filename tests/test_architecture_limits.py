@@ -15,7 +15,6 @@ MAX_LINES = 400
 OVERSIZED = {
     "api/v1/products.py": 1178,
     "api/v1/table.py": 627,
-    "api/v1/saved.py": 511,
 }
 
 

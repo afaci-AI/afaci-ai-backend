@@ -12,13 +12,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 
-# Коэффициенты МР 2.3.1.0253-21, приложение 3: белки 4,0, жиры 9,0, углеводы 4,0 ккал/г.
-# Те же коэффициенты использует калькулятор рецептур.
-KCAL_PER_G_PROTEIN = 4
-KCAL_PER_G_FAT = 9
-KCAL_PER_G_CARB = 4
+from features.calculator.domain.formulas import energy_kcal
+
+PdfUrl = Callable[[str | None], str | None]
 
 NORM_ORDER = ("energy", "protein", "fat", "carbs", "fiber")
 
@@ -66,15 +64,6 @@ NORMS_INFO = {
         "специалиста."
     ),
 }
-
-
-def energy_kcal(
-    protein: float | None, fat: float | None, carb: float | None
-) -> float | None:
-    """Энергия, ккал на 100 г; None, если неизвестен хотя бы один макронутриент."""
-    if protein is None or fat is None or carb is None:
-        return None
-    return KCAL_PER_G_PROTEIN * protein + KCAL_PER_G_FAT * fat + KCAL_PER_G_CARB * carb
 
 
 def percent_of_norm(amount: float | None, norm: float) -> float | None:

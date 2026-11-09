@@ -95,8 +95,6 @@ allow_indirect_imports = True
 # Baseline: существующие нарушения. Список только сокращается; новые
 # записи добавлять нельзя (убираются при разборе соответствующих файлов).
 ignore_imports =
-    application.products.daily_norms_service -> sqlalchemy
-    application.products.daily_norms_service -> sqlalchemy.ext.asyncio
 
 [importlinter:contract:api-no-direct-db]
 name = Api не обращается к core.db напрямую
@@ -113,11 +111,8 @@ ignore_imports =
     api.v1.app_version -> core.db.session
     api.v1.auth -> core.db.models
     api.v1.auth -> core.db.session
-    api.v1.norms -> core.db.session
     api.v1.products -> core.db.models
     api.v1.products -> core.db.session
-    api.v1.saved -> core.db.models
-    api.v1.saved -> core.db.session
     api.v1.table -> core.db.fuzzy_search
     api.v1.table -> core.db.session
     api.v1.table -> core.db.text_filters
