@@ -13,9 +13,8 @@ htmlcov/
 .vscode/
 .DS_Store
 backups/
-docker/
-Dockerfile
-.dockerignore
+docker/*
+!docker/docker-entrypoint.sh
 README.md
 .env
 .env.*
