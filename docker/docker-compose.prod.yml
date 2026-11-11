@@ -1,3 +1,4 @@
+# Запуск из корня репозитория: docker compose -f docker/docker-compose.prod.yml --project-directory . up --build -d
 name: afaci
 
 services:
@@ -21,7 +22,8 @@ services:
       - afaci-network
 
   backend:
-    image: ${BACKEND_IMAGE}
+    build:
+      dockerfile: docker/Dockerfile.prod
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}

@@ -33,7 +33,7 @@ ENV PATH="/opt/venv/bin:$PATH" \
 WORKDIR /app
 
 # Редко меняющееся — выше, код приложения — в самом конце.
-COPY --chown=afaci:afaci docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY --chown=afaci:afaci docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
     && mkdir -p /app/uploads/apk \
     && chown -R afaci:afaci /app
