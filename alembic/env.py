@@ -9,7 +9,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
-from infrastructure.db.models import Base
+from core.db.models import Base
 
 sys.path.append(os.getcwd())
 

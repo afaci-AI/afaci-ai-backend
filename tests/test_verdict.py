@@ -5,9 +5,9 @@ import json
 import unittest
 from pathlib import Path
 
-from domain.calculator import formulas
-from domain.calculator.formulas import NAK_GROUPS, compute_report
-from domain.calculator.optimizer import CandidateItem, _build_items
+from features.calculator.domain import CandidateItem, formulas
+from features.calculator.domain import build_items as _build_items
+from features.calculator.domain.formulas import NAK_GROUPS, compute_report
 
 
 def control():
@@ -171,7 +171,10 @@ class VerdictByReferenceChecks(unittest.TestCase):
         self.assertIsNone(report["verdict"])
 
     def test_conditional_thresholds_and_levels_are_gone(self):
-        source = inspect.getsource(formulas)
+        source = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in sorted(Path(inspect.getfile(formulas)).parent.glob("*.py"))
+        )
         for forbidden in (
             "c_min_val >= 95",
             "c_min_val >= 70",

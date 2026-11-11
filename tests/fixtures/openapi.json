@@ -1,0 +1,7414 @@
+{
+ "components": {
+  "schemas": {
+   "AppVersionAdmin": {
+    "properties": {
+     "apkFilename": {
+      "title": "Apkfilename",
+      "type": "string"
+     },
+     "apkUrl": {
+      "title": "Apkurl",
+      "type": "string"
+     },
+     "changelog": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Changelog"
+     },
+     "forceUpdate": {
+      "title": "Forceupdate",
+      "type": "boolean"
+     },
+     "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+     },
+     "isCurrent": {
+      "title": "Iscurrent",
+      "type": "boolean"
+     },
+     "minSupportedVersionCode": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Minsupportedversioncode"
+     },
+     "publishedAt": {
+      "format": "date-time",
+      "title": "Publishedat",
+      "type": "string"
+     },
+     "version": {
+      "title": "Version",
+      "type": "string"
+     },
+     "versionCode": {
+      "title": "Versioncode",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "id",
+     "version",
+     "versionCode",
+     "apkUrl",
+     "apkFilename",
+     "changelog",
+     "forceUpdate",
+     "minSupportedVersionCode",
+     "isCurrent",
+     "publishedAt"
+    ],
+    "title": "AppVersionAdmin",
+    "type": "object"
+   },
+   "AppVersionCreate": {
+    "properties": {
+     "apkFilename": {
+      "minLength": 1,
+      "title": "Apkfilename",
+      "type": "string"
+     },
+     "changelog": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Changelog"
+     },
+     "forceUpdate": {
+      "default": false,
+      "title": "Forceupdate",
+      "type": "boolean"
+     },
+     "isCurrent": {
+      "default": true,
+      "title": "Iscurrent",
+      "type": "boolean"
+     },
+     "minSupportedVersionCode": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Minsupportedversioncode"
+     },
+     "version": {
+      "minLength": 1,
+      "title": "Version",
+      "type": "string"
+     },
+     "versionCode": {
+      "exclusiveMinimum": 0.0,
+      "title": "Versioncode",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "version",
+     "versionCode",
+     "apkFilename"
+    ],
+    "title": "AppVersionCreate",
+    "type": "object"
+   },
+   "AppVersionUpdate": {
+    "properties": {
+     "changelog": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Changelog"
+     },
+     "forceUpdate": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Forceupdate"
+     },
+     "minSupportedVersionCode": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Minsupportedversioncode"
+     },
+     "version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Version"
+     }
+    },
+    "title": "AppVersionUpdate",
+    "type": "object"
+   },
+   "Body_upload_apk_api_v1_admin_app_versions_upload_apk_post": {
+    "properties": {
+     "changelog": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Changelog"
+     },
+     "file": {
+      "contentMediaType": "application/octet-stream",
+      "title": "File",
+      "type": "string"
+     },
+     "forceUpdate": {
+      "default": false,
+      "title": "Forceupdate",
+      "type": "boolean"
+     },
+     "minSupportedVersionCode": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Minsupportedversioncode"
+     }
+    },
+    "required": [
+     "file"
+    ],
+    "title": "Body_upload_apk_api_v1_admin_app_versions_upload_apk_post",
+    "type": "object"
+   },
+   "CalcItem": {
+    "properties": {
+     "amount_g": {
+      "title": "Amount G",
+      "type": "number"
+     },
+     "product_id": {
+      "format": "uuid",
+      "title": "Product Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "product_id",
+     "amount_g"
+    ],
+    "title": "CalcItem",
+    "type": "object"
+   },
+   "CalcRequest": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/CalcItem"
+      },
+      "title": "Items",
+      "type": "array"
+     },
+     "reference_protein_id": {
+      "format": "uuid",
+      "title": "Reference Protein Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "reference_protein_id",
+     "items"
+    ],
+    "title": "CalcRequest",
+    "type": "object"
+   },
+   "CandidateIn": {
+    "properties": {
+     "max_amount_g": {
+      "default": 100.0,
+      "title": "Max Amount G",
+      "type": "number"
+     },
+     "min_amount_g": {
+      "default": 0.0,
+      "title": "Min Amount G",
+      "type": "number"
+     },
+     "price_per_kg": {
+      "title": "Price Per Kg",
+      "type": "number"
+     },
+     "product_id": {
+      "format": "uuid",
+      "title": "Product Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "product_id",
+     "price_per_kg"
+    ],
+    "title": "CandidateIn",
+    "type": "object"
+   },
+   "ChangePasswordRequest": {
+    "properties": {
+     "current_password": {
+      "title": "Current Password",
+      "type": "string"
+     },
+     "new_password": {
+      "minLength": 6,
+      "title": "New Password",
+      "type": "string"
+     }
+    },
+    "required": [
+     "current_password",
+     "new_password"
+    ],
+    "title": "ChangePasswordRequest",
+    "type": "object"
+   },
+   "DailyNormsOut": {
+    "properties": {
+     "info": {
+      "$ref": "#/components/schemas/NormsInfoOut"
+     },
+     "norms": {
+      "items": {
+       "$ref": "#/components/schemas/NormRowOut"
+      },
+      "title": "Norms",
+      "type": "array"
+     },
+     "sources": {
+      "items": {
+       "$ref": "#/components/schemas/SourceOut"
+      },
+      "title": "Sources",
+      "type": "array"
+     }
+    },
+    "required": [
+     "norms",
+     "sources",
+     "info"
+    ],
+    "title": "DailyNormsOut",
+    "type": "object"
+   },
+   "GroupIn": {
+    "properties": {
+     "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name"
+    ],
+    "title": "GroupIn",
+    "type": "object"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "title": "Detail",
+      "type": "array"
+     }
+    },
+    "title": "HTTPValidationError",
+    "type": "object"
+   },
+   "ItemCreate": {
+    "properties": {
+     "description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "name": {
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     },
+     "role": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Role"
+     }
+    },
+    "required": [
+     "name"
+    ],
+    "title": "ItemCreate",
+    "type": "object"
+   },
+   "ItemUpdate": {
+    "properties": {
+     "description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "name": {
+      "anyOf": [
+       {
+        "maxLength": 100,
+        "minLength": 1,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "role": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Role"
+     }
+    },
+    "title": "ItemUpdate",
+    "type": "object"
+   },
+   "LoginRequest": {
+    "properties": {
+     "email": {
+      "title": "Email",
+      "type": "string"
+     },
+     "password": {
+      "title": "Password",
+      "type": "string"
+     }
+    },
+    "required": [
+     "email",
+     "password"
+    ],
+    "title": "LoginRequest",
+    "type": "object"
+   },
+   "NormRowOut": {
+    "properties": {
+     "amount": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Amount"
+     },
+     "basis": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Basis"
+     },
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "norm": {
+      "title": "Norm",
+      "type": "number"
+     },
+     "percent": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Percent"
+     },
+     "source_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Id"
+     },
+     "unit": {
+      "title": "Unit",
+      "type": "string"
+     }
+    },
+    "required": [
+     "key",
+     "name",
+     "unit",
+     "norm"
+    ],
+    "title": "NormRowOut",
+    "type": "object"
+   },
+   "NormsInfoOut": {
+    "properties": {
+     "disclaimer": {
+      "title": "Disclaimer",
+      "type": "string"
+     },
+     "paragraphs": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Paragraphs",
+      "type": "array"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "title",
+     "paragraphs",
+     "disclaimer"
+    ],
+    "title": "NormsInfoOut",
+    "type": "object"
+   },
+   "NutrientBulkCreate": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/NutrientCreate"
+      },
+      "title": "Items",
+      "type": "array"
+     }
+    },
+    "required": [
+     "items"
+    ],
+    "title": "NutrientBulkCreate",
+    "type": "object"
+   },
+   "NutrientCreate": {
+    "properties": {
+     "error_rate": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Rate"
+     },
+     "nutrient_name_id": {
+      "format": "uuid",
+      "title": "Nutrient Name Id",
+      "type": "string"
+     },
+     "product_id": {
+      "format": "uuid",
+      "title": "Product Id",
+      "type": "string"
+     },
+     "quantity": {
+      "title": "Quantity",
+      "type": "number"
+     },
+     "unit_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unit Id"
+     }
+    },
+    "required": [
+     "product_id",
+     "nutrient_name_id",
+     "quantity"
+    ],
+    "title": "NutrientCreate",
+    "type": "object"
+   },
+   "NutrientNameCreate": {
+    "properties": {
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "nutrient_type_id": {
+      "format": "uuid",
+      "title": "Nutrient Type Id",
+      "type": "string"
+     },
+     "unit_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unit Id"
+     }
+    },
+    "required": [
+     "name",
+     "nutrient_type_id"
+    ],
+    "title": "NutrientNameCreate",
+    "type": "object"
+   },
+   "NutrientNameUpdate": {
+    "properties": {
+     "name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "nutrient_type_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Nutrient Type Id"
+     },
+     "unit_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unit Id"
+     }
+    },
+    "title": "NutrientNameUpdate",
+    "type": "object"
+   },
+   "NutrientUpdate": {
+    "properties": {
+     "error_rate": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Rate"
+     },
+     "nutrient_name_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Nutrient Name Id"
+     },
+     "product_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Product Id"
+     },
+     "quantity": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Quantity"
+     },
+     "unit_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unit Id"
+     }
+    },
+    "title": "NutrientUpdate",
+    "type": "object"
+   },
+   "OptConstraints": {
+    "properties": {
+     "bc_min": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Bc Min"
+     },
+     "kras_max": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Kras Max"
+     }
+    },
+    "title": "OptConstraints",
+    "type": "object"
+   },
+   "OptimizationItemIn": {
+    "properties": {
+     "amount_g": {
+      "maximum": 100.0,
+      "minimum": 0.0,
+      "title": "Amount G",
+      "type": "number"
+     },
+     "max_amount_g": {
+      "default": 100.0,
+      "maximum": 100.0,
+      "minimum": 0.0,
+      "title": "Max Amount G",
+      "type": "number"
+     },
+     "min_amount_g": {
+      "default": 0.0,
+      "maximum": 100.0,
+      "minimum": 0.0,
+      "title": "Min Amount G",
+      "type": "number"
+     },
+     "price_per_kg": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Price Per Kg"
+     },
+     "product_id": {
+      "format": "uuid",
+      "title": "Product Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "product_id",
+     "amount_g"
+    ],
+    "title": "OptimizationItemIn",
+    "type": "object"
+   },
+   "OptimizeCostRequest": {
+    "properties": {
+     "candidates": {
+      "items": {
+       "$ref": "#/components/schemas/CandidateIn"
+      },
+      "title": "Candidates",
+      "type": "array"
+     },
+     "constraints": {
+      "$ref": "#/components/schemas/OptConstraints",
+      "default": {}
+     },
+     "reference_protein_id": {
+      "format": "uuid",
+      "title": "Reference Protein Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "reference_protein_id",
+     "candidates"
+    ],
+    "title": "OptimizeCostRequest",
+    "type": "object"
+   },
+   "OptimizeRecipeRequest": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/OptimizationItemIn"
+      },
+      "maxItems": 50,
+      "minItems": 1,
+      "title": "Items",
+      "type": "array"
+     },
+     "mode": {
+      "enum": [
+       "basic",
+       "cost"
+      ],
+      "title": "Mode",
+      "type": "string"
+     },
+     "reference_protein_id": {
+      "format": "uuid",
+      "title": "Reference Protein Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "mode",
+     "reference_protein_id",
+     "items"
+    ],
+    "title": "OptimizeRecipeRequest",
+    "type": "object"
+   },
+   "ProductAutoCreate": {
+    "properties": {
+     "category_name": {
+      "title": "Category Name",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "region_name": {
+      "title": "Region Name",
+      "type": "string"
+     },
+     "subcategory_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Subcategory Name"
+     }
+    },
+    "required": [
+     "name",
+     "category_name",
+     "region_name"
+    ],
+    "title": "ProductAutoCreate",
+    "type": "object"
+   },
+   "ProductCount": {
+    "properties": {
+     "count": {
+      "description": "Общее количество продуктов питания в базе",
+      "minimum": 0.0,
+      "title": "Count",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "count"
+    ],
+    "title": "ProductCount",
+    "type": "object"
+   },
+   "ProductCreate": {
+    "properties": {
+     "category_id": {
+      "format": "uuid",
+      "title": "Category Id",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "region_id": {
+      "format": "uuid",
+      "title": "Region Id",
+      "type": "string"
+     },
+     "subcategory_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Subcategory Id"
+     }
+    },
+    "required": [
+     "name",
+     "category_id",
+     "region_id"
+    ],
+    "title": "ProductCreate",
+    "type": "object"
+   },
+   "ProductUpdate": {
+    "properties": {
+     "category_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Category Id"
+     },
+     "name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "region_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Region Id"
+     },
+     "subcategory_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Subcategory Id"
+     }
+    },
+    "title": "ProductUpdate",
+    "type": "object"
+   },
+   "RankingRequest": {
+    "properties": {
+     "recipe_ids": {
+      "items": {
+       "format": "uuid",
+       "type": "string"
+      },
+      "title": "Recipe Ids",
+      "type": "array"
+     },
+     "weights": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Weights"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "required": [
+     "recipe_ids"
+    ],
+    "title": "RankingRequest",
+    "type": "object"
+   },
+   "ReferenceProteinOut": {
+    "properties": {
+     "description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+     },
+     "is_default": {
+      "title": "Is Default",
+      "type": "boolean"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "source": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ReferenceSourceOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "values": {
+      "items": {
+       "$ref": "#/components/schemas/ReferenceValueOut"
+      },
+      "title": "Values",
+      "type": "array"
+     },
+     "year": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Year"
+     }
+    },
+    "required": [
+     "id",
+     "name",
+     "year",
+     "is_default",
+     "description",
+     "values"
+    ],
+    "title": "ReferenceProteinOut",
+    "type": "object"
+   },
+   "ReferenceSourceOut": {
+    "properties": {
+     "authors": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authors"
+     },
+     "location": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Location"
+     },
+     "pdf_url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Pdf Url"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     },
+     "url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Url"
+     },
+     "year": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Year"
+     }
+    },
+    "required": [
+     "title"
+    ],
+    "title": "ReferenceSourceOut",
+    "type": "object"
+   },
+   "ReferenceValueOut": {
+    "properties": {
+     "amino_acid": {
+      "title": "Amino Acid",
+      "type": "string"
+     },
+     "value": {
+      "title": "Value",
+      "type": "number"
+     }
+    },
+    "required": [
+     "amino_acid",
+     "value"
+    ],
+    "title": "ReferenceValueOut",
+    "type": "object"
+   },
+   "SavedItemIn": {
+    "properties": {
+     "amount_g": {
+      "title": "Amount G",
+      "type": "number"
+     },
+     "price_per_kg": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Price Per Kg"
+     },
+     "product_id": {
+      "format": "uuid",
+      "title": "Product Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "product_id",
+     "amount_g"
+    ],
+    "title": "SavedItemIn",
+    "type": "object"
+   },
+   "SavedRecipeCreate": {
+    "properties": {
+     "draft": {
+      "default": false,
+      "title": "Draft",
+      "type": "boolean"
+     },
+     "group_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Group Id"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/SavedItemIn"
+      },
+      "title": "Items",
+      "type": "array"
+     },
+     "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     },
+     "new_group_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "New Group Name"
+     },
+     "reference_protein_id": {
+      "format": "uuid",
+      "title": "Reference Protein Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name",
+     "reference_protein_id",
+     "items"
+    ],
+    "title": "SavedRecipeCreate",
+    "type": "object"
+   },
+   "SavedRecipeUpdate": {
+    "properties": {
+     "draft": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Draft"
+     },
+     "group_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Group Id"
+     },
+     "items": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/SavedItemIn"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Items"
+     },
+     "name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "reference_protein_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reference Protein Id"
+     }
+    },
+    "title": "SavedRecipeUpdate",
+    "type": "object"
+   },
+   "SimpleBulkCreate": {
+    "properties": {
+     "names": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Names",
+      "type": "array"
+     }
+    },
+    "required": [
+     "names"
+    ],
+    "title": "SimpleBulkCreate",
+    "type": "object"
+   },
+   "SimpleCreate": {
+    "properties": {
+     "name": {
+      "title": "Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name"
+    ],
+    "title": "SimpleCreate",
+    "type": "object"
+   },
+   "SimpleUpdate": {
+    "properties": {
+     "name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     }
+    },
+    "title": "SimpleUpdate",
+    "type": "object"
+   },
+   "SourceOut": {
+    "properties": {
+     "authors": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authors"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "location": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Location"
+     },
+     "pdf_url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Pdf Url"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     },
+     "url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Url"
+     },
+     "used_for": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Used For"
+     },
+     "year": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Year"
+     }
+    },
+    "required": [
+     "id",
+     "kind",
+     "title"
+    ],
+    "title": "SourceOut",
+    "type": "object"
+   },
+   "SubcategoryCreate": {
+    "properties": {
+     "category_id": {
+      "format": "uuid",
+      "title": "Category Id",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name",
+     "category_id"
+    ],
+    "title": "SubcategoryCreate",
+    "type": "object"
+   },
+   "SubcategoryUpdate": {
+    "properties": {
+     "category_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Category Id"
+     },
+     "name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     }
+    },
+    "title": "SubcategoryUpdate",
+    "type": "object"
+   },
+   "UserCreateRequest": {
+    "properties": {
+     "access_expires_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Access Expires At"
+     },
+     "email": {
+      "minLength": 3,
+      "title": "Email",
+      "type": "string"
+     },
+     "must_change_password": {
+      "default": false,
+      "title": "Must Change Password",
+      "type": "boolean"
+     },
+     "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     },
+     "password": {
+      "minLength": 6,
+      "title": "Password",
+      "type": "string"
+     },
+     "role": {
+      "default": "viewer",
+      "title": "Role",
+      "type": "string"
+     }
+    },
+    "required": [
+     "email",
+     "name",
+     "password"
+    ],
+    "title": "UserCreateRequest",
+    "type": "object"
+   },
+   "UserUpdateRequest": {
+    "properties": {
+     "access_expires_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Access Expires At"
+     },
+     "access_expires_at_unlimited": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Access Expires At Unlimited"
+     },
+     "is_active": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Is Active"
+     },
+     "name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "role": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Role"
+     }
+    },
+    "title": "UserUpdateRequest",
+    "type": "object"
+   },
+   "ValidationError": {
+    "properties": {
+     "ctx": {
+      "title": "Context",
+      "type": "object"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "title": "Location",
+      "type": "array"
+     },
+     "msg": {
+      "title": "Message",
+      "type": "string"
+     },
+     "type": {
+      "title": "Error Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError",
+    "type": "object"
+   },
+   "Weights": {
+    "properties": {
+     "bc": {
+      "default": 0.25,
+      "title": "Bc",
+      "type": "number"
+     },
+     "g": {
+      "default": 0.25,
+      "title": "G",
+      "type": "number"
+     },
+     "kras": {
+      "default": 0.25,
+      "title": "Kras",
+      "type": "number"
+     },
+     "u": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "U"
+     },
+     "v": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "V"
+     }
+    },
+    "title": "Weights",
+    "type": "object"
+   }
+  }
+ },
+ "info": {
+  "title": "AFACI API",
+  "version": "0.1.0"
+ },
+ "openapi": "3.1.0",
+ "paths": {
+  "/api/v1/admin/app-versions": {
+   "get": {
+    "operationId": "list_app_versions_api_v1_admin_app_versions_get",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Список всех версий",
+    "tags": [
+     "App Version"
+    ]
+   },
+   "post": {
+    "operationId": "create_app_version_api_v1_admin_app_versions_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AppVersionCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Создать версию",
+    "tags": [
+     "App Version"
+    ]
+   }
+  },
+  "/api/v1/admin/app-versions/upload-apk": {
+   "post": {
+    "operationId": "upload_apk_api_v1_admin_app_versions_upload_apk_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_upload_apk_api_v1_admin_app_versions_upload_apk_post"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AppVersionAdmin"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Загрузить APK и опубликовать версию",
+    "tags": [
+     "App Version"
+    ]
+   }
+  },
+  "/api/v1/admin/app-versions/{id}": {
+   "delete": {
+    "operationId": "delete_app_version_api_v1_admin_app_versions__id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Удалить версию",
+    "tags": [
+     "App Version"
+    ]
+   },
+   "patch": {
+    "operationId": "update_app_version_api_v1_admin_app_versions__id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AppVersionUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Отредактировать версию",
+    "tags": [
+     "App Version"
+    ]
+   }
+  },
+  "/api/v1/admin/app-versions/{id}/current": {
+   "patch": {
+    "operationId": "set_current_app_version_api_v1_admin_app_versions__id__current_patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Назначить версию текущей",
+    "tags": [
+     "App Version"
+    ]
+   }
+  },
+  "/api/v1/app/version": {
+   "get": {
+    "operationId": "get_app_version_api_v1_app_version_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Текущая версия приложения",
+    "tags": [
+     "App Version"
+    ]
+   }
+  },
+  "/api/v1/auth/change-password": {
+   "post": {
+    "operationId": "change_password_api_v1_auth_change_password_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ChangePasswordRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Смена пароля",
+    "tags": [
+     "Auth"
+    ]
+   }
+  },
+  "/api/v1/auth/login": {
+   "post": {
+    "operationId": "login_api_v1_auth_login_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/LoginRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Вход",
+    "tags": [
+     "Auth"
+    ]
+   }
+  },
+  "/api/v1/auth/me": {
+   "get": {
+    "operationId": "me_api_v1_auth_me_get",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Текущий пользователь",
+    "tags": [
+     "Auth"
+    ]
+   }
+  },
+  "/api/v1/calculator/compute": {
+   "post": {
+    "operationId": "compute_api_v1_calculator_compute_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CalcRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Рассчитать пищевую и биологическую ценность",
+    "tags": [
+     "Calculator"
+    ]
+   }
+  },
+  "/api/v1/calculator/optimize-cost": {
+   "post": {
+    "description": "Находит дешевейший состав рецептуры при ограничениях на качество белка (БЦ, КРАС).\nВозвращает 422 с описанием, если задача неразрешима.",
+    "operationId": "optimize_cost_endpoint_api_v1_calculator_optimize_cost_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/OptimizeCostRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Оптимизировать стоимость рецептуры",
+    "tags": [
+     "Calculator"
+    ]
+   }
+  },
+  "/api/v1/calculator/optimize-recipe": {
+   "post": {
+    "operationId": "optimize_recipe_endpoint_api_v1_calculator_optimize_recipe_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/OptimizeRecipeRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Оптимизировать рецептуру относительно исходного состава",
+    "tags": [
+     "Calculator"
+    ]
+   }
+  },
+  "/api/v1/calculator/recipes": {
+   "get": {
+    "operationId": "list_recipes_api_v1_calculator_recipes_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Сохранённые рецептуры (примеры)",
+    "tags": [
+     "Calculator"
+    ]
+   }
+  },
+  "/api/v1/calculator/reference-documents/{filename}": {
+   "get": {
+    "operationId": "get_reference_document_api_v1_calculator_reference_documents__filename__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "filename",
+      "required": true,
+      "schema": {
+       "title": "Filename",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/pdf": {}
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "description": "Документ не найден"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "PDF документа-источника эталонного белка",
+    "tags": [
+     "Calculator"
+    ]
+   }
+  },
+  "/api/v1/calculator/reference-proteins": {
+   "get": {
+    "operationId": "list_reference_proteins_api_v1_calculator_reference_proteins_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ReferenceProteinOut"
+         },
+         "title": "Response List Reference Proteins Api V1 Calculator Reference Proteins Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Эталонные белки ФАО/ВОЗ",
+    "tags": [
+     "Calculator"
+    ]
+   }
+  },
+  "/api/v1/categories": {
+   "get": {
+    "operationId": "api_list_categories_api_v1_categories_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "name",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Name"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api List Categories",
+    "tags": [
+     "Categories"
+    ]
+   },
+   "post": {
+    "operationId": "api_create_category_api_v1_categories_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SimpleCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Create Category",
+    "tags": [
+     "Categories"
+    ]
+   }
+  },
+  "/api/v1/categories/bulk": {
+   "post": {
+    "operationId": "api_bulk_categories_api_v1_categories_bulk_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SimpleBulkCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Bulk Categories",
+    "tags": [
+     "Categories"
+    ]
+   }
+  },
+  "/api/v1/categories/{id}": {
+   "delete": {
+    "operationId": "api_delete_category_api_v1_categories__id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Delete Category",
+    "tags": [
+     "Categories"
+    ]
+   },
+   "get": {
+    "operationId": "api_get_category_api_v1_categories__id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Get Category",
+    "tags": [
+     "Categories"
+    ]
+   },
+   "patch": {
+    "operationId": "api_update_category_api_v1_categories__id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SimpleUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Update Category",
+    "tags": [
+     "Categories"
+    ]
+   }
+  },
+  "/api/v1/daily-norms": {
+   "get": {
+    "operationId": "get_daily_norms_api_v1_daily_norms_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DailyNormsOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Усреднённые суточные нормы",
+    "tags": [
+     "Sources and daily norms"
+    ]
+   }
+  },
+  "/api/v1/demo/error-4xx": {
+   "get": {
+    "description": "Возвращает 400 — middleware должен залогировать с level=WARNING.",
+    "operationId": "demo_4xx_api_v1_demo_error_4xx_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Demo 4Xx Api V1 Demo Error 4Xx Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "[AUDIT DEMO] Проверка WARNING (4xx)",
+    "tags": [
+     "Audit Demo"
+    ]
+   }
+  },
+  "/api/v1/demo/error-5xx": {
+   "get": {
+    "description": "Бросает необработанное исключение — middleware логирует с level=ERROR, status 500.",
+    "operationId": "demo_5xx_api_v1_demo_error_5xx_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Demo 5Xx Api V1 Demo Error 5Xx Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "[AUDIT DEMO] Проверка ERROR (5xx)",
+    "tags": [
+     "Audit Demo"
+    ]
+   }
+  },
+  "/api/v1/demo/items": {
+   "get": {
+    "operationId": "demo_list_items_api_v1_demo_items_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "additionalProperties": true,
+          "type": "object"
+         },
+         "title": "Response Demo List Items Api V1 Demo Items Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "[AUDIT DEMO] Список items",
+    "tags": [
+     "Audit Demo"
+    ]
+   },
+   "post": {
+    "description": "POST — демонстрирует явный вызов log_audit_change.",
+    "operationId": "demo_create_item_api_v1_demo_items_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ItemCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Demo Create Item Api V1 Demo Items Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "[AUDIT DEMO] POST — создание с audit.change",
+    "tags": [
+     "Audit Demo"
+    ]
+   }
+  },
+  "/api/v1/demo/items/{id}": {
+   "delete": {
+    "operationId": "demo_delete_item_api_v1_demo_items__id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Demo Delete Item Api V1 Demo Items  Id  Delete",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "[AUDIT DEMO] DELETE — удаление с log_audit_change",
+    "tags": [
+     "Audit Demo"
+    ]
+   },
+   "patch": {
+    "operationId": "demo_patch_item_api_v1_demo_items__id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ItemUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Demo Patch Item Api V1 Demo Items  Id  Patch",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "[AUDIT DEMO] PATCH — обновление с декоратором",
+    "tags": [
+     "Audit Demo"
+    ]
+   },
+   "put": {
+    "description": "PUT — демонстрирует декоратор @audit_log.\n\nДекоратор автоматически извлечёт id и changed_fields из аргументов.",
+    "operationId": "demo_update_item_api_v1_demo_items__id__put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ItemUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Demo Update Item Api V1 Demo Items  Id  Put",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "[AUDIT DEMO] PUT — обновление с декоратором @audit_log",
+    "tags": [
+     "Audit Demo"
+    ]
+   }
+  },
+  "/api/v1/demo/ping": {
+   "get": {
+    "description": "Простой GET — должен попасть в audit.log с level=INFO, status=200.",
+    "operationId": "demo_ping_api_v1_demo_ping_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Demo Ping Api V1 Demo Ping Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "[AUDIT DEMO] GET — проверка INFO лога",
+    "tags": [
+     "Audit Demo"
+    ]
+   }
+  },
+  "/api/v1/nutrient-names": {
+   "get": {
+    "operationId": "api_list_nutrient_names_api_v1_nutrient_names_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Api List Nutrient Names",
+    "tags": [
+     "Nutrient Names"
+    ]
+   },
+   "post": {
+    "operationId": "api_create_nutrient_name_api_v1_nutrient_names_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/NutrientNameCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Create Nutrient Name",
+    "tags": [
+     "Nutrient Names"
+    ]
+   }
+  },
+  "/api/v1/nutrient-names/bulk": {
+   "post": {
+    "operationId": "api_bulk_nutrient_names_api_v1_nutrient_names_bulk_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SimpleBulkCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Bulk Nutrient Names",
+    "tags": [
+     "Nutrient Names"
+    ]
+   }
+  },
+  "/api/v1/nutrient-names/{id}": {
+   "delete": {
+    "operationId": "api_delete_nutrient_name_api_v1_nutrient_names__id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Delete Nutrient Name",
+    "tags": [
+     "Nutrient Names"
+    ]
+   },
+   "get": {
+    "operationId": "api_get_nutrient_name_api_v1_nutrient_names__id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Get Nutrient Name",
+    "tags": [
+     "Nutrient Names"
+    ]
+   },
+   "patch": {
+    "operationId": "api_update_nutrient_name_api_v1_nutrient_names__id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/NutrientNameUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Update Nutrient Name",
+    "tags": [
+     "Nutrient Names"
+    ]
+   }
+  },
+  "/api/v1/nutrient-types": {
+   "get": {
+    "operationId": "api_list_nutrient_types_api_v1_nutrient_types_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Api List Nutrient Types",
+    "tags": [
+     "Nutrient Types"
+    ]
+   },
+   "post": {
+    "operationId": "api_create_nutrient_type_api_v1_nutrient_types_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SimpleCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Create Nutrient Type",
+    "tags": [
+     "Nutrient Types"
+    ]
+   }
+  },
+  "/api/v1/nutrient-types/bulk": {
+   "post": {
+    "operationId": "api_bulk_nutrient_types_api_v1_nutrient_types_bulk_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SimpleBulkCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Bulk Nutrient Types",
+    "tags": [
+     "Nutrient Types"
+    ]
+   }
+  },
+  "/api/v1/nutrient-types/{id}": {
+   "delete": {
+    "operationId": "api_delete_nutrient_type_api_v1_nutrient_types__id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Delete Nutrient Type",
+    "tags": [
+     "Nutrient Types"
+    ]
+   },
+   "get": {
+    "operationId": "api_get_nutrient_type_api_v1_nutrient_types__id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Get Nutrient Type",
+    "tags": [
+     "Nutrient Types"
+    ]
+   },
+   "patch": {
+    "operationId": "api_update_nutrient_type_api_v1_nutrient_types__id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SimpleUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Update Nutrient Type",
+    "tags": [
+     "Nutrient Types"
+    ]
+   }
+  },
+  "/api/v1/nutrients": {
+   "get": {
+    "operationId": "api_list_nutrients_api_v1_nutrients_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Api List Nutrients",
+    "tags": [
+     "Nutrients"
+    ]
+   },
+   "post": {
+    "operationId": "api_create_nutrient_api_v1_nutrients_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/NutrientCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Create Nutrient",
+    "tags": [
+     "Nutrients"
+    ]
+   }
+  },
+  "/api/v1/nutrients/bulk": {
+   "post": {
+    "operationId": "api_bulk_nutrients_api_v1_nutrients_bulk_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/NutrientBulkCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Bulk Nutrients",
+    "tags": [
+     "Nutrients"
+    ]
+   }
+  },
+  "/api/v1/nutrients/product/{id}": {
+   "get": {
+    "operationId": "api_product_nutrients_api_v1_nutrients_product__id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Product Nutrients",
+    "tags": [
+     "Nutrients"
+    ]
+   }
+  },
+  "/api/v1/nutrients/{id}": {
+   "delete": {
+    "operationId": "api_delete_nutrient_api_v1_nutrients__id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Delete Nutrient",
+    "tags": [
+     "Nutrients"
+    ]
+   },
+   "get": {
+    "operationId": "api_get_nutrient_api_v1_nutrients__id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Get Nutrient",
+    "tags": [
+     "Nutrients"
+    ]
+   },
+   "patch": {
+    "operationId": "api_update_nutrient_api_v1_nutrients__id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/NutrientUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Update Nutrient",
+    "tags": [
+     "Nutrients"
+    ]
+   }
+  },
+  "/api/v1/products": {
+   "get": {
+    "operationId": "api_list_products_api_v1_products_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Api List Products",
+    "tags": [
+     "Products"
+    ]
+   },
+   "post": {
+    "operationId": "api_create_product_api_v1_products_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProductCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Create Product",
+    "tags": [
+     "Products"
+    ]
+   }
+  },
+  "/api/v1/products/auto": {
+   "post": {
+    "operationId": "api_auto_create_product_api_v1_products_auto_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProductAutoCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Auto Create Product",
+    "tags": [
+     "Products"
+    ]
+   }
+  },
+  "/api/v1/products/auto/bulk": {
+   "post": {
+    "operationId": "api_auto_bulk_products_api_v1_products_auto_bulk_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "items": {
+         "$ref": "#/components/schemas/ProductAutoCreate"
+        },
+        "title": "Data",
+        "type": "array"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Auto Bulk Products",
+    "tags": [
+     "Products"
+    ]
+   }
+  },
+  "/api/v1/products/bulk": {
+   "post": {
+    "operationId": "api_bulk_products_api_v1_products_bulk_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "items": {
+         "$ref": "#/components/schemas/ProductCreate"
+        },
+        "title": "Data",
+        "type": "array"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Bulk Products",
+    "tags": [
+     "Products"
+    ]
+   }
+  },
+  "/api/v1/products/by-category/{id}": {
+   "get": {
+    "operationId": "api_products_by_category_api_v1_products_by_category__id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Products By Category",
+    "tags": [
+     "Products"
+    ]
+   }
+  },
+  "/api/v1/products/by-region/{id}": {
+   "get": {
+    "operationId": "api_products_by_region_api_v1_products_by_region__id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Products By Region",
+    "tags": [
+     "Products"
+    ]
+   }
+  },
+  "/api/v1/products/count": {
+   "get": {
+    "description": "Возвращает число всех продуктов в базе. Не принимает фильтров, поиска и пагинации; для пустой базы возвращает `{\"count\": 0}`.",
+    "operationId": "api_count_products_api_v1_products_count_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProductCount"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Общее количество продуктов питания",
+    "tags": [
+     "Products"
+    ]
+   }
+  },
+  "/api/v1/products/{id}": {
+   "delete": {
+    "operationId": "api_delete_product_api_v1_products__id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Delete Product",
+    "tags": [
+     "Products"
+    ]
+   },
+   "get": {
+    "operationId": "api_get_product_api_v1_products__id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Get Product",
+    "tags": [
+     "Products"
+    ]
+   },
+   "patch": {
+    "operationId": "api_update_product_api_v1_products__id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProductUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Update Product",
+    "tags": [
+     "Products"
+    ]
+   }
+  },
+  "/api/v1/products/{id}/daily-norms": {
+   "get": {
+    "operationId": "get_product_daily_norms_api_v1_products__id__daily_norms_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DailyNormsOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Суточные нормы и доля от нормы для 100 г продукта",
+    "tags": [
+     "Sources and daily norms"
+    ]
+   }
+  },
+  "/api/v1/regions": {
+   "get": {
+    "operationId": "api_list_regions_api_v1_regions_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Api List Regions",
+    "tags": [
+     "Regions"
+    ]
+   },
+   "post": {
+    "operationId": "api_create_region_api_v1_regions_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SimpleCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Create Region",
+    "tags": [
+     "Regions"
+    ]
+   }
+  },
+  "/api/v1/regions/bulk": {
+   "post": {
+    "operationId": "api_bulk_regions_api_v1_regions_bulk_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SimpleBulkCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Bulk Regions",
+    "tags": [
+     "Regions"
+    ]
+   }
+  },
+  "/api/v1/regions/{id}": {
+   "delete": {
+    "operationId": "api_delete_region_api_v1_regions__id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Delete Region",
+    "tags": [
+     "Regions"
+    ]
+   },
+   "get": {
+    "operationId": "api_get_region_api_v1_regions__id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Get Region",
+    "tags": [
+     "Regions"
+    ]
+   },
+   "patch": {
+    "operationId": "api_update_region_api_v1_regions__id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SimpleUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Update Region",
+    "tags": [
+     "Regions"
+    ]
+   }
+  },
+  "/api/v1/saved/groups": {
+   "get": {
+    "operationId": "list_groups_api_v1_saved_groups_get",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Группы пользователя",
+    "tags": [
+     "Saved"
+    ]
+   },
+   "post": {
+    "operationId": "create_group_api_v1_saved_groups_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/GroupIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Создать группу",
+    "tags": [
+     "Saved"
+    ]
+   }
+  },
+  "/api/v1/saved/groups/{group_id}": {
+   "delete": {
+    "operationId": "delete_group_api_v1_saved_groups__group_id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "group_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Group Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Удалить группу (рецептуры остаются без группы)",
+    "tags": [
+     "Saved"
+    ]
+   },
+   "patch": {
+    "operationId": "update_group_api_v1_saved_groups__group_id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "group_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Group Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/GroupIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Переименовать группу",
+    "tags": [
+     "Saved"
+    ]
+   }
+  },
+  "/api/v1/saved/ranking": {
+   "post": {
+    "operationId": "ranking_api_v1_saved_ranking_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/RankingRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Ранжирование рецептур по БЦ, КРАС, V, G",
+    "tags": [
+     "Saved"
+    ]
+   }
+  },
+  "/api/v1/saved/recipes": {
+   "get": {
+    "operationId": "list_recipes_api_v1_saved_recipes_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "group_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "uuid",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Group Id"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Сохранённые рецептуры пользователя",
+    "tags": [
+     "Saved"
+    ]
+   },
+   "post": {
+    "operationId": "create_recipe_api_v1_saved_recipes_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SavedRecipeCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Сохранить рецептуру",
+    "tags": [
+     "Saved"
+    ]
+   }
+  },
+  "/api/v1/saved/recipes/{recipe_id}": {
+   "delete": {
+    "operationId": "delete_recipe_api_v1_saved_recipes__recipe_id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "recipe_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Recipe Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Удалить рецептуру",
+    "tags": [
+     "Saved"
+    ]
+   },
+   "get": {
+    "operationId": "get_recipe_api_v1_saved_recipes__recipe_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "recipe_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Recipe Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Сохранённая рецептура с составом",
+    "tags": [
+     "Saved"
+    ]
+   },
+   "patch": {
+    "operationId": "update_recipe_api_v1_saved_recipes__recipe_id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "recipe_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Recipe Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SavedRecipeUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Изменить рецептуру (имя/группа/состав)",
+    "tags": [
+     "Saved"
+    ]
+   }
+  },
+  "/api/v1/sources": {
+   "get": {
+    "operationId": "list_sources_api_v1_sources_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/SourceOut"
+         },
+         "title": "Response List Sources Api V1 Sources Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Источники информации",
+    "tags": [
+     "Sources and daily norms"
+    ]
+   }
+  },
+  "/api/v1/subcategories": {
+   "get": {
+    "operationId": "api_list_subcategories_api_v1_subcategories_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Api List Subcategories",
+    "tags": [
+     "Subcategories"
+    ]
+   },
+   "post": {
+    "operationId": "api_create_subcategory_api_v1_subcategories_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SubcategoryCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Create Subcategory",
+    "tags": [
+     "Subcategories"
+    ]
+   }
+  },
+  "/api/v1/subcategories/{id}": {
+   "delete": {
+    "operationId": "api_delete_subcategory_api_v1_subcategories__id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Delete Subcategory",
+    "tags": [
+     "Subcategories"
+    ]
+   },
+   "get": {
+    "operationId": "api_get_subcategory_api_v1_subcategories__id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Get Subcategory",
+    "tags": [
+     "Subcategories"
+    ]
+   },
+   "patch": {
+    "operationId": "api_update_subcategory_api_v1_subcategories__id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SubcategoryUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Update Subcategory",
+    "tags": [
+     "Subcategories"
+    ]
+   }
+  },
+  "/api/v1/table/nutrients": {
+   "get": {
+    "description": "Возвращает полную таблицу нутриентов с разыменованием всех FK. Готово для `pd.DataFrame(response.json())`.\n\n**Колонки:** `product_id`, `product_name`, `category_name`, `subcategory_name`, `region_name`, `nutrient_name`, `nutrient_type`, `unit`, `quantity`, `error_rate`",
+    "operationId": "table_nutrients_api_v1_table_nutrients_get",
+    "parameters": [
+     {
+      "description": "Фильтр по региону (часть, без учёта регистра)",
+      "in": "query",
+      "name": "region",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по региону (часть, без учёта регистра)",
+       "title": "Region"
+      }
+     },
+     {
+      "description": "Фильтр по категории (часть, без учёта регистра)",
+      "in": "query",
+      "name": "category",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по категории (часть, без учёта регистра)",
+       "title": "Category"
+      }
+     },
+     {
+      "description": "Фильтр по подкатегории (часть, без учёта регистра)",
+      "in": "query",
+      "name": "subcategory",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по подкатегории (часть, без учёта регистра)",
+       "title": "Subcategory"
+      }
+     },
+     {
+      "description": "Фильтр по названию продукта (часть, без учёта регистра)",
+      "in": "query",
+      "name": "product",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по названию продукта (часть, без учёта регистра)",
+       "title": "Product"
+      }
+     },
+     {
+      "description": "Фильтр по типу нутриента (часть, без учёта регистра)",
+      "in": "query",
+      "name": "nutrient_type",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по типу нутриента (часть, без учёта регистра)",
+       "title": "Nutrient Type"
+      }
+     },
+     {
+      "description": "Фильтр по названию нутриента (часть, без учёта регистра)",
+      "in": "query",
+      "name": "nutrient_name",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по названию нутриента (часть, без учёта регистра)",
+       "title": "Nutrient Name"
+      }
+     },
+     {
+      "description": "Колонка для сортировки",
+      "in": "query",
+      "name": "sort_by",
+      "required": false,
+      "schema": {
+       "default": "product_name",
+       "description": "Колонка для сортировки",
+       "title": "Sort By",
+       "type": "string"
+      }
+     },
+     {
+      "description": "Направление сортировки",
+      "in": "query",
+      "name": "sort_order",
+      "required": false,
+      "schema": {
+       "default": "asc",
+       "description": "Направление сортировки",
+       "enum": [
+        "asc",
+        "desc"
+       ],
+       "title": "Sort Order",
+       "type": "string"
+      }
+     },
+     {
+      "description": "Максимум строк",
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 1000,
+       "description": "Максимум строк",
+       "maximum": 10000,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Сдвиг (пагинация)",
+      "in": "query",
+      "name": "offset",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "description": "Сдвиг (пагинация)",
+       "minimum": 0,
+       "title": "Offset",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Плоская таблица нутриентов",
+    "tags": [
+     "Table (Flat)"
+    ]
+   }
+  },
+  "/api/v1/table/nutrients/csv": {
+   "get": {
+    "operationId": "table_nutrients_csv_api_v1_table_nutrients_csv_get",
+    "parameters": [
+     {
+      "description": "Фильтр по региону (часть, без учёта регистра)",
+      "in": "query",
+      "name": "region",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по региону (часть, без учёта регистра)",
+       "title": "Region"
+      }
+     },
+     {
+      "description": "Фильтр по категории (часть, без учёта регистра)",
+      "in": "query",
+      "name": "category",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по категории (часть, без учёта регистра)",
+       "title": "Category"
+      }
+     },
+     {
+      "description": "Фильтр по названию продукта (часть, без учёта регистра)",
+      "in": "query",
+      "name": "product",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по названию продукта (часть, без учёта регистра)",
+       "title": "Product"
+      }
+     },
+     {
+      "description": "Фильтр по типу нутриента (часть, без учёта регистра)",
+      "in": "query",
+      "name": "nutrient_type",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по типу нутриента (часть, без учёта регистра)",
+       "title": "Nutrient Type"
+      }
+     },
+     {
+      "description": "Фильтр по названию нутриента (часть, без учёта регистра)",
+      "in": "query",
+      "name": "nutrient_name",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по названию нутриента (часть, без учёта регистра)",
+       "title": "Nutrient Name"
+      }
+     },
+     {
+      "description": "product_name / region_name / nutrient_name / quantity",
+      "in": "query",
+      "name": "sort_by",
+      "required": false,
+      "schema": {
+       "default": "product_name",
+       "description": "product_name / region_name / nutrient_name / quantity",
+       "title": "Sort By",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "sort_order",
+      "required": false,
+      "schema": {
+       "default": "asc",
+       "enum": [
+        "asc",
+        "desc"
+       ],
+       "title": "Sort Order",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 10000,
+       "maximum": 50000,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "offset",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "minimum": 0,
+       "title": "Offset",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Нутриенты — 4 колонки (Продукт, Регион, Показатель, Значение)",
+    "tags": [
+     "Table (Flat)"
+    ]
+   }
+  },
+  "/api/v1/table/nutrients/map": {
+   "get": {
+    "description": "Плоский массив продуктов. Нутриенты каждого продукта свёрнуты в словарь `nutrient_name → quantity`. Готово для `pd.DataFrame(response.json())`.",
+    "operationId": "table_nutrients_map_api_v1_table_nutrients_map_get",
+    "parameters": [
+     {
+      "description": "Фильтр по региону (часть, без учёта регистра)",
+      "in": "query",
+      "name": "region",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по региону (часть, без учёта регистра)",
+       "title": "Region"
+      }
+     },
+     {
+      "description": "Фильтр по категории (часть, без учёта регистра)",
+      "in": "query",
+      "name": "category",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по категории (часть, без учёта регистра)",
+       "title": "Category"
+      }
+     },
+     {
+      "description": "Фильтр по подкатегории (часть, без учёта регистра)",
+      "in": "query",
+      "name": "subcategory",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по подкатегории (часть, без учёта регистра)",
+       "title": "Subcategory"
+      }
+     },
+     {
+      "description": "Фильтр по названию продукта (часть, без учёта регистра)",
+      "in": "query",
+      "name": "product",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по названию продукта (часть, без учёта регистра)",
+       "title": "Product"
+      }
+     },
+     {
+      "description": "Фильтр по типу нутриента (часть, без учёта регистра)",
+      "in": "query",
+      "name": "nutrient_type",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по типу нутриента (часть, без учёта регистра)",
+       "title": "Nutrient Type"
+      }
+     },
+     {
+      "description": "Фильтр по названию нутриента (часть, без учёта регистра)",
+      "in": "query",
+      "name": "nutrient_name",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по названию нутриента (часть, без учёта регистра)",
+       "title": "Nutrient Name"
+      }
+     },
+     {
+      "description": "Колонка для сортировки (product_name, category_name, region_name)",
+      "in": "query",
+      "name": "sort_by",
+      "required": false,
+      "schema": {
+       "default": "product_name",
+       "description": "Колонка для сортировки (product_name, category_name, region_name)",
+       "title": "Sort By",
+       "type": "string"
+      }
+     },
+     {
+      "description": "Направление сортировки",
+      "in": "query",
+      "name": "sort_order",
+      "required": false,
+      "schema": {
+       "default": "asc",
+       "description": "Направление сортировки",
+       "enum": [
+        "asc",
+        "desc"
+       ],
+       "title": "Sort Order",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Нутриенты — массив продуктов, нутриенты свёрнуты в {name: quantity}",
+    "tags": [
+     "Table (Flat)"
+    ]
+   }
+  },
+  "/api/v1/table/nutrients/pivot": {
+   "get": {
+    "description": "Каждый продукт — одна строка. Нутриенты разворачиваются в колонки. Удобно когда нужен широкий DataFrame без группировки по строкам.\n\nФильтры те же что у `/table/nutrients`.",
+    "operationId": "table_nutrients_pivot_api_v1_table_nutrients_pivot_get",
+    "parameters": [
+     {
+      "description": "Фильтр по региону (часть, без учёта регистра)",
+      "in": "query",
+      "name": "region",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по региону (часть, без учёта регистра)",
+       "title": "Region"
+      }
+     },
+     {
+      "description": "Фильтр по категории (часть, без учёта регистра)",
+      "in": "query",
+      "name": "category",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по категории (часть, без учёта регистра)",
+       "title": "Category"
+      }
+     },
+     {
+      "description": "Фильтр по подкатегории (часть, без учёта регистра)",
+      "in": "query",
+      "name": "subcategory",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по подкатегории (часть, без учёта регистра)",
+       "title": "Subcategory"
+      }
+     },
+     {
+      "description": "Фильтр по названию продукта (часть, без учёта регистра)",
+      "in": "query",
+      "name": "product",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по названию продукта (часть, без учёта регистра)",
+       "title": "Product"
+      }
+     },
+     {
+      "description": "Фильтр по типу нутриента (часть, без учёта регистра)",
+      "in": "query",
+      "name": "nutrient_type",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по типу нутриента (часть, без учёта регистра)",
+       "title": "Nutrient Type"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Пивот-таблица нутриентов (продукты × нутриенты)",
+    "tags": [
+     "Table (Flat)"
+    ]
+   }
+  },
+  "/api/v1/table/products": {
+   "get": {
+    "description": "Возвращает список продуктов с разыменованием FK (category, subcategory, region). Готово для `pd.DataFrame(response.json())`.\n\n**Колонки:** `product_id`, `product_name`, `category_name`, `subcategory_name`, `region_name`",
+    "operationId": "table_products_api_v1_table_products_get",
+    "parameters": [
+     {
+      "description": "Фильтр по региону (часть, без учёта регистра)",
+      "in": "query",
+      "name": "region",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по региону (часть, без учёта регистра)",
+       "title": "Region"
+      }
+     },
+     {
+      "description": "Фильтр по категории (часть, без учёта регистра)",
+      "in": "query",
+      "name": "category",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по категории (часть, без учёта регистра)",
+       "title": "Category"
+      }
+     },
+     {
+      "description": "Фильтр по подкатегории (часть, без учёта регистра)",
+      "in": "query",
+      "name": "subcategory",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по подкатегории (часть, без учёта регистра)",
+       "title": "Subcategory"
+      }
+     },
+     {
+      "description": "Фильтр по названию продукта (часть, без учёта регистра)",
+      "in": "query",
+      "name": "product",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по названию продукта (часть, без учёта регистра)",
+       "title": "Product"
+      }
+     },
+     {
+      "description": "Точный фильтр по категории (ID)",
+      "in": "query",
+      "name": "category_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "uuid",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Точный фильтр по категории (ID)",
+       "title": "Category Id"
+      }
+     },
+     {
+      "description": "Точный фильтр по подкатегории (ID)",
+      "in": "query",
+      "name": "subcategory_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "uuid",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Точный фильтр по подкатегории (ID)",
+       "title": "Subcategory Id"
+      }
+     },
+     {
+      "description": "Точный фильтр по региону (ID)",
+      "in": "query",
+      "name": "region_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "uuid",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Точный фильтр по региону (ID)",
+       "title": "Region Id"
+      }
+     },
+     {
+      "description": "Колонка для сортировки",
+      "in": "query",
+      "name": "sort_by",
+      "required": false,
+      "schema": {
+       "default": "product_name",
+       "description": "Колонка для сортировки",
+       "title": "Sort By",
+       "type": "string"
+      }
+     },
+     {
+      "description": "Направление сортировки",
+      "in": "query",
+      "name": "sort_order",
+      "required": false,
+      "schema": {
+       "default": "asc",
+       "description": "Направление сортировки",
+       "enum": [
+        "asc",
+        "desc"
+       ],
+       "title": "Sort Order",
+       "type": "string"
+      }
+     },
+     {
+      "description": "Максимум строк",
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 1000,
+       "description": "Максимум строк",
+       "maximum": 10000,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "description": "Сдвиг (пагинация)",
+      "in": "query",
+      "name": "offset",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "description": "Сдвиг (пагинация)",
+       "minimum": 0,
+       "title": "Offset",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Плоская таблица продуктов",
+    "tags": [
+     "Table (Flat)"
+    ]
+   }
+  },
+  "/api/v1/table/products/map": {
+   "get": {
+    "operationId": "table_products_map_api_v1_table_products_map_get",
+    "parameters": [
+     {
+      "description": "Фильтр по региону (часть, без учёта регистра)",
+      "in": "query",
+      "name": "region",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по региону (часть, без учёта регистра)",
+       "title": "Region"
+      }
+     },
+     {
+      "description": "Фильтр по категории (часть, без учёта регистра)",
+      "in": "query",
+      "name": "category",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по категории (часть, без учёта регистра)",
+       "title": "Category"
+      }
+     },
+     {
+      "description": "Фильтр по подкатегории (часть, без учёта регистра)",
+      "in": "query",
+      "name": "subcategory",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по подкатегории (часть, без учёта регистра)",
+       "title": "Subcategory"
+      }
+     },
+     {
+      "description": "Фильтр по названию продукта (часть, без учёта регистра)",
+      "in": "query",
+      "name": "product",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по названию продукта (часть, без учёта регистра)",
+       "title": "Product"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Продукты в виде карты  category → region → [products]",
+    "tags": [
+     "Table (Flat)"
+    ]
+   }
+  },
+  "/api/v1/units": {
+   "get": {
+    "operationId": "api_list_units_api_v1_units_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Api List Units",
+    "tags": [
+     "Units"
+    ]
+   },
+   "post": {
+    "operationId": "api_create_unit_api_v1_units_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SimpleCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Create Unit",
+    "tags": [
+     "Units"
+    ]
+   }
+  },
+  "/api/v1/units/bulk": {
+   "post": {
+    "operationId": "api_bulk_units_api_v1_units_bulk_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SimpleBulkCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Bulk Units",
+    "tags": [
+     "Units"
+    ]
+   }
+  },
+  "/api/v1/units/{id}": {
+   "delete": {
+    "operationId": "api_delete_unit_api_v1_units__id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Delete Unit",
+    "tags": [
+     "Units"
+    ]
+   },
+   "get": {
+    "operationId": "api_get_unit_api_v1_units__id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Get Unit",
+    "tags": [
+     "Units"
+    ]
+   },
+   "patch": {
+    "operationId": "api_update_unit_api_v1_units__id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SimpleUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Update Unit",
+    "tags": [
+     "Units"
+    ]
+   }
+  },
+  "/api/v1/users": {
+   "get": {
+    "operationId": "list_users_api_v1_users_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "search",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Search"
+      }
+     },
+     {
+      "in": "query",
+      "name": "role",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Role"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Список пользователей",
+    "tags": [
+     "Users"
+    ]
+   },
+   "post": {
+    "operationId": "create_user_api_v1_users_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/UserCreateRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Создать пользователя",
+    "tags": [
+     "Users"
+    ]
+   }
+  },
+  "/api/v1/users/{id}": {
+   "delete": {
+    "operationId": "deactivate_user_api_v1_users__id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Деактивировать пользователя",
+    "tags": [
+     "Users"
+    ]
+   },
+   "get": {
+    "operationId": "get_user_api_v1_users__id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Пользователь по id",
+    "tags": [
+     "Users"
+    ]
+   },
+   "patch": {
+    "operationId": "update_user_api_v1_users__id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/UserUpdateRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Редактировать пользователя",
+    "tags": [
+     "Users"
+    ]
+   }
+  },
+  "/static/apk/{filename}": {
+   "get": {
+    "operationId": "download_apk_static_apk__filename__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "filename",
+      "required": true,
+      "schema": {
+       "title": "Filename",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Download Apk"
+   }
+  }
+ },
+ "tags": [
+  {
+   "description": "Плоские таблицы с разыменованием FK — готовы для `pd.DataFrame(response.json())`. Поддерживают фильтрацию (ILIKE), сортировку и пагинацию через query-параметры.",
+   "name": "Table (Flat)"
+  },
+  {
+   "name": "Products"
+  },
+  {
+   "name": "Nutrients"
+  },
+  {
+   "name": "Categories"
+  },
+  {
+   "name": "Subcategories"
+  },
+  {
+   "name": "Regions"
+  },
+  {
+   "name": "Units"
+  },
+  {
+   "name": "Nutrient Types"
+  },
+  {
+   "name": "Nutrient Names"
+  },
+  {
+   "description": "Калькулятор пищевой и биологической ценности (методика Липатова).",
+   "name": "Calculator"
+  },
+  {
+   "description": "Вход, текущий пользователь (JWT), смена пароля.",
+   "name": "Auth"
+  },
+  {
+   "description": "Сохранённые рецептуры, группы и ранжирование рецептур (по пользователю).",
+   "name": "Saved"
+  },
+  {
+   "description": "Проверка версии мобильного приложения (публично) и управление версиями/загрузка APK (только для администраторов).",
+   "name": "App Version"
+  }
+ ]
+}

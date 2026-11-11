@@ -1,36 +1,116 @@
 """Client payload regressions without loading local secrets or connecting to a DB."""
 
-import importlib
-import sys
 import unittest
-from types import ModuleType
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI
 from pydantic import ValidationError
 
-from api.v1.schemas import (
-    NutrientBulkCreate,
-    NutrientCreate,
+from core.db import models
+from core.errors import AppError
+from features.catalog.api import router as catalog_router
+from features.catalog.api.schemas import (
     NutrientNameCreate,
     NutrientNameUpdate,
-    NutrientUpdate,
     SubcategoryCreate,
     SubcategoryUpdate,
 )
+from features.catalog.app import CatalogService
+from features.catalog.domain.rules import UNIT_MISMATCH
+from features.catalog.infra.sql_repo import SqlCatalogRepository
+from features.products.api import router as products_router
+from features.products.api.schemas import (
+    NutrientBulkCreate,
+    NutrientCreate,
+    NutrientUpdate,
+    ProductCount,
+)
+from features.products.app import Caller, NutrientService, ProductService
+from features.products.app.service import _unit_for
+from features.products.infra.audit import FoodAuditTrail
+from features.products.infra.sql_repo import SqlNutrientRepository, SqlProductRepository
+
+NO_CALLER = Caller(None, None)
 
 
-async def unused_db():
-    raise AssertionError("Contract tests must not connect to a database")
+def catalog(db):
+    return CatalogService(SqlCatalogRepository(db))
 
 
-# The production session module loads .env at import time. Use a dependency stub
-# so these checks remain independent of developer credentials and database state.
-session_stub = ModuleType("infrastructure.db.session")
-session_stub.get_db = unused_db
-with patch.dict(sys.modules, {"infrastructure.db.session": session_stub}):
-    products = importlib.import_module("api.v1.products")
+def nutrients(db):
+    return NutrientService(SqlNutrientRepository(db), FoodAuditTrail())
+
+
+async def api_create_subcategory(data, db):
+    return await catalog(db).create_subcategory(data.model_dump())
+
+
+async def api_create_nutrient_name(data, db):
+    return await catalog(db).create_nutrient_name(data.model_dump())
+
+
+async def api_update_subcategory(item_id, data, db):
+    return await catalog(db).update_subcategory(
+        item_id,
+        name=data.name,
+        category_id=data.category_id,
+        provided=set(data.model_fields_set),
+    )
+
+
+async def api_update_nutrient_name(item_id, data, db):
+    return await catalog(db).update_nutrient_name(
+        item_id,
+        name=data.name,
+        nutrient_type_id=data.nutrient_type_id,
+        unit_id=data.unit_id,
+        provided=set(data.model_fields_set),
+    )
+
+
+async def api_count_products(db):
+    service = ProductService(SqlProductRepository(db), FoodAuditTrail())
+    return ProductCount(count=await service.count())
+
+
+async def api_create_nutrient(data, db):
+    return await nutrients(db).create(data.model_dump(), NO_CALLER)
+
+
+async def api_update_nutrient(item_id, data, db):
+    return await nutrients(db).update(
+        item_id, data.model_dump(exclude_unset=True), NO_CALLER
+    )
+
+
+async def api_bulk_nutrients(data, db):
+    return await nutrients(db).bulk_create(
+        [n.model_dump() for n in data.items], NO_CALLER
+    )
+
+
+_router = APIRouter()
+_router.include_router(catalog_router)
+_router.include_router(products_router)
+
+# Прежние имена обработчиков: тесты проверяют контракт, а не расположение кода.
+products = SimpleNamespace(
+    router=_router,
+    models=models,
+    UNIT_MISMATCH=UNIT_MISMATCH,
+    nutrient_unit_for=_unit_for,
+    api_create_subcategory=api_create_subcategory,
+    api_create_nutrient_name=api_create_nutrient_name,
+    api_update_subcategory=api_update_subcategory,
+    api_update_nutrient_name=api_update_nutrient_name,
+    api_count_products=api_count_products,
+    api_create_nutrient=api_create_nutrient,
+    api_update_nutrient=api_update_nutrient,
+    api_bulk_nutrients=api_bulk_nutrients,
+)
+AUDIT_TARGET = "features.products.infra.audit.log_food_event"
 
 
 class DictionaryContractChecks(unittest.IsolatedAsyncioTestCase):
@@ -117,7 +197,7 @@ class DictionaryContractChecks(unittest.IsolatedAsyncioTestCase):
         ):
             with self.subTest(field=field):
                 db = Mock(get=AsyncMock(return_value=Mock()), commit=AsyncMock())
-                with self.assertRaises(HTTPException) as caught:
+                with self.assertRaises(AppError) as caught:
                     await endpoint(uuid4(), schema(**{field: None}), db)
                 self.assertEqual(caught.exception.status_code, 422)
                 db.commit.assert_not_awaited()
@@ -155,7 +235,7 @@ class NutrientUpdateChecks(unittest.IsolatedAsyncioTestCase):
             quantity=1,
         )
         self.db = Mock(get=AsyncMock(), commit=AsyncMock(), refresh=AsyncMock())
-        self.audit = patch.object(products, "log_food_event").start()
+        self.audit = patch(AUDIT_TARGET).start()
         self.addCleanup(patch.stopall)
 
     async def test_new_name_uses_its_type_and_audits_change(self):
@@ -187,7 +267,7 @@ class NutrientUpdateChecks(unittest.IsolatedAsyncioTestCase):
             with self.subTest(name_id=name_id):
                 self.db.get.side_effect = [self.item, None]
                 previous_name = self.item.nutrient_name_id
-                with self.assertRaises(HTTPException) as caught:
+                with self.assertRaises(AppError) as caught:
                     await products.api_update_nutrient(
                         self.item.id,
                         NutrientUpdate(nutrient_name_id=name_id, quantity=3),
@@ -209,7 +289,7 @@ class FixedUnitChecks(unittest.IsolatedAsyncioTestCase):
     """Единица нутриента назначается сервером по названию и не принимает чужую."""
 
     def setUp(self):
-        self.audit = patch.object(products, "log_food_event").start()
+        self.audit = patch(AUDIT_TARGET).start()
         self.addCleanup(patch.stopall)
         self.unit = uuid4()
         self.other_unit = uuid4()
@@ -228,7 +308,7 @@ class FixedUnitChecks(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(products.nutrient_unit_for(name, self.unit), self.unit)
 
     def test_other_unit_is_rejected(self):
-        with self.assertRaises(HTTPException) as caught:
+        with self.assertRaises(AppError) as caught:
             products.nutrient_unit_for(make_name(self.unit), self.other_unit)
         self.assertEqual(caught.exception.status_code, 400)
         self.assertEqual(caught.exception.detail, products.UNIT_MISMATCH)
@@ -236,7 +316,7 @@ class FixedUnitChecks(unittest.IsolatedAsyncioTestCase):
     def test_name_without_fixed_unit_still_needs_explicit_unit(self):
         name = make_name(None)
         self.assertEqual(products.nutrient_unit_for(name, self.unit), self.unit)
-        with self.assertRaises(HTTPException) as caught:
+        with self.assertRaises(AppError) as caught:
             products.nutrient_unit_for(name, None)
         self.assertEqual(caught.exception.status_code, 422)
 
@@ -261,7 +341,7 @@ class FixedUnitChecks(unittest.IsolatedAsyncioTestCase):
             unit_id=self.other_unit,
             quantity=2,
         )
-        with self.assertRaises(HTTPException) as caught:
+        with self.assertRaises(AppError) as caught:
             await products.api_create_nutrient(data, db)
         self.assertEqual(caught.exception.status_code, 400)
         db.commit.assert_not_awaited()
@@ -294,7 +374,7 @@ class FixedUnitChecks(unittest.IsolatedAsyncioTestCase):
         )
         new_name = make_name(self.unit)
         db = self.db_with(item, new_name)
-        with self.assertRaises(HTTPException) as caught:
+        with self.assertRaises(AppError) as caught:
             await products.api_update_nutrient(
                 item.id,
                 NutrientUpdate(nutrient_name_id=new_name.id, unit_id=self.other_unit),
@@ -345,7 +425,7 @@ class FixedUnitChecks(unittest.IsolatedAsyncioTestCase):
                 )
             ]
         )
-        with self.assertRaises(HTTPException) as caught:
+        with self.assertRaises(AppError) as caught:
             await products.api_bulk_nutrients(bad, db)
         self.assertEqual(caught.exception.status_code, 400)
 
@@ -384,7 +464,7 @@ class NutrientNameUnitChecks(unittest.IsolatedAsyncioTestCase):
             scalar=AsyncMock(return_value=None),
             commit=AsyncMock(),
         )
-        with self.assertRaises(HTTPException) as caught:
+        with self.assertRaises(AppError) as caught:
             await products.api_create_nutrient_name(
                 NutrientNameCreate(name="X", nutrient_type_id=nutrient_type.id), db
             )
@@ -396,7 +476,7 @@ class NutrientNameUnitChecks(unittest.IsolatedAsyncioTestCase):
             get=AsyncMock(side_effect=[Mock(), None]),
             commit=AsyncMock(),
         )
-        with self.assertRaises(HTTPException) as caught:
+        with self.assertRaises(AppError) as caught:
             await products.api_create_nutrient_name(
                 NutrientNameCreate(name="X", nutrient_type_id=uuid4(), unit_id=uuid4()),
                 db,
@@ -411,7 +491,7 @@ class NutrientNameUnitChecks(unittest.IsolatedAsyncioTestCase):
             commit=AsyncMock(),
             refresh=AsyncMock(),
         )
-        with self.assertRaises(HTTPException) as caught:
+        with self.assertRaises(AppError) as caught:
             await products.api_update_nutrient_name(
                 item.id, NutrientNameUpdate(unit_id=uuid4()), db
             )
@@ -439,7 +519,7 @@ class NutrientNameUnitChecks(unittest.IsolatedAsyncioTestCase):
             scalar=AsyncMock(return_value=None),
             commit=AsyncMock(),
         )
-        with self.assertRaises(HTTPException) as caught:
+        with self.assertRaises(AppError) as caught:
             await products.api_update_nutrient_name(
                 item.id, NutrientNameUpdate(unit_id=None), db
             )

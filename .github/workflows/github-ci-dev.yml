@@ -37,3 +37,46 @@ jobs:
 
       - name: Run Ruff (Format Check)
         run: ruff format --check .
+
+  architecture:
+    name: architecture
+    runs-on: afaci-runner-01
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Check layer boundaries
+        run: lint-imports
+
+  unit-tests:
+    name: unit-tests
+    runs-on: afaci-runner-01
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run unit tests (each module in its own process)
+        run: |
+          for f in tests/test_*.py; do
+            python -m unittest "$(echo "${f%.py}" | tr / .)" || exit 1
+          done

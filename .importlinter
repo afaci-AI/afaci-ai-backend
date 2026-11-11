@@ -1,21 +1,105 @@
 [importlinter]
-root_package = afaci
-
-[importlinter:contract:domain-is-pure]
-name = Domain не импортирует infrastructure
-type = forbidden
-source_modules =
-    domain
-forbidden_modules =
-    infrastructure
-    api
+root_packages =
+    core
+    features
     sqlalchemy
     fastapi
+include_external_packages = True
 
-[importlinter:contract:infra-not-domain]
-name = Infrastructure не импортирует domain напрямую
+# Внутри фичи: api -> infra -> app -> domain (внутрь), фреймворки только снаружи.
+[importlinter:contract:feature-layers]
+name = Слои фичи: api -> infra -> app -> domain
+type = layers
+layers =
+    api
+    (infra)
+    (app)
+    (domain)
+containers =
+    features.app_versions
+    features.audit
+    features.auth
+    features.calculator
+    features.catalog
+    features.norms
+    features.products
+    features.recipes
+    features.table
+    features.users
+
+[importlinter:contract:feature-domain-is-pure]
+name = Feature domain не зависит от остальных слоёв и фреймворков
 type = forbidden
 source_modules =
-    infrastructure
+    features.*.domain
 forbidden_modules =
-    domain
+    features.*.app
+    features.*.infra
+    features.*.api
+    core
+    sqlalchemy
+    fastapi
+ignore_imports =
+    features.norms.domain.** -> features.calculator.domain.**
+
+[importlinter:contract:feature-app-no-frameworks]
+name = Feature app не зависит от infra, api и фреймворков
+type = forbidden
+source_modules =
+    features.*.app
+forbidden_modules =
+    features.*.infra
+    features.*.api
+    core.db
+    sqlalchemy
+    fastapi
+allow_indirect_imports = True
+
+[importlinter:contract:feature-infra-not-api]
+name = Feature infra не зависит от api
+type = forbidden
+source_modules =
+    features.*.infra
+forbidden_modules =
+    features.*.api
+    fastapi
+allow_indirect_imports = True
+
+[importlinter:contract:feature-api-no-infra]
+name = Feature api получает infra только через deps.py
+type = forbidden
+source_modules =
+    features.*.api
+forbidden_modules =
+    features.*.infra
+    core.db.text_filters
+    core.db.fuzzy_search
+allow_indirect_imports = True
+ignore_imports =
+    features.*.api.deps -> features.*.infra.**
+
+# Фичи не знают устройство друг друга; разрешены только перечисленные связи
+# через публичные app/domain/api.deps чужой фичи.
+[importlinter:contract:features-independent]
+name = Фичи независимы, кроме явно разрешённых связей
+type = independence
+modules =
+    features.app_versions
+    features.audit
+    features.auth
+    features.calculator
+    features.catalog
+    features.norms
+    features.products
+    features.recipes
+    features.table
+    features.users
+ignore_imports =
+    features.norms.domain.** -> features.calculator.domain.**
+    features.calculator.api.router -> features.norms.api.deps
+    features.calculator.api.router -> features.norms.api.documents
+    features.calculator.api.router -> features.norms.app
+    features.calculator.api.router -> features.norms.domain.daily_norms
+    features.recipes.api.deps -> features.calculator.api.deps
+    features.recipes.api.deps -> features.calculator.app
+    features.products.app.service -> features.catalog.domain.rules

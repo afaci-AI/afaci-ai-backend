@@ -1,29 +1,16 @@
 """Search normalization regressions: no database connection is required."""
 
-import importlib
-import sys
 import unittest
-from types import ModuleType
-from unittest.mock import patch
 from uuid import UUID
 
-from infrastructure.db.text_filters import (
+from core.db.text_filters import (
     SQL_REPLACEMENTS,
     contains_clause,
     escape_like,
     normalize_search_text,
     normalized_sql,
 )
-
-
-async def unused_db():
-    raise AssertionError("Search normalization tests must not connect to a database")
-
-
-session_stub = ModuleType("infrastructure.db.session")
-session_stub.get_db = unused_db
-with patch.dict(sys.modules, {"infrastructure.db.session": session_stub}):
-    table = importlib.import_module("api.v1.table")
+from features.table.infra import sql_queries as table
 
 
 def apply_sql_chain(value: str) -> str:
@@ -111,11 +98,11 @@ class ContainsClauseChecks(unittest.TestCase):
 
 class TableFiltersChecks(unittest.TestCase):
     def test_build_where_skips_blank_and_none(self):
-        where, params = table._build_where({"p.name": "  ", "c.name": None})
+        where, params = table.build_where({"product": "  ", "category": None})
         self.assertEqual((where, params), ("", {}))
 
     def test_build_where_combines_filters_with_unique_params(self):
-        where, params = table._build_where({"c.name": "мясо", "p.name": "Баранина"})
+        where, params = table.build_where({"category": "мясо", "product": "Баранина"})
         self.assertTrue(where.startswith("WHERE "))
         self.assertEqual(where.count(" AND "), 1)
         self.assertEqual(params["p0"], "%мясо%")
@@ -125,7 +112,7 @@ class TableFiltersChecks(unittest.TestCase):
     def test_exact_ids_are_added_after_name_filters(self):
         category = UUID("11111111-1111-1111-1111-111111111111")
         params: dict = {}
-        where = table._add_exact_ids(
+        where = table.add_exact_ids(
             "WHERE x", params, {"p.category_id": category, "p.region_id": None}
         )
         self.assertEqual(where, "WHERE x AND p.category_id = CAST(:id0 AS uuid)")
@@ -133,11 +120,11 @@ class TableFiltersChecks(unittest.TestCase):
 
     def test_exact_ids_without_name_filters_open_where(self):
         region = UUID("22222222-2222-2222-2222-222222222222")
-        where = table._add_exact_ids("", {}, {"p.region_id": region})
+        where = table.add_exact_ids("", {}, {"p.region_id": region})
         self.assertEqual(where, "WHERE p.region_id = CAST(:id0 AS uuid)")
 
     def test_exact_ids_none_keeps_where(self):
-        self.assertEqual(table._add_exact_ids("WHERE x", {}, {"a": None}), "WHERE x")
+        self.assertEqual(table.add_exact_ids("WHERE x", {}, {"a": None}), "WHERE x")
 
 
 if __name__ == "__main__":

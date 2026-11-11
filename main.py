@@ -7,11 +7,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from slowapi.middleware import SlowAPIMiddleware
 
-from api.openapi import OPENAPI_TAGS
-from api.rate_limit import limiter
-from api.router import register_routers
-from infrastructure.audit.logger import setup_audit_logging
-from infrastructure.audit.middleware import AuditLogMiddleware
+from core.audit.logger import setup_audit_logging
+from core.audit.middleware import AuditLogMiddleware
+from core.errors import register_error_handlers
+from core.openapi import OPENAPI_TAGS
+from core.rate_limit import limiter
+from routes import register_routers
 
 load_dotenv()
 
@@ -20,6 +21,7 @@ setup_audit_logging()
 
 app = FastAPI(title="AFACI API", openapi_tags=OPENAPI_TAGS)
 app.state.limiter = limiter
+register_error_handlers(app)
 
 # ВАЖНО: порядок add_middleware — LIFO (последний добавленный — внешний).
 # Добавляем AuditLogMiddleware ПЕРВЫМ, затем CORS, чтобы Audit был внешним

@@ -11,4 +11,4 @@ venv/
 backups/
 logs/
 scripts/
-infrastructure/db/import_part2.py
+scripts/import_part2.py
