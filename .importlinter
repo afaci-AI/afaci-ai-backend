@@ -24,6 +24,7 @@ containers =
     features.norms
     features.products
     features.recipes
+    features.reports_temp
     features.table
     features.users
 
@@ -103,3 +104,23 @@ ignore_imports =
     features.recipes.api.deps -> features.calculator.api.deps
     features.recipes.api.deps -> features.calculator.app
     features.products.app.service -> features.catalog.domain.rules
+
+# TEMP: reports_temp — временная фича; на неё не ссылается ни одна другая (см. REMOVE.md).
+[importlinter:contract:reports-temp-isolated]
+name = TEMP - никто не импортирует reports_temp
+type = forbidden
+source_modules =
+    core
+    features.app_versions
+    features.audit
+    features.auth
+    features.calculator
+    features.catalog
+    features.norms
+    features.products
+    features.recipes
+    features.table
+    features.users
+forbidden_modules =
+    features.reports_temp
+allow_indirect_imports = True
