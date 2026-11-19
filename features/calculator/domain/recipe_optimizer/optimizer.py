@@ -6,11 +6,45 @@ import numpy as np
 
 from ..candidates import CandidateItem, build_items
 from ..formulas import compute_report
-from .errors import METRICS, RecipeOptimizationError
+from .errors import COMPARISON_TOLERANCE, METRICS, RecipeOptimizationError
+from .lp_cost import forms_for, solve_cost
 from .result import build_result
-from .search import RecipeSearch
+from .search import EvaluatedRecipe, RecipeSearch
 from .simplex import build_starts
 from .validation import is_finite, validate_data, validate_request
+
+
+def _lp_cost_entry(
+    search: RecipeSearch,
+    candidates: list[CandidateItem],
+    reference: dict,
+    baseline: np.ndarray,
+    mode: str,
+) -> EvaluatedRecipe | None:
+    """Состав режима `cost` из ЛП, уже пересчитанный методикой.
+
+    `None` — задача ЛП недопустима или состав не прошёл пересчёт; тогда
+    работает прежний численный поиск (до этапа 5 он остаётся запасным).
+    """
+    if mode != "cost":
+        return None
+    amounts = solve_cost(
+        forms_for(candidates, reference),
+        lower=search.lower,
+        upper=search.upper,
+        prices=search.prices,
+        original={
+            metric: value
+            for metric, value in zip(METRICS, search.base_quality, strict=True)
+        },
+        baseline=baseline,
+    )
+    if amounts is None:
+        return None
+    entry = search.evaluate(amounts)
+    if entry is None or np.any(search.margins(entry) < -COMPARISON_TOLERANCE):
+        return None
+    return entry
 
 
 def optimize_recipe(
@@ -36,7 +70,9 @@ def optimize_recipe(
     search = RecipeSearch(
         candidates, reference, mode, (lower, upper), prices, base_quality, base_cost
     )
-    selected = search.run(build_starts(baseline, lower, upper, prices, mode))
+    selected = _lp_cost_entry(search, candidates, reference, baseline, mode)
+    if selected is None:
+        selected = search.run(build_starts(baseline, lower, upper, prices, mode))
 
     return build_result(
         mode=mode,

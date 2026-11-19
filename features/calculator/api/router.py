@@ -4,7 +4,7 @@
   GET  /api/v1/calculator/reference-proteins  — эталоны ФАО/ВОЗ (для селектора и Табл. 4)
   GET  /api/v1/calculator/recipes             — сохранённые рецептуры (загружаемые примеры)
   POST /api/v1/calculator/compute             — расчёт по списку ингредиентов + эталону
-  POST /api/v1/calculator/optimize-cost       — оптимизация стоимости рецептуры (SLSQP)
+  POST /api/v1/calculator/optimize-cost       — оптимизация стоимости рецептуры (ЛП, libs/lp)
   POST /api/v1/calculator/optimize-recipe     — оптимизация относительно исходного состава
 """
 
