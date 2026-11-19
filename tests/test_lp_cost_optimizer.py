@@ -23,9 +23,13 @@ from features.calculator.domain import (
 from features.calculator.domain.cost_optimizer import kras_limit
 from features.calculator.domain.formulas import NAK_GROUPS
 from features.calculator.domain.formulas.linear import indicators
-from features.calculator.domain.lp_model import QualityTargets, solve_amounts, t_floor
+from features.calculator.domain.lp_model import (
+    QualityTargets,
+    fit_mass,
+    solve_amounts,
+    t_floor,
+)
 from features.calculator.domain.recipe_optimizer.lp_cost import forms_for
-from features.calculator.domain.recipe_optimizer.simplex import project
 
 FIXTURES = Path(__file__).parent / "fixtures"
 RANDOM_COMPOSITIONS = 500
@@ -55,7 +59,7 @@ def random_compositions(candidates, count=RANDOM_COMPOSITIONS):
     lower, upper, _ = bounds(candidates)
     rng = np.random.default_rng(SEED)
     for _ in range(count):
-        yield project(rng.dirichlet(np.ones(len(candidates))) * 100.0, lower, upper)
+        yield fit_mass(rng.dirichlet(np.ones(len(candidates))) * 100.0, lower, upper)
 
 
 def quality_of(candidates, reference, amounts):

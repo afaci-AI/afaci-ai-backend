@@ -9,8 +9,7 @@ from .errors import COMPARISON_TOLERANCE, METRICS
 from .search import EvaluatedRecipe
 
 FAILURE_MESSAGE = (
-    "Цель не достигнута; показан лучший найденный вариант. "
-    "Численный поиск не доказывает невозможность улучшения."
+    "Цель недостижима в заданных диапазонах; показан состав с наименьшим нарушением."
 )
 
 

@@ -333,14 +333,22 @@ class OptimizationChecks(unittest.TestCase):
             ):
                 optimize_recipe(candidates, reference, [50, 50], mode)
 
-    def test_solver_failure_returns_only_verified_composition(self):
+    def test_solver_failure_returns_no_unverified_composition(self):
+        """Сбой решателя даёт честную ошибку, а не непроверенный состав."""
         candidates, reference = fixture()
-        with patch(
-            "features.calculator.domain.recipe_optimizer.search.minimize",
-            side_effect=RuntimeError("control"),
+        with (
+            patch(
+                "features.calculator.domain.lp_model.solve",
+                side_effect=RuntimeError("control"),
+            ),
+            patch(
+                "features.calculator.domain.lp_quality.solve",
+                side_effect=RuntimeError("control"),
+            ),
+            self.assertRaises(RecipeOptimizationError) as caught,
         ):
-            result = optimize_recipe(candidates, reference, [80, 20], "basic")
-        self.assert_valid(result, candidates, reference)
+            optimize_recipe(candidates, reference, [80, 20], "basic")
+        self.assertEqual(caught.exception.code, "optimization_calculation_failed")
 
     def test_unrounded_comparison_detects_small_improvement(self):
         candidates, reference = fixture()
