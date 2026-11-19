@@ -84,6 +84,23 @@ def weight_bound(forms: LinearForms, upper: np.ndarray) -> float:
     return float(max(best.min(), 0.0)) * WEIGHT_MARGIN
 
 
+def fit_mass(amounts, lower, upper):
+    """Привести состав к границам и ровно 100 г: мелкая правка после решения.
+
+    Решение ЛП уже удовлетворяет этим условиям, остаётся только убрать
+    накопленную погрешность вычислений.
+    """
+    result = np.clip(np.asarray(amounts, dtype=float), lower, upper)
+    for index in range(len(result)):
+        difference = TOTAL_MASS - float(result.sum())
+        if abs(difference) < 1e-12:
+            break
+        result[index] += np.clip(
+            difference, lower[index] - result[index], upper[index] - result[index]
+        )
+    return result
+
+
 def _kras_row(forms: LinearForms, kras_max: float) -> tuple[np.ndarray, float]:
     """Строка «(1/n)·Σⱼ Cⱼ·B − w ≤ KРАС_max·B»."""
     rows = forms.score_rows()

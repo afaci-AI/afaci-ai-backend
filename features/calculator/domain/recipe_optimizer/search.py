@@ -1,8 +1,10 @@
-"""Численный поиск состава: SLSQP из нескольких стартов и запасной вариант.
+"""Выбор состава: решения ЛП, проверенные методикой.
 
-Fallback order is lexicographic: maximum relative quality violation, sum of
-relative violations, then maximum BV (basic) or minimum price (cost).
-SLSQP is a local numerical search, not a proof of global optimality.
+Основной путь — одна задача линейного программирования на режим (цена или
+ценность). Её решение проверяется пересчётом `compute_report`: наружу не
+выходит состав, показатели которого не подтверждены методикой. Если задача
+недопустима, работает запасной вариант (`lp_fallback.py`) с прежним
+лексикографическим порядком приоритетов.
 """
 
 from __future__ import annotations
@@ -10,15 +12,20 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-from scipy.optimize import Bounds, minimize
 
 from ..candidates import CandidateItem, build_items
 from ..formulas import compute_report
+from ..lp_model import fit_mass
 from .errors import COMPARISON_TOLERANCE, METRICS, RecipeOptimizationError
-from .simplex import project
+from .lp_basic import solve_basic
+from .lp_cost import forms_for, solve_cost
+from .lp_fallback import candidates_for, minimum_violation
 from .validation import is_finite
 
 SIGNS = np.array([1, 1, -1])  # БЦ и U — больше лучше, G — меньше лучше
+# Сбой вычислений решателя не должен превращаться в непроверенный ответ:
+# такие ошибки означают «решения нет», и дальше работает запасной вариант.
+SOLVER_FAILURES = (ArithmeticError, RuntimeError, np.linalg.LinAlgError)
 
 
 @dataclass
@@ -30,7 +37,7 @@ class EvaluatedRecipe:
 
 
 class RecipeSearch:
-    """Оценивает составы (с кэшем) и ищет лучший относительно исходного."""
+    """Решает задачу режима и выбирает состав среди проверенных вариантов."""
 
     def __init__(
         self,
@@ -41,6 +48,7 @@ class RecipeSearch:
         prices: np.ndarray,
         base_quality: np.ndarray,
         base_cost: float,
+        protein_min: float | None = None,
     ) -> None:
         self.candidates = candidates
         self.reference = reference
@@ -49,26 +57,23 @@ class RecipeSearch:
         self.prices = prices
         self.base_quality = base_quality
         self.base_cost = base_cost
+        self.protein_min = protein_min
         # No arbitrary weights: each violation is divided by its own baseline.
         self.scales = np.array([abs(v) if v != 0 else 1.0 for v in base_quality])
-        self.records: dict[tuple, EvaluatedRecipe | None] = {}
+        self.records: list[EvaluatedRecipe] = []
+
+    @property
+    def original(self) -> dict:
+        return dict(zip(METRICS, (float(v) for v in self.base_quality), strict=True))
 
     # ----------------------------------------------------------- оценка
     def evaluate(self, x) -> EvaluatedRecipe | None:
-        tol = COMPARISON_TOLERANCE
-        key = tuple(float(v) for v in x)
-        if key in self.records:
-            return self.records[key]
-        self.records[key] = None
-        if (
-            not np.isfinite(x).all()
-            or np.any(x < self.lower - tol)
-            or np.any(x > self.upper + tol)
-            or abs(float(np.sum(x)) - 100) > tol
-        ):
+        """Пересчитать состав методикой; `None`, если он непригоден."""
+        if not np.isfinite(x).all():
             return None
-        # Evaluate the exact composition that will be returned and saved.
-        amounts = project(np.asarray(x), self.lower, self.upper)
+        amounts = fit_mass(x, self.lower, self.upper)
+        if abs(float(amounts.sum()) - 100.0) > COMPARISON_TOLERANCE:
+            return None
         try:
             quality = compute_report(
                 build_items(self.candidates, amounts), self.reference, rounded=False
@@ -79,15 +84,17 @@ class RecipeSearch:
             return None
         actual = np.array([quality[m] for m in METRICS])
         differences = (self.base_quality - actual) * SIGNS
-        violation = np.maximum(differences, 0) / self.scales
         result = EvaluatedRecipe(
-            amounts, quality, float(np.dot(self.prices, amounts)), violation
+            amounts,
+            quality,
+            float(np.dot(self.prices, amounts)),
+            np.maximum(differences, 0) / self.scales,
         )
-        self.records[key] = result
+        self.records.append(result)
         return result
 
     def entries(self) -> list[EvaluatedRecipe]:
-        return [entry for entry in self.records.values() if entry is not None]
+        return list(self.records)
 
     def rank(self, entry: EvaluatedRecipe) -> float:
         return entry.cost if self.mode == "cost" else -entry.quality["bc"]
@@ -105,79 +112,74 @@ class RecipeSearch:
         return bool(np.all(margins >= -tol) and improvement > tol)
 
     # ------------------------------------------------------------ поиск
-    def objective(self, x) -> float:
-        entry = self.evaluate(x)
-        return 1e12 if entry is None else self.rank(entry)
-
-    def quality_margin(self, x) -> np.ndarray:
-        entry = self.evaluate(x)
-        return np.full(3, -1e12) if entry is None else self.margins(entry)
-
-    def search(self, fun, start, extra) -> None:
-        self.evaluate(start)
+    def _main(self, forms, baseline: np.ndarray):
+        """Решение задачи режима: минимум цены либо максимум ценности."""
         try:
-            result = minimize(
-                fun,
-                start,
-                method="SLSQP",
-                bounds=Bounds(self.lower, self.upper),
-                constraints=[
-                    {"type": "eq", "fun": lambda x: float(np.sum(x)) - 100},
-                    *extra,
-                ],
-                options={"ftol": 1e-10, "maxiter": 250, "disp": False},
+            return self._solve_mode(forms, baseline)
+        except SOLVER_FAILURES:
+            return None
+
+    def _solve_mode(self, forms, baseline: np.ndarray):
+        if self.mode == "cost":
+            return solve_cost(
+                forms,
+                lower=self.lower,
+                upper=self.upper,
+                prices=self.prices,
+                original=self.original,
+                baseline=baseline,
             )
-            self.evaluate(result.x)
-        except (ArithmeticError, ValueError, RuntimeError):
-            pass
+        return solve_basic(
+            forms,
+            lower=self.lower,
+            upper=self.upper,
+            original=self.original,
+            tolerance=COMPARISON_TOLERANCE,
+        )
 
-    def run(self, starts: list[np.ndarray]) -> EvaluatedRecipe:
-        """Основной поиск, при неудаче — лексикографический запасной вариант."""
-        for start in starts:
-            self.search(
-                self.objective, start, [{"type": "ineq", "fun": self.quality_margin}]
-            )
-        found = [entry for entry in self.entries() if self.achieved(entry)]
-        if not found:
-            self._fallback(starts)
-            found = [entry for entry in self.entries() if self.achieved(entry)]
-        return self._select(found)
-
-    def _violation(self, kind: str):
-        def value(x) -> float:
-            entry = self.evaluate(x)
-            if not entry:
-                return 1e12
-            return float(getattr(entry.violations, kind)())
-
-        return value
-
-    def _fallback(self, starts: list[np.ndarray]) -> None:
-        """Lexicographic fallback, without mixing metric priorities into weights."""
-        tol = COMPARISON_TOLERANCE
-        maximum, total = self._violation("max"), self._violation("sum")
-        for start in starts:
-            self.search(maximum, start, [])
-        if not self.entries():
+    def _fallback(self, forms) -> None:
+        """Составы с наименьшим нарушением порогов, когда цель недостижима."""
+        try:
+            self._collect(forms)
+        except SOLVER_FAILURES:
             return
-        best_max = min(float(e.violations.max()) for e in self.entries())
-        max_constraint = {
-            "type": "ineq",
-            "fun": lambda x: best_max + tol - maximum(x),
-        }
-        stage_starts = sorted(self.entries(), key=lambda e: e.violations.max())[:3]
-        for entry in stage_starts:
-            self.search(total, entry.amounts, [max_constraint])
-        permitted = [e for e in self.entries() if e.violations.max() <= best_max + tol]
-        best_sum = min(float(e.violations.sum()) for e in permitted)
-        total_constraint = {
-            "type": "ineq",
-            "fun": lambda x: best_sum + tol - total(x),
-        }
-        for entry in sorted(permitted, key=lambda e: e.violations.sum())[:3]:
-            self.search(
-                self.objective, entry.amounts, [max_constraint, total_constraint]
-            )
+
+    def _collect(self, forms) -> None:
+        violation = minimum_violation(
+            forms,
+            lower=self.lower,
+            upper=self.upper,
+            prices=self.prices,
+            original=self.original,
+            scales=self.scales,
+            protein_min=self.protein_min,
+        )
+        if violation is None:
+            return
+        for amounts in candidates_for(
+            forms,
+            lower=self.lower,
+            upper=self.upper,
+            prices=self.prices,
+            original=self.original,
+            scales=self.scales,
+            protein_min=self.protein_min,
+            violation=violation,
+        ):
+            self.evaluate(amounts)
+
+    def run(self, baseline: np.ndarray) -> EvaluatedRecipe:
+        """Состав режима: решение ЛП, при недопустимости — запасной вариант."""
+        forms = forms_for(self.candidates, self.reference)
+        amounts = self._main(forms, baseline)
+        if amounts is not None:
+            entry = self.evaluate(amounts)
+            if entry is not None and np.all(
+                self.margins(entry) >= -COMPARISON_TOLERANCE
+            ):
+                return entry
+        self._fallback(forms)
+        return self._select([e for e in self.entries() if self.achieved(e)])
 
     def _select(self, found: list[EvaluatedRecipe]) -> EvaluatedRecipe:
         tol = COMPARISON_TOLERANCE
