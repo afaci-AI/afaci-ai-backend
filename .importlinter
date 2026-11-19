@@ -2,6 +2,7 @@
 root_packages =
     core
     features
+    libs
     sqlalchemy
     fastapi
 include_external_packages = True
@@ -123,4 +124,17 @@ source_modules =
     features.users
 forbidden_modules =
     features.reports_temp
+allow_indirect_imports = True
+
+# libs — переиспользуемые алгоритмы: никакого приложения и фреймворков внутри.
+[importlinter:contract:libs-are-pure]
+name = libs не зависит от core, features и фреймворков
+type = forbidden
+source_modules =
+    libs
+forbidden_modules =
+    core
+    features
+    sqlalchemy
+    fastapi
 allow_indirect_imports = True
