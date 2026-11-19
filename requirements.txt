@@ -26,3 +26,6 @@ typing_extensions==4.15.0
 uvicorn==0.43.0
 scipy==1.18.0
 slowapi==0.1.9
+# TEMP: reports_temp (PDF-отчёты; удалить вместе с фичей)
+reportlab==4.4.10
+pillow==11.3.0
