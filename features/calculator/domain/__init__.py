@@ -8,10 +8,11 @@ from .exceptions import (
     ReferenceProteinNotFoundError,
 )
 from .formulas import NAK_GROUPS, REQUIRED_SUM, SUM_TOLERANCE, compute_report
-from .recipe_optimizer import RecipeOptimizationError, optimize_recipe
+from .recipe_optimizer import PER_KILOGRAM, RecipeOptimizationError, optimize_recipe
 
 __all__ = [
     "NAK_GROUPS",
+    "PER_KILOGRAM",
     "REQUIRED_SUM",
     "SUM_TOLERANCE",
     "CandidateItem",

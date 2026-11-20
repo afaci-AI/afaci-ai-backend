@@ -324,6 +324,7 @@
  },
  "optimize_recipe_basic": {
   "baseline_cost_per_100g": null,
+  "baseline_cost_per_kg": null,
   "baseline_items": [
    {
     "amount_g": 50.0,
@@ -392,6 +393,7 @@
   },
   "comparison_tolerance": 1e-06,
   "cost_change_per_100g": null,
+  "cost_change_per_kg": null,
   "message": "Цель достигнута.",
   "mode": "basic",
   "optimal_items": [
@@ -1057,6 +1059,7 @@
    ]
   },
   "savings_per_100g": null,
+  "savings_per_kg": null,
   "savings_percent": null,
   "status": "goal_achieved",
   "thresholds": {
@@ -1066,10 +1069,12 @@
    "v_min": 0.7852443878931297
   },
   "total_cost_per_100g": null,
+  "total_cost_per_kg": null,
   "violations": []
  },
  "optimize_recipe_cost": {
   "baseline_cost_per_100g": 19.949,
+  "baseline_cost_per_kg": 199.49,
   "baseline_items": [
    {
     "amount_g": 50.0,
@@ -1138,6 +1143,7 @@
   },
   "comparison_tolerance": 1e-06,
   "cost_change_per_100g": -2.1161250000000003,
+  "cost_change_per_kg": -21.161250000000003,
   "message": "Цель достигнута.",
   "mode": "cost",
   "optimal_items": [
@@ -1803,6 +1809,7 @@
    ]
   },
   "savings_per_100g": 2.1161250000000003,
+  "savings_per_kg": 21.161250000000003,
   "savings_percent": 10.607674570153893,
   "status": "goal_achieved",
   "thresholds": {
@@ -1812,6 +1819,7 @@
    "v_min": 0.7852443878931297
   },
   "total_cost_per_100g": 17.832875,
+  "total_cost_per_kg": 178.32875,
   "violations": []
  }
 }
