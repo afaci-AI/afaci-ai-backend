@@ -8,6 +8,9 @@ from ..candidates import CandidateItem
 from .errors import COMPARISON_TOLERANCE, METRICS
 from .search import EvaluatedRecipe
 
+# Стоимость считается на 100 г; интерфейсу нужна цена за килограмм.
+PER_KILOGRAM = 10.0
+
 FAILURE_MESSAGE = (
     "Цель недостижима в заданных диапазонах; показан состав с наименьшим нарушением."
 )
@@ -98,10 +101,15 @@ def build_result(
         "comparison": comparison(original, selected),
         "violations": violations(original, selected, scales),
         "comparison_tolerance": COMPARISON_TOLERANCE,
+        # Поля `*_per_100g` устарели: оставлены для выпущенных клиентов.
         "baseline_cost_per_100g": base_cost if is_cost else None,
         "total_cost_per_100g": selected.cost if is_cost else None,
         "cost_change_per_100g": -savings if is_cost else None,
         "savings_per_100g": savings if is_cost else None,
+        "baseline_cost_per_kg": base_cost * PER_KILOGRAM if is_cost else None,
+        "total_cost_per_kg": selected.cost * PER_KILOGRAM if is_cost else None,
+        "cost_change_per_kg": -savings * PER_KILOGRAM if is_cost else None,
+        "savings_per_kg": savings * PER_KILOGRAM if is_cost else None,
         "savings_percent": savings / base_cost * 100
         if is_cost and base_cost != 0
         else None,

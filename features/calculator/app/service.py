@@ -12,6 +12,7 @@ from uuid import UUID
 from core.errors import BadRequestError, NotFoundError, UnprocessableError
 
 from ..domain import (
+    PER_KILOGRAM,
     REQUIRED_SUM,
     SUM_TOLERANCE,
     CandidateItem,
@@ -84,7 +85,7 @@ class RecipeCalculator:
     ) -> dict:
         """candidates: [{product_id, price_per_kg, min_amount_g, max_amount_g}];
         constraints: {bc_min?, kras_max?}.
-        Возвращает {optimal_items, total_cost_per_100g, report}."""
+        Возвращает {optimal_items, total_cost_per_kg, report}."""
         if not candidates:
             raise BadRequestError("Список кандидатов пуст.")
 
@@ -130,7 +131,9 @@ class RecipeCalculator:
                 }
                 for i, c in enumerate(domain_candidates)
             ],
+            # `total_cost_per_100g` устарело: оставлено для выпущенных клиентов.
             "total_cost_per_100g": opt["total_cost_per_100g"],
+            "total_cost_per_kg": opt["total_cost_per_100g"] * PER_KILOGRAM,
             "report": compute_report(enriched, reference),
         }
 

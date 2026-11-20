@@ -281,6 +281,35 @@ class RecipeCostMode(unittest.TestCase):
         self.assertIsNone(result["total_cost_per_100g"])
 
 
+class PerKilogramFields(unittest.TestCase):
+    """Стоимость в ответе выражена в сом/кг; поля за 100 г сохранены."""
+
+    def test_recipe_mode_reports_both_units(self):
+        candidates, reference, baseline = control()
+        result = optimize_recipe(candidates, reference, baseline, "cost")
+        for per_kg, per_100g in (
+            ("total_cost_per_kg", "total_cost_per_100g"),
+            ("baseline_cost_per_kg", "baseline_cost_per_100g"),
+            ("cost_change_per_kg", "cost_change_per_100g"),
+            ("savings_per_kg", "savings_per_100g"),
+        ):
+            with self.subTest(field=per_kg):
+                self.assertAlmostEqual(
+                    result[per_kg], result[per_100g] * 10.0, places=9
+                )
+
+    def test_basic_mode_leaves_cost_fields_empty(self):
+        candidates, reference, baseline = control()
+        result = optimize_recipe(candidates, reference, baseline, "basic")
+        for field in (
+            "total_cost_per_kg",
+            "baseline_cost_per_kg",
+            "cost_change_per_kg",
+            "savings_per_kg",
+        ):
+            self.assertIsNone(result[field], field)
+
+
 class ModelStructure(unittest.TestCase):
     def test_infeasible_targets_raise(self):
         candidates, reference, _ = control()

@@ -77,7 +77,9 @@ def optimize_cost(
     lower = np.array([c.min_amount_g for c in candidates], dtype=float)
     upper = np.array([c.max_amount_g for c in candidates], dtype=float)
     _check_bounds(lower, upper)
-    prices = np.array([c.price_per_kg / 1000.0 for c in candidates])  # сом/г
+    prices = np.array(
+        [c.price_per_kg / 1000.0 for c in candidates]
+    )  # внутренняя единица: стоимость грамма
 
     forms = build_forms(build_items(candidates, np.zeros(len(candidates))), reference)
     limit = kras_limit(constraints)
