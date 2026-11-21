@@ -5,7 +5,18 @@ from __future__ import annotations
 from typing import Any, Protocol
 from uuid import UUID
 
+from core.mail import MailError as MailFailure
+
 Row = Any
+
+__all__ = [
+    "ChangeAudit",
+    "MailFailure",
+    "Mailer",
+    "PasswordHasher",
+    "Row",
+    "UserRepository",
+]
 
 
 class UserRepository(Protocol):
@@ -29,3 +40,10 @@ class ChangeAudit(Protocol):
     def user_updated(
         self, admin_id: UUID, user: Row, user_id: UUID, changes: dict
     ) -> None: ...
+
+
+class Mailer(Protocol):
+    async def send(
+        self, to: str, subject: str, text: str, html: str | None = None
+    ) -> None:
+        """Бросает MailFailure, если письмо не отправлено."""

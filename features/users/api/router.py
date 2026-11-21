@@ -3,7 +3,8 @@
 
   GET    /api/v1/users            — список (поиск/фильтр по роли)
   GET    /api/v1/users/{id}       — один пользователь
-  POST   /api/v1/users            — создать
+  POST   /api/v1/users            — создать (временный пароль уходит письмом)
+  POST   /api/v1/users/{id}/resend-credentials — новый временный пароль письмом
   PATCH  /api/v1/users/{id}       — редактировать (роль, статус, срок доступа)
   DELETE /api/v1/users/{id}           — деактивировать
 """
@@ -41,9 +42,19 @@ async def get_user(id: UUID, service: Service, _admin: Admin):
     return user_public(await service.get(id))
 
 
+def _with_delivery(user: User, delivery: dict) -> dict:
+    """Пользователь и отдельно — результат отправки письма с данными для входа."""
+    return {**user_public(user), "credentialsEmail": delivery}
+
+
 @router.post("", status_code=201, summary="Создать пользователя")
 async def create_user(data: UserCreateRequest, service: Service, _admin: Admin):
-    return user_public(await service.create(data.model_dump()))
+    return _with_delivery(*await service.create(data.model_dump()))
+
+
+@router.post("/{id}/resend-credentials", summary="Выслать новый временный пароль")
+async def resend_credentials(id: UUID, service: Service, _admin: Admin):
+    return _with_delivery(*await service.resend_credentials(id))
 
 
 @router.patch("/{id}", summary="Редактировать пользователя")
