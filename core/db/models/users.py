@@ -28,6 +28,10 @@ class User(Base):
     is_active = Column(Boolean, nullable=False, default=True)
     access_expires_at = Column(DateTime(timezone=True), nullable=True)
     must_change_password = Column(Boolean, nullable=False, default=False)
+    # Срок временного пароля из письма администратора; null — срока нет.
+    temp_password_expires_at = Column(DateTime(timezone=True), nullable=True)
+    # Растёт при восстановлении пароля: JWT с прежней версией отклоняются.
+    token_version = Column(Integer, nullable=False, default=0, server_default="0")
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
     last_login_at = Column(DateTime(timezone=True), nullable=True)
 
@@ -37,6 +41,25 @@ class User(Base):
     saved_recipes = relationship(
         "SavedRecipe", back_populates="user", cascade="all, delete-orphan"
     )
+
+
+class PasswordResetCode(Base):
+    """Одноразовый код восстановления пароля; хранится только HMAC кода."""
+
+    __tablename__ = "password_reset_codes"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    code_hash = Column(String, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    attempts = Column(Integer, nullable=False, default=0)
+    used_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
 
 class RecipeGroup(Base):

@@ -3,6 +3,8 @@
 и FastAPI-зависимости для получения текущего пользователя.
 """
 
+import hashlib
+import hmac
 import os
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
@@ -36,20 +38,38 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
+def hash_reset_code(user_id: UUID, code: str) -> str:
+    """HMAC кода восстановления: 6 цифр нельзя перебрать по утёкшей БД без секрета."""
+    message = f"{user_id}:{code}".encode()
+    return hmac.new(JWT_SECRET.encode(), message, hashlib.sha256).hexdigest()
+
+
 # ----------------------------- токены -----------------------------
-def create_access_token(user_id: UUID) -> str:
+def create_access_token(user_id: UUID, version: int = 0) -> str:
+    """`ver` — версия токенов пользователя; при её росте токен отклоняется."""
     expire = datetime.now(UTC) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    payload = {"sub": str(user_id), "exp": expire}
+    payload = {"sub": str(user_id), "ver": version, "exp": expire}
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def _decode(token: str) -> tuple[UUID, int] | None:
+    """(user_id, версия токена) из валидного токена либо None."""
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return UUID(payload["sub"]), int(payload.get("ver", 0))
+    except (jwt.PyJWTError, KeyError, TypeError, ValueError):
+        return None
 
 
 def decode_token(token: str) -> str | None:
     """Вернуть user_id (str) из валидного токена либо None."""
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        return payload.get("sub")
-    except jwt.PyJWTError:
-        return None
+    claims = _decode(token)
+    return str(claims[0]) if claims else None
+
+
+def token_is_current(user: User, version: int) -> bool:
+    """Токены, выпущенные до восстановления пароля, больше не принимаются."""
+    return version == (user.token_version or 0)
 
 
 def _extract_bearer(authorization: str | None) -> str | None:
@@ -81,24 +101,38 @@ def user_status(user: User) -> str:
 
 
 # -------------------------- зависимости ---------------------------
-async def get_current_user(
+PASSWORD_CHANGE_REQUIRED = "Сначала смените временный пароль."
+
+
+async def get_current_user_pending_password(
     db: Annotated[AsyncSession, Depends(get_db)],
     authorization: str | None = Header(default=None),
 ) -> User:
+    """Пользователь по токену, даже если он ещё не сменил временный пароль.
+
+    Только для `/auth/me` и `/auth/change-password`: остальные маршруты идут
+    через `get_current_user`, который такого пользователя не пропускает.
+    """
     token = _extract_bearer(authorization)
     if not token:
         raise HTTPException(status_code=401, detail="Требуется авторизация.")
-    user_id = decode_token(token)
-    if not user_id:
+    claims = _decode(token)
+    if not claims:
         raise HTTPException(
             status_code=401, detail="Недействительный или истёкший токен."
         )
+    user_id, version = claims
     user = (
-        await db.execute(select(User).where(User.id == UUID(user_id)))
+        await db.execute(select(User).where(User.id == user_id))
     ).scalar_one_or_none()
     if user is None or not user.is_active:
         raise HTTPException(
             status_code=401, detail="Пользователь не найден или отключён."
+        )
+    if not token_is_current(user, version):
+        raise HTTPException(
+            status_code=401,
+            detail="Сессия завершена после смены пароля. Войдите снова.",
         )
     if is_expired(user):
         # Проверка на каждом запросе: истёкший срок доступа = принудительный логаут.
@@ -106,6 +140,14 @@ async def get_current_user(
             status_code=401,
             detail="Срок действия учётной записи истёк. Обратитесь в техническую поддержку.",
         )
+    return user
+
+
+async def get_current_user(
+    user: Annotated[User, Depends(get_current_user_pending_password)],
+) -> User:
+    if user.must_change_password:
+        raise HTTPException(status_code=403, detail=PASSWORD_CHANGE_REQUIRED)
     return user
 
 
@@ -128,12 +170,15 @@ async def get_current_user_optional(
     token = _extract_bearer(authorization)
     if not token:
         return None
-    user_id = decode_token(token)
-    if not user_id:
+    claims = _decode(token)
+    if not claims:
         return None
-    return (
-        await db.execute(select(User).where(User.id == UUID(user_id)))
+    user = (
+        await db.execute(select(User).where(User.id == claims[0]))
     ).scalar_one_or_none()
+    if user is None or not token_is_current(user, claims[1]):
+        return None
+    return user
 
 
 def user_public(user: User) -> dict:
@@ -148,6 +193,9 @@ def user_public(user: User) -> dict:
         if user.access_expires_at
         else None,
         "mustChangePassword": user.must_change_password,
+        "temporaryPasswordExpiresAt": user.temp_password_expires_at.isoformat()
+        if user.temp_password_expires_at
+        else None,
         "status": user_status(user),
         "createdAt": user.created_at.isoformat() if user.created_at else None,
         "lastLoginAt": user.last_login_at.isoformat() if user.last_login_at else None,

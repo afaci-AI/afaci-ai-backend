@@ -32,8 +32,11 @@ class SecurityCredentials:
     def hash_password(self, password: str) -> str:
         return security.hash_password(password)
 
-    def issue_token(self, user_id) -> str:
-        return security.create_access_token(user_id)
+    def hash_reset_code(self, user_id, code: str) -> str:
+        return security.hash_reset_code(user_id, code)
+
+    def issue_token(self, user: Row) -> str:
+        return security.create_access_token(user.id, user.token_version or 0)
 
     def is_expired(self, user: Row) -> bool:
         return security.is_expired(user)

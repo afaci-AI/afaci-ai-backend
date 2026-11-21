@@ -11,7 +11,7 @@ from core.audit.logger import setup_audit_logging
 from core.audit.middleware import AuditLogMiddleware
 from core.errors import register_error_handlers
 from core.openapi import OPENAPI_TAGS
-from core.rate_limit import limiter
+from core.rate_limit import register_rate_limit_handler
 from routes import register_routers
 
 load_dotenv()
@@ -20,7 +20,7 @@ load_dotenv()
 setup_audit_logging()
 
 app = FastAPI(title="AFACI API", openapi_tags=OPENAPI_TAGS)
-app.state.limiter = limiter
+register_rate_limit_handler(app)
 register_error_handlers(app)
 
 # ВАЖНО: порядок add_middleware — LIFO (последний добавленный — внешний).

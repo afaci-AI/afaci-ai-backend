@@ -987,6 +987,70 @@
     "title": "OptimizeRecipeRequest",
     "type": "object"
    },
+   "PasswordResetConfirm": {
+    "properties": {
+     "code": {
+      "pattern": "^\\s*\\d{6}\\s*$",
+      "title": "Code",
+      "type": "string"
+     },
+     "email": {
+      "maxLength": 254,
+      "minLength": 3,
+      "title": "Email",
+      "type": "string"
+     },
+     "new_password": {
+      "maxLength": 128,
+      "minLength": 6,
+      "title": "New Password",
+      "type": "string"
+     }
+    },
+    "required": [
+     "email",
+     "code",
+     "new_password"
+    ],
+    "title": "PasswordResetConfirm",
+    "type": "object"
+   },
+   "PasswordResetRequest": {
+    "properties": {
+     "email": {
+      "maxLength": 254,
+      "minLength": 3,
+      "title": "Email",
+      "type": "string"
+     }
+    },
+    "required": [
+     "email"
+    ],
+    "title": "PasswordResetRequest",
+    "type": "object"
+   },
+   "PasswordResetVerify": {
+    "properties": {
+     "code": {
+      "pattern": "^\\s*\\d{6}\\s*$",
+      "title": "Code",
+      "type": "string"
+     },
+     "email": {
+      "maxLength": 254,
+      "minLength": 3,
+      "title": "Email",
+      "type": "string"
+     }
+    },
+    "required": [
+     "email",
+     "code"
+    ],
+    "title": "PasswordResetVerify",
+    "type": "object"
+   },
    "ProductAutoCreate": {
     "properties": {
      "category_name": {
@@ -1641,6 +1705,7 @@
     "type": "object"
    },
    "UserCreateRequest": {
+    "description": "Пароль задаёт сервер (временный, уходит письмом); поля `password` и\n`must_change_password` от старых клиентов игнорируются.",
     "properties": {
      "access_expires_at": {
       "anyOf": [
@@ -1659,19 +1724,9 @@
       "title": "Email",
       "type": "string"
      },
-     "must_change_password": {
-      "default": false,
-      "title": "Must Change Password",
-      "type": "boolean"
-     },
      "name": {
       "minLength": 1,
       "title": "Name",
-      "type": "string"
-     },
-     "password": {
-      "minLength": 6,
-      "title": "Password",
       "type": "string"
      },
      "role": {
@@ -1682,8 +1737,7 @@
     },
     "required": [
      "email",
-     "name",
-     "password"
+     "name"
     ],
     "title": "UserCreateRequest",
     "type": "object"
@@ -2338,6 +2392,123 @@
      }
     },
     "summary": "Текущий пользователь",
+    "tags": [
+     "Auth"
+    ]
+   }
+  },
+  "/api/v1/auth/password-reset/confirm": {
+   "post": {
+    "operationId": "confirm_password_reset_api_v1_auth_password_reset_confirm_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PasswordResetConfirm"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Новый пароль по коду",
+    "tags": [
+     "Auth"
+    ]
+   }
+  },
+  "/api/v1/auth/password-reset/request": {
+   "post": {
+    "operationId": "request_password_reset_api_v1_auth_password_reset_request_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PasswordResetRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Запросить код восстановления",
+    "tags": [
+     "Auth"
+    ]
+   }
+  },
+  "/api/v1/auth/password-reset/verify": {
+   "post": {
+    "operationId": "verify_password_reset_api_v1_auth_password_reset_verify_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PasswordResetVerify"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Проверить код восстановления",
     "tags": [
      "Auth"
     ]
@@ -7816,6 +7987,63 @@
      }
     },
     "summary": "Редактировать пользователя",
+    "tags": [
+     "Users"
+    ]
+   }
+  },
+  "/api/v1/users/{id}/resend-credentials": {
+   "post": {
+    "operationId": "resend_credentials_api_v1_users__id__resend_credentials_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Выслать новый временный пароль",
     "tags": [
      "Users"
     ]

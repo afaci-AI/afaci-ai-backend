@@ -15,6 +15,7 @@ SENSITIVE_FIELDS: set[str] = {
     "token",
     "access_token",
     "refresh_token",
+    "code",
 }
 
 MAX_PAYLOAD_CHARS = 4000  # защита от гигантских diff
