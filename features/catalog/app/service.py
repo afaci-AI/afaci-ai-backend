@@ -11,6 +11,7 @@ from ..domain.dictionaries import (
     SUBCATEGORY_KIND,
     DictionarySpec,
 )
+from ..domain.nutrient_classes import default_nutrient_class
 from ..domain.rules import UNIT_CHANGE_FORBIDDEN, UNIT_REQUIRED, UNIT_REQUIRED_FOR_TYPE
 from .ports import CatalogRepository, DuplicateError, InUseError, Row
 
@@ -118,6 +119,8 @@ class CatalogService:
             data["unit_id"] = await self._repo.default_unit_id(nutrient_type.name)
             if data["unit_id"] is None:
                 raise UnprocessableError(UNIT_REQUIRED_FOR_TYPE)
+        if data.get("nutrient_class") is None:
+            data["nutrient_class"] = default_nutrient_class(nutrient_type.name)
         return await self._create(NUTRIENT_NAME_KIND, data, "NutrientName")
 
     async def update_nutrient_name(
@@ -127,6 +130,7 @@ class CatalogService:
         name: str | None,
         nutrient_type_id,
         unit_id,
+        nutrient_class: str | None = None,
         provided: set[str],
     ) -> Row:
         item = await self.get(NUTRIENT_NAME_KIND, item_id)
@@ -151,6 +155,8 @@ class CatalogService:
         item.name = name
         item.nutrient_type_id = type_id
         item.unit_id = new_unit_id
+        if nutrient_class is not None:
+            item.nutrient_class = nutrient_class
         try:
             return await self._repo.save(item)
         except DuplicateError as exc:

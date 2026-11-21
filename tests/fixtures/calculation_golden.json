@@ -98,6 +98,8 @@
    "protein": 10.56,
    "protein_fat_ratio": 1.25
   },
+  "micro": [],
+  "other": [],
   "quality": {
    "G": 9.85,
    "U": 0.79,
@@ -537,6 +539,8 @@
     "protein": 10.56,
     "protein_fat_ratio": 1.25
    },
+   "micro": [],
+   "other": [],
    "quality": {
     "G": 9.85,
     "U": 0.79,
@@ -847,6 +851,8 @@
     "protein": 9.01,
     "protein_fat_ratio": 1.53
    },
+   "micro": [],
+   "other": [],
    "quality": {
     "G": 9.25,
     "U": 0.8,
@@ -1287,6 +1293,8 @@
     "protein": 10.56,
     "protein_fat_ratio": 1.25
    },
+   "micro": [],
+   "other": [],
    "quality": {
     "G": 9.85,
     "U": 0.79,
@@ -1597,6 +1605,8 @@
     "protein": 12.16,
     "protein_fat_ratio": 0.87
    },
+   "micro": [],
+   "other": [],
    "quality": {
     "G": 9.85,
     "U": 0.79,

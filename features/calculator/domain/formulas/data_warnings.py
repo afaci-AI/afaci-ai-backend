@@ -39,3 +39,15 @@ def ingredient_warnings(items: list[dict], no_amino_protein: list[str]) -> list[
             "данным; отсутствие значения не означает нулевое содержание."
         )
     return warnings
+
+
+def composition_warning(micro: list[dict]) -> list[str]:
+    """Предупреждение о минералах, известных не у всех ингредиентов рецептуры."""
+    partial = [row["name"] for row in micro if row["partial"]]
+    if not partial:
+        return []
+    return [
+        "Микросостав рассчитан только по известным данным (значение есть не у всех "
+        "ингредиентов): " + ", ".join(partial) + ". Отсутствие значения не означает "
+        "нулевое содержание."
+    ]

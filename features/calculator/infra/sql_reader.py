@@ -71,13 +71,15 @@ class SqlCalculatorData:
     async def load_products(self, ids: list[UUID]) -> dict:
         q = text("""
             SELECT p.id AS product_id, p.name, r.name AS region, s.name AS subcategory,
-                   nn.name AS nutrient, nt.name AS ntype, n.quantity
+                   nn.name AS nutrient, nt.name AS ntype, n.quantity,
+                   nn.nutrient_class AS nclass, un.name AS unit
             FROM products p
             JOIN regions r ON r.id = p.region_id
             LEFT JOIN subcategories s ON s.id = p.subcategory_id
             LEFT JOIN nutrients n ON n.id_product = p.id
             LEFT JOIN nutrients_names nn ON nn.id = n.id_name_component
             LEFT JOIN nutrients_types nt ON nt.id = nn.nutrient_type_id
+            LEFT JOIN units un ON un.id = nn.unit_id
             WHERE p.id IN :ids
         """).bindparams(bindparam("ids", expanding=True))
         rows = (await self._db.execute(q, {"ids": ids})).mappings().all()
@@ -94,6 +96,9 @@ class SqlCalculatorData:
                     "subcategory": row["subcategory"],
                     "chem": {},
                     "amino": {},
+                    "micro": {},
+                    "other": {},
+                    "units": {},
                 },
             )
             if row["nutrient"] is None:
@@ -102,6 +107,9 @@ class SqlCalculatorData:
                 prod["chem"][row["nutrient"]] = row["quantity"]
             elif row["ntype"] == AMINO_TYPE:
                 prod["amino"][row["nutrient"]] = row["quantity"]
+            if row["nclass"] in ("micro", "other"):
+                prod[row["nclass"]][row["nutrient"]] = row["quantity"]
+                prod["units"][row["nutrient"]] = row["unit"]
         return products
 
     # ------------------------------------------------ ReferenceCatalog

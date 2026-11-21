@@ -5,13 +5,19 @@
   2. НАК и скор:         Mⱼ = Σ(Sᵢ·Xᵢ·Mᵢⱼ) / Σ(Sᵢ·Xᵢ), C = Mⱼ/эталон·100  — amino.py
   3. Энергоценность:     ЭЦ = 4·Б + 9·Ж + 4·У                   — macro.py
   4. Качество:           КРАС, БЦ, U, G                         — quality.py
+  5. Микросостав и прочее: S = Σ(Sᵢ·Xᵢ) / 100 по нутриентам      — composition.py
 """
 
 from __future__ import annotations
 
 from .amino import amino_contributors, amino_rows, protein_base
+from .composition import composition_rows
 from .constants import NAK_GROUPS
-from .data_warnings import ingredient_warnings, missing_amino_protein
+from .data_warnings import (
+    composition_warning,
+    ingredient_warnings,
+    missing_amino_protein,
+)
 from .macro import macro_composition
 from .quality import Quality, quality_indicators
 from .verdict import build_verdict
@@ -19,6 +25,16 @@ from .verdict import build_verdict
 
 def _round(value: float | None, digits: int) -> float | None:
     return None if value is None else round(value, digits)
+
+
+COMPOSITION_DIGITS = 4
+
+
+def _composition_block(items: list[dict], field: str, display) -> list[dict]:
+    return [
+        {**row, "amount": display(row["amount"], COMPOSITION_DIGITS)}
+        for row in composition_rows(items, field)
+    ]
 
 
 def _recipe_rows(items: list[dict], display) -> list[dict]:
@@ -124,6 +140,7 @@ def compute_report(items: list[dict], reference: dict, *, rounded: bool = True) 
         amino_coverage=coverage,
     )
     shown, precise = _quality_blocks(quality, display)
+    micro = _composition_block(items, "micro", display)
 
     return {
         "recipe": _recipe_rows(items, display),
@@ -131,6 +148,8 @@ def compute_report(items: list[dict], reference: dict, *, rounded: bool = True) 
         "reference": _reference_block(reference),
         "macro": _macro_block(macro, display),
         "energy_kcal": display(macro["energy"], 1),
+        "micro": micro,
+        "other": _composition_block(items, "other", display),
         "amino_acids": _amino_block(rows, display),
         "c_min": {"name": quality.c_min_name, "score": display(quality.c_min, 1)}
         if quality.c_min_name
@@ -140,6 +159,7 @@ def compute_report(items: list[dict], reference: dict, *, rounded: bool = True) 
         "quality": shown,
         "quality_precise": precise,
         "amino_contributors": [it["name"] for it in contributors],
-        "warnings": ingredient_warnings(items, no_amino_protein),
+        "warnings": ingredient_warnings(items, no_amino_protein)
+        + composition_warning(micro),
         "verdict": verdict,
     }

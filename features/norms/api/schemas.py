@@ -18,12 +18,15 @@ class SourceOut(BaseModel):
 class NormRowOut(BaseModel):
     key: str
     name: str
-    unit: str
-    norm: float
+    unit: str | None = None
+    # None — нормы для нутриента нет: показывается только содержание.
+    norm: float | None = None
     amount: float | None = None
     percent: float | None = None
     source_id: str | None = None
     basis: str | None = None
+    # Значение есть не у всех ингредиентов рецептуры: сумма неполная.
+    partial: bool = False
 
 
 class NormsInfoOut(BaseModel):
@@ -33,6 +36,10 @@ class NormsInfoOut(BaseModel):
 
 
 class DailyNormsOut(BaseModel):
+    # Макросостав; `norms` — прежнее имя того же списка.
+    macro: list[NormRowOut]
     norms: list[NormRowOut]
+    micro: list[NormRowOut]
+    other: list[NormRowOut]
     sources: list[SourceOut]
     info: NormsInfoOut

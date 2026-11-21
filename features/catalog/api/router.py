@@ -150,6 +150,7 @@ async def api_update_nutrient_name(
         name=data.name,
         nutrient_type_id=data.nutrient_type_id,
         unit_id=data.unit_id,
+        nutrient_class=data.nutrient_class,
         provided=set(data.model_fields_set),
     )
 

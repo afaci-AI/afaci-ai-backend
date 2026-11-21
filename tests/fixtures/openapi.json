@@ -319,11 +319,32 @@
      "info": {
       "$ref": "#/components/schemas/NormsInfoOut"
      },
+     "macro": {
+      "items": {
+       "$ref": "#/components/schemas/NormRowOut"
+      },
+      "title": "Macro",
+      "type": "array"
+     },
+     "micro": {
+      "items": {
+       "$ref": "#/components/schemas/NormRowOut"
+      },
+      "title": "Micro",
+      "type": "array"
+     },
      "norms": {
       "items": {
        "$ref": "#/components/schemas/NormRowOut"
       },
       "title": "Norms",
+      "type": "array"
+     },
+     "other": {
+      "items": {
+       "$ref": "#/components/schemas/NormRowOut"
+      },
+      "title": "Other",
       "type": "array"
      },
      "sources": {
@@ -335,7 +356,10 @@
      }
     },
     "required": [
+     "macro",
      "norms",
+     "micro",
+     "other",
      "sources",
      "info"
     ],
@@ -498,8 +522,20 @@
       "type": "string"
      },
      "norm": {
-      "title": "Norm",
-      "type": "number"
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Norm"
+     },
+     "partial": {
+      "default": false,
+      "title": "Partial",
+      "type": "boolean"
      },
      "percent": {
       "anyOf": [
@@ -524,15 +560,20 @@
       "title": "Source Id"
      },
      "unit": {
-      "title": "Unit",
-      "type": "string"
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unit"
      }
     },
     "required": [
      "key",
-     "name",
-     "unit",
-     "norm"
+     "name"
     ],
     "title": "NormRowOut",
     "type": "object"
@@ -633,6 +674,23 @@
       "title": "Name",
       "type": "string"
      },
+     "nutrient_class": {
+      "anyOf": [
+       {
+        "enum": [
+         "macro",
+         "micro",
+         "amino",
+         "other"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Nutrient Class"
+     },
      "nutrient_type_id": {
       "format": "uuid",
       "title": "Nutrient Type Id",
@@ -670,6 +728,23 @@
        }
       ],
       "title": "Name"
+     },
+     "nutrient_class": {
+      "anyOf": [
+       {
+        "enum": [
+         "macro",
+         "micro",
+         "amino",
+         "other"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Nutrient Class"
      },
      "nutrient_type_id": {
       "anyOf": [

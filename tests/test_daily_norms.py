@@ -162,6 +162,9 @@ class FakeNormsRepository:
     async def product_macros(self, product_id):
         return self._macros
 
+    async def product_composition(self, product_id):
+        return {"micro": [], "other": []}
+
 
 class ServiceTests(unittest.IsolatedAsyncioTestCase):
     def test_sources_registry_merges_reference_documents(self):
