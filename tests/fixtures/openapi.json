@@ -517,6 +517,21 @@
       "title": "Key",
       "type": "string"
      },
+     "kind": {
+      "anyOf": [
+       {
+        "enum": [
+         "norm",
+         "adequate"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Kind"
+     },
      "name": {
       "title": "Name",
       "type": "string"

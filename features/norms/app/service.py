@@ -13,6 +13,7 @@ from ..domain.daily_norms import (
     amounts_from_macros,
     build_class_rows,
     build_norm_rows,
+    mineral_norm_rows,
 )
 from ..domain.sources import merge_sources
 from .ports import NormsRepository
@@ -40,15 +41,22 @@ class NormsService:
         Блоки макро-, микросостава и прочего, источники и пояснение.
 
         Доля от нормы считается, если переданы содержания; `norms` — прежнее имя
-        списка `macro`.
+        списка `macro`. Без `micro` (общий список норм) микросостав — нормы
+        минералов без содержания.
         """
-        rows = build_norm_rows(await self._repo.norms(), amounts)
-        used = {row["source_id"] for row in rows}
+        norms = await self._repo.norms()
+        rows = build_norm_rows(norms, amounts)
+        micro_rows = (
+            mineral_norm_rows(norms)
+            if micro is None
+            else build_class_rows(micro, norms)
+        )
+        used = {row["source_id"] for row in rows + micro_rows if row["source_id"]}
         sources = [s for s in await self.sources(pdf_url) if s["id"] in used]
         return {
             "macro": rows,
             "norms": rows,
-            "micro": build_class_rows(micro or []),
+            "micro": micro_rows,
             "other": build_class_rows(other or []),
             "sources": sources,
             "info": NORMS_INFO,

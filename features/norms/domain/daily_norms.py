@@ -53,6 +53,19 @@ NORMS_INFO = {
             "коэффициентами 4, 9 и 4 ккал на 1 г (приложение 3 к МР 2.3.1.0253-21)."
         ),
         (
+            "Минеральные вещества: нормы для взрослых старше 18 лет из таблиц 12 и 17 "
+            "(мужчины и женщины). Где нормы различаются, принято среднее, округлённое до "
+            "целого: железо 14 мг (10 и 18 мг), селен 63 мкг (70 и 55 мкг). Кальций — "
+            "1000 мг, норма взрослых до 64 лет (старше 65 лет — 1200 мг). Для кобальта и "
+            "ванадия в документе даны адекватные уровни потребления (таблицы 13 и 18), а не "
+            "физиологические нормы; они отмечены в таблице. Для алюминия, бора, лития, "
+            "никеля и олова норм нет: показывается только содержание."
+        ),
+        (
+            "Селен, йод, хром, кобальт и ванадий показаны в микрограммах, как в документе; "
+            "в базе значения хранятся в миллиграммах и пересчитываются (1 мг = 1000 мкг)."
+        ),
+        (
             "Доля от нормы = содержание на 100 г продукта (или рецептуры) ÷ усреднённая "
             "суточная норма × 100 %."
         ),
@@ -117,9 +130,29 @@ def build_norm_rows(
                 "percent": percent_of_norm(amount, value),
                 "source_id": norm.get("source_id"),
                 "basis": norm.get("basis"),
+                "kind": norm.get("kind", "norm"),
             }
         )
     return rows
+
+
+# Единственное место перевода единиц: значение продукта (мг/100 г) → единица нормы.
+UNIT_FACTORS: dict[tuple[str, str], float] = {
+    ("мг", "мкг"): 1000.0,
+    ("мкг", "мг"): 0.001,
+}
+
+
+def convert_amount(
+    amount: float | None, from_unit: str | None, to_unit: str
+) -> float | None:
+    """Значение в единице нормы; единицы без правила перевода не смешиваются."""
+    if amount is None or from_unit == to_unit:
+        return amount
+    factor = UNIT_FACTORS.get((from_unit or "", to_unit))
+    if factor is None:
+        raise ValueError(f"Нет перевода единиц {from_unit!r} → {to_unit!r}")
+    return amount * factor
 
 
 def short_unit(unit: str | None) -> str | None:
@@ -127,22 +160,56 @@ def short_unit(unit: str | None) -> str | None:
     return None if unit is None else unit.split("/")[0]
 
 
-def build_class_rows(entries: list[Mapping]) -> list[dict]:
-    """
-    Строки микросостава и прочих показателей: содержание без нормы и доли.
+def _class_row(entry: Mapping, norm: Mapping | None) -> dict:
+    unit = short_unit(entry.get("unit"))
+    row = {
+        "key": entry["name"],
+        "name": entry["name"],
+        "unit": unit,
+        "norm": None,
+        "amount": entry["amount"],
+        "percent": None,
+        "partial": bool(entry.get("partial", False)),
+        "kind": None,
+        "source_id": None,
+        "basis": None,
+    }
+    if norm is None:
+        return row
+    value = float(norm["value"])
+    amount = convert_amount(entry["amount"], unit, norm["unit"])
+    return {
+        **row,
+        "unit": norm["unit"],
+        "norm": value,
+        "amount": amount,
+        "percent": percent_of_norm(amount, value),
+        "kind": norm.get("kind", "norm"),
+        "source_id": norm.get("source_id"),
+        "basis": norm.get("basis"),
+    }
 
-    Нормы для минералов вносятся отдельно (общий этап «Суточные нормы для
-    минералов»); пока нормы нет, `norm` и `percent` равны None.
+
+def build_class_rows(
+    entries: list[Mapping], norms: list[Mapping] | None = None
+) -> list[dict]:
     """
-    return [
-        {
-            "key": entry["name"],
-            "name": entry["name"],
-            "unit": short_unit(entry.get("unit")),
-            "norm": None,
-            "amount": entry["amount"],
-            "percent": None,
-            "partial": bool(entry.get("partial", False)),
-        }
-        for entry in entries
-    ]
+    Строки микросостава и прочих показателей.
+
+    Если для нутриента есть норма (ключ нормы — название нутриента), значение
+    переводится в единицу нормы и считается доля; иначе `norm` и `percent` — None.
+    """
+    by_key = {norm["key"]: norm for norm in norms or []}
+    return [_class_row(entry, by_key.get(entry["name"])) for entry in entries]
+
+
+def mineral_norm_rows(norms: list[Mapping]) -> list[dict]:
+    """Нормы минералов без содержания — для общего списка норм."""
+    return build_class_rows(
+        [
+            {"name": norm["key"], "unit": norm["unit"], "amount": None}
+            for norm in norms
+            if norm["key"] not in NORM_ORDER
+        ],
+        norms,
+    )

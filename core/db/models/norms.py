@@ -53,3 +53,9 @@ class DailyNorm(Base):
     source_id = Column(UUID(as_uuid=True), ForeignKey("sources.id"), nullable=False)
     basis = Column(Text, nullable=True)
     sort_order = Column(Integer, nullable=False, default=0)
+    # norm — физиологическая норма; adequate — адекватный уровень потребления.
+    kind = Column(String, nullable=False, server_default="norm")
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('norm', 'adequate')", name="ck_daily_norm_kind"),
+    )
