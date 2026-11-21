@@ -17,3 +17,6 @@ class NormsRepository(Protocol):
 
     async def product_macros(self, product_id: UUID) -> dict[str, float | None] | None:
         """{название нутриента: количество} либо None, если продукта нет."""
+
+    async def product_composition(self, product_id: UUID) -> dict[str, list[dict]]:
+        """Микросостав и прочее продукта: {класс: [{name, unit, amount}]} по названию."""

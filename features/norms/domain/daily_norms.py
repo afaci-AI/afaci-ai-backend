@@ -120,3 +120,29 @@ def build_norm_rows(
             }
         )
     return rows
+
+
+def short_unit(unit: str | None) -> str | None:
+    """Единица для показа: «мг/100г» → «мг» (все значения даны на 100 г)."""
+    return None if unit is None else unit.split("/")[0]
+
+
+def build_class_rows(entries: list[Mapping]) -> list[dict]:
+    """
+    Строки микросостава и прочих показателей: содержание без нормы и доли.
+
+    Нормы для минералов вносятся отдельно (общий этап «Суточные нормы для
+    минералов»); пока нормы нет, `norm` и `percent` равны None.
+    """
+    return [
+        {
+            "key": entry["name"],
+            "name": entry["name"],
+            "unit": short_unit(entry.get("unit")),
+            "norm": None,
+            "amount": entry["amount"],
+            "percent": None,
+            "partial": bool(entry.get("partial", False)),
+        }
+        for entry in entries
+    ]

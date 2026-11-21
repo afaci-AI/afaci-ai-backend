@@ -93,6 +93,8 @@ async def compute(
             macro["fiber"],
             energy=result["energy_kcal"],
         ),
+        result["micro"],
+        result["other"],
     )
     return result
 

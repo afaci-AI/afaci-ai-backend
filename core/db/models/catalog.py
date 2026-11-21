@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Column, ForeignKey, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, Column, ForeignKey, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -62,12 +62,18 @@ class NutrientName(Base):
     # Фиксированная единица измерения. NULL только у названий, для которых
     # единицу не удалось определить по данным (миграция их не угадывает).
     unit_id = Column(UUID(as_uuid=True), ForeignKey("units.id"), nullable=True)
+    # Класс показа: macro | micro | amino | other. Не зависит от типа состава.
+    nutrient_class = Column(String, nullable=False, server_default="other")
 
     nutrient_type = relationship("NutrientType", back_populates="nutrient_names")
     nutrients = relationship("Nutrient", back_populates="name_component")
     unit = relationship("Unit")
     __table_args__ = (
         UniqueConstraint("nutrient_type_id", "name", name="uq_nutrient_name_type_name"),
+        CheckConstraint(
+            "nutrient_class IN ('macro', 'micro', 'amino', 'other')",
+            name="ck_nutrient_name_class",
+        ),
     )
 
 

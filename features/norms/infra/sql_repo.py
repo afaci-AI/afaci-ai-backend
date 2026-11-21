@@ -82,3 +82,30 @@ class SqlNormsRepository:
             .all()
         )
         return {row["nutrient"]: row["quantity"] for row in rows}
+
+    async def product_composition(self, product_id: UUID) -> dict[str, list[dict]]:
+        rows = (
+            (
+                await self._db.execute(
+                    text(
+                        "SELECT nn.nutrient_class AS class, nn.name, u.name AS unit, "
+                        "n.quantity AS amount "
+                        "FROM nutrients n "
+                        "JOIN nutrients_names nn ON nn.id = n.id_name_component "
+                        "LEFT JOIN units u ON u.id = nn.unit_id "
+                        "WHERE n.id_product = :id "
+                        "AND nn.nutrient_class IN ('micro', 'other') "
+                        "ORDER BY nn.name"
+                    ),
+                    {"id": product_id},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        result: dict[str, list[dict]] = {"micro": [], "other": []}
+        for row in rows:
+            result[row["class"]].append(
+                {"name": row["name"], "unit": row["unit"], "amount": row["amount"]}
+            )
+        return result
