@@ -6,12 +6,13 @@ from pydantic import BaseModel, Field
 
 
 class UserCreateRequest(BaseModel):
+    """Пароль задаёт сервер (временный, уходит письмом); поля `password` и
+    `must_change_password` от старых клиентов игнорируются."""
+
     email: str = Field(min_length=3)
     name: str = Field(min_length=1)
-    password: str = Field(min_length=6)
     role: str = "viewer"
     access_expires_at: datetime | None = None
-    must_change_password: bool = False
 
 
 class UserUpdateRequest(BaseModel):

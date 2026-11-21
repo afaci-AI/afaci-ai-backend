@@ -101,10 +101,18 @@ def user_status(user: User) -> str:
 
 
 # -------------------------- зависимости ---------------------------
-async def get_current_user(
+PASSWORD_CHANGE_REQUIRED = "Сначала смените временный пароль."
+
+
+async def get_current_user_pending_password(
     db: Annotated[AsyncSession, Depends(get_db)],
     authorization: str | None = Header(default=None),
 ) -> User:
+    """Пользователь по токену, даже если он ещё не сменил временный пароль.
+
+    Только для `/auth/me` и `/auth/change-password`: остальные маршруты идут
+    через `get_current_user`, который такого пользователя не пропускает.
+    """
     token = _extract_bearer(authorization)
     if not token:
         raise HTTPException(status_code=401, detail="Требуется авторизация.")
@@ -132,6 +140,14 @@ async def get_current_user(
             status_code=401,
             detail="Срок действия учётной записи истёк. Обратитесь в техническую поддержку.",
         )
+    return user
+
+
+async def get_current_user(
+    user: Annotated[User, Depends(get_current_user_pending_password)],
+) -> User:
+    if user.must_change_password:
+        raise HTTPException(status_code=403, detail=PASSWORD_CHANGE_REQUIRED)
     return user
 
 
@@ -177,6 +193,9 @@ def user_public(user: User) -> dict:
         if user.access_expires_at
         else None,
         "mustChangePassword": user.must_change_password,
+        "temporaryPasswordExpiresAt": user.temp_password_expires_at.isoformat()
+        if user.temp_password_expires_at
+        else None,
         "status": user_status(user),
         "createdAt": user.created_at.isoformat() if user.created_at else None,
         "lastLoginAt": user.last_login_at.isoformat() if user.last_login_at else None,

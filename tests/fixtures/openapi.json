@@ -1705,6 +1705,7 @@
     "type": "object"
    },
    "UserCreateRequest": {
+    "description": "Пароль задаёт сервер (временный, уходит письмом); поля `password` и\n`must_change_password` от старых клиентов игнорируются.",
     "properties": {
      "access_expires_at": {
       "anyOf": [
@@ -1723,19 +1724,9 @@
       "title": "Email",
       "type": "string"
      },
-     "must_change_password": {
-      "default": false,
-      "title": "Must Change Password",
-      "type": "boolean"
-     },
      "name": {
       "minLength": 1,
       "title": "Name",
-      "type": "string"
-     },
-     "password": {
-      "minLength": 6,
-      "title": "Password",
       "type": "string"
      },
      "role": {
@@ -1746,8 +1737,7 @@
     },
     "required": [
      "email",
-     "name",
-     "password"
+     "name"
     ],
     "title": "UserCreateRequest",
     "type": "object"
@@ -7997,6 +7987,63 @@
      }
     },
     "summary": "Редактировать пользователя",
+    "tags": [
+     "Users"
+    ]
+   }
+  },
+  "/api/v1/users/{id}/resend-credentials": {
+   "post": {
+    "operationId": "resend_credentials_api_v1_users__id__resend_credentials_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Выслать новый временный пароль",
     "tags": [
      "Users"
     ]

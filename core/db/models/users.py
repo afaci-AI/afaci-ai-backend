@@ -28,6 +28,8 @@ class User(Base):
     is_active = Column(Boolean, nullable=False, default=True)
     access_expires_at = Column(DateTime(timezone=True), nullable=True)
     must_change_password = Column(Boolean, nullable=False, default=False)
+    # Срок временного пароля из письма администратора; null — срока нет.
+    temp_password_expires_at = Column(DateTime(timezone=True), nullable=True)
     # Растёт при восстановлении пароля: JWT с прежней версией отклоняются.
     token_version = Column(Integer, nullable=False, default=0, server_default="0")
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)

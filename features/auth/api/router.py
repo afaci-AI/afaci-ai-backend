@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, Request
 
 from core.db.models import User
 from core.rate_limit import limiter
-from core.security import get_current_user, user_public
+from core.security import get_current_user_pending_password, user_public
 
 from ..app import AuthService, PasswordResetService
 from .deps import get_auth_service, get_password_reset_service
@@ -40,14 +40,14 @@ async def login(req: LoginRequest, service: Service):
 
 
 @router.get("/me", summary="Текущий пользователь")
-async def me(current: Annotated[User, Depends(get_current_user)]):
+async def me(current: Annotated[User, Depends(get_current_user_pending_password)]):
     return user_public(current)
 
 
 @router.post("/change-password", summary="Смена пароля")
 async def change_password(
     req: ChangePasswordRequest,
-    current: Annotated[User, Depends(get_current_user)],
+    current: Annotated[User, Depends(get_current_user_pending_password)],
     service: Service,
 ):
     return await service.change_password(

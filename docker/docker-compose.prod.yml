@@ -36,6 +36,7 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       SMTP_FROM: ${SMTP_FROM}
       SMTP_SECURITY: ${SMTP_SECURITY:-starttls}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
       REFERENCE_DOCUMENT_STORAGE_PATH: /app/uploads/reference-documents
     depends_on:
       db:

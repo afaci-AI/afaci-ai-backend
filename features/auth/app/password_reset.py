@@ -149,6 +149,7 @@ class PasswordResetService:
         row.used_at = now
         user.password_hash = self._credentials.hash_password(new_password)
         user.must_change_password = False
+        user.temp_password_expires_at = None
         # Все выданные ранее токены (другие устройства, вкладки) отклоняются.
         user.token_version = (user.token_version or 0) + 1
         await self._codes.invalidate_others(user.id, keep=row.id, at=now)
