@@ -91,5 +91,5 @@ jobs:
         uses: actions/checkout@v4
     
       - name: Build docker image
-        run: docker build .
+        run: docker build -f docker/Dockerfile.prod .
   

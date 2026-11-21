@@ -1,0 +1,13 @@
+[lint]
+extend-select = ["C901", "PLR0912", "PLR0915"]
+
+[lint.mccabe]
+max-complexity = 10
+
+[lint.pylint]
+max-branches = 12
+max-statements = 50
+
+# Разовые скрипты (scripts/) не входят в приложение: пороги сложности к ним не применяются.
+[lint.per-file-ignores]
+"scripts/*" = ["C901", "PLR0912", "PLR0915"]

@@ -1,37 +1,35 @@
 """Upload contract regressions without local settings or a database."""
 
-import importlib
 import io
-import sys
 import tempfile
 import unittest
 from datetime import UTC, datetime
 from pathlib import Path
-from types import ModuleType
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from core.db.session import get_db
+from core.errors import register_error_handlers
+from core.security import require_admin
+from features.app_versions.api import router
+from features.app_versions.domain.apk import ApkError
+from features.app_versions.infra import adapters
 
-async def unused_db():
-    raise AssertionError("Tests must not connect to a database")
-
-
-session_stub = ModuleType("infrastructure.db.session")
-session_stub.get_db = unused_db
-with patch.dict(sys.modules, {"infrastructure.db.session": session_stub}):
-    versions = importlib.import_module("api.v1.app_version")
+READ_VERSION = "features.app_versions.infra.adapters.AaptInspector.read_version"
 
 
 class ApkUploadTests(unittest.TestCase):
     def setUp(self):
         self.storage = tempfile.TemporaryDirectory()
         self.addCleanup(self.storage.cleanup)
-        self.path_patch = patch.object(versions, "APK_STORAGE_PATH", self.storage.name)
-        self.path_patch.start()
-        self.addCleanup(self.path_patch.stop)
+        self.env_patch = patch.dict(
+            "os.environ", {"APK_STORAGE_PATH": self.storage.name}
+        )
+        self.env_patch.start()
+        self.addCleanup(self.env_patch.stop)
         self.db = Mock(execute=AsyncMock(), commit=AsyncMock(), rollback=AsyncMock())
         self.db.execute.return_value = Mock()
         self.db.execute.return_value.scalar_one_or_none.return_value = None
@@ -42,9 +40,10 @@ class ApkUploadTests(unittest.TestCase):
 
         self.db.refresh = AsyncMock(side_effect=refresh)
         app = FastAPI()
-        app.include_router(versions.router)
-        app.dependency_overrides[versions.get_db] = lambda: self.db
-        app.dependency_overrides[versions.require_admin] = lambda: Mock(role="admin")
+        register_error_handlers(app)
+        app.include_router(router)
+        app.dependency_overrides[get_db] = lambda: self.db
+        app.dependency_overrides[require_admin] = lambda: Mock(role="admin")
         self.client = TestClient(app)
         self.addCleanup(self.client.close)
 
@@ -56,7 +55,7 @@ class ApkUploadTests(unittest.TestCase):
         )
 
     def test_upload_publishes_complete_admin_contract_and_options(self):
-        with patch.object(versions, "_apk_version", return_value=("1.2.3", 12)):
+        with patch(READ_VERSION, return_value=("1.2.3", 12)):
             response = self.upload(
                 forceUpdate="true", changelog="Fix", minSupportedVersionCode="10"
             )
@@ -74,7 +73,7 @@ class ApkUploadTests(unittest.TestCase):
 
     def test_old_version_does_not_publish_or_leave_file(self):
         self.db.execute.return_value.scalar_one_or_none.return_value = 12
-        with patch.object(versions, "_apk_version", return_value=("1.2.3", 12)):
+        with patch(READ_VERSION, return_value=("1.2.3", 12)):
             response = self.upload()
         self.assertEqual(response.status_code, 400)
         self.assertEqual(list(Path(self.storage.name).iterdir()), [])
@@ -82,30 +81,27 @@ class ApkUploadTests(unittest.TestCase):
         self.db.rollback.assert_awaited_once()
 
     def test_invalid_manifest_does_not_leave_file(self):
-        with patch.object(
-            versions,
-            "_apk_version",
-            side_effect=versions.HTTPException(400, "Invalid APK"),
-        ):
+        with patch(READ_VERSION, side_effect=ApkError("Invalid APK")):
             response = self.upload()
         self.assertEqual(response.status_code, 400)
         self.assertEqual(list(Path(self.storage.name).iterdir()), [])
         self.db.commit.assert_not_awaited()
 
     def test_aapt_metadata_and_invalid_archive(self):
+        inspector = adapters.AaptInspector()
         with patch.object(
-            versions.subprocess,
+            adapters.subprocess,
             "run",
             return_value=Mock(
                 stdout="package: name='app' versionCode='12' versionName='1.2.3'\n"
             ),
         ):
-            self.assertEqual(versions._apk_version("file.apk"), ("1.2.3", 12))
+            self.assertEqual(inspector.read_version("file.apk"), ("1.2.3", 12))
         with (
-            patch.object(versions.subprocess, "run", return_value=Mock(stdout="")),
-            self.assertRaises(versions.HTTPException),
+            patch.object(adapters.subprocess, "run", return_value=Mock(stdout="")),
+            self.assertRaises(ApkError),
         ):
-            versions._apk_version("file.apk")
+            inspector.read_version("file.apk")
 
 
 if __name__ == "__main__":

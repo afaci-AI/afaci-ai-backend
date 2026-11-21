@@ -9,7 +9,7 @@ from unittest.mock import patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from api.v1.reference_documents import document_path, router
+from features.norms.api.documents import document_path, router
 
 
 class ReferenceDocumentChecks(unittest.TestCase):

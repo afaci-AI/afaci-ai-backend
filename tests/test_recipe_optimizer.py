@@ -7,9 +7,13 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
-from domain.calculator.formulas import NAK_GROUPS, compute_report
-from domain.calculator.optimizer import CandidateItem, _build_items
-from domain.calculator.recipe_optimizer import RecipeOptimizationError, optimize_recipe
+from features.calculator.domain import CandidateItem
+from features.calculator.domain import build_items as _build_items
+from features.calculator.domain.formulas import NAK_GROUPS, compute_report
+from features.calculator.domain.recipe_optimizer import (
+    RecipeOptimizationError,
+    optimize_recipe,
+)
 
 
 def fixture():
@@ -78,7 +82,7 @@ class OptimizationChecks(unittest.TestCase):
         result = optimize_recipe(candidates, reference, [50, 50], "basic")
         self.assertEqual(result["status"], "goal_not_achieved")
         self.assert_valid(result, candidates, reference)
-        self.assertEqual({v["metric"] for v in result["violations"]}, {"bc", "V", "G"})
+        self.assertEqual({v["metric"] for v in result["violations"]}, {"bc", "U", "G"})
         self.assertTrue(all(v["amount"] > 0 for v in result["violations"]))
 
     def test_fixed_composition_zero_price_is_not_saving(self):
@@ -220,7 +224,7 @@ class OptimizationChecks(unittest.TestCase):
                 with (
                     self.subTest(mode=mode, missing_chem=missing_chem),
                     self.assertRaisesRegex(
-                        RecipeOptimizationError, "Невозможно рассчитать БЦ, V и G"
+                        RecipeOptimizationError, "Невозможно рассчитать БЦ, U и G"
                     ),
                 ):
                     optimize_recipe(unknown, reference, [50, 50], mode)
@@ -235,7 +239,7 @@ class OptimizationChecks(unittest.TestCase):
         original = compute_report(_build_items(candidates, baseline), reference)
         for metric, expected in (
             ("bc", 78.2668201),
-            ("V", 0.78524439),
+            ("U", 0.78524439),
             ("G", 9.84559986),
         ):
             self.assertAlmostEqual(
@@ -329,14 +333,22 @@ class OptimizationChecks(unittest.TestCase):
             ):
                 optimize_recipe(candidates, reference, [50, 50], mode)
 
-    def test_solver_failure_returns_only_verified_composition(self):
+    def test_solver_failure_returns_no_unverified_composition(self):
+        """Сбой решателя даёт честную ошибку, а не непроверенный состав."""
         candidates, reference = fixture()
-        with patch(
-            "domain.calculator.recipe_optimizer.minimize",
-            side_effect=RuntimeError("control"),
+        with (
+            patch(
+                "features.calculator.domain.lp_model.solve",
+                side_effect=RuntimeError("control"),
+            ),
+            patch(
+                "features.calculator.domain.lp_quality.solve",
+                side_effect=RuntimeError("control"),
+            ),
+            self.assertRaises(RecipeOptimizationError) as caught,
         ):
-            result = optimize_recipe(candidates, reference, [80, 20], "basic")
-        self.assert_valid(result, candidates, reference)
+            optimize_recipe(candidates, reference, [80, 20], "basic")
+        self.assertEqual(caught.exception.code, "optimization_calculation_failed")
 
     def test_unrounded_comparison_detects_small_improvement(self):
         candidates, reference = fixture()

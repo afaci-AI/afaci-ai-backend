@@ -16,8 +16,9 @@ ON CONFLICT (name) DO NOTHING;
 -- ----------------------------------------------------------------------------
 -- 2. Нутриент «Пищевые волокна» (тип «Химический состав», %/100г)
 -- ----------------------------------------------------------------------------
-INSERT INTO nutrients_names (id, nutrient_type_id, name)
-SELECT gen_random_uuid(), nt.id, 'Пищевые волокна'
+INSERT INTO nutrients_names (id, nutrient_type_id, name, unit_id)
+SELECT gen_random_uuid(), nt.id, 'Пищевые волокна',
+       (SELECT id FROM units WHERE name = '%/100г')
 FROM nutrients_types nt
 WHERE nt.name = 'Химический состав'
 ON CONFLICT (name) DO NOTHING;
