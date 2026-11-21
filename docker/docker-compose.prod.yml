@@ -30,6 +30,12 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-10080}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
+      SMTP_SECURITY: ${SMTP_SECURITY:-starttls}
       REFERENCE_DOCUMENT_STORAGE_PATH: /app/uploads/reference-documents
     depends_on:
       db:

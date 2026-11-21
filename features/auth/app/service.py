@@ -30,7 +30,7 @@ class AuthService:
 
         user.last_login_at = datetime.now(UTC)
         user = await self._repo.save(user)
-        return self._credentials.issue_token(user.id), user
+        return self._credentials.issue_token(user), user
 
     async def change_password(
         self, user: Row, current_password: str, new_password: str
