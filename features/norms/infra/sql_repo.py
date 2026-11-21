@@ -50,7 +50,7 @@ class SqlNormsRepository:
             (
                 await self._db.execute(
                     text(
-                        "SELECT key, name, unit, value, source_id, basis "
+                        "SELECT key, name, unit, value, source_id, basis, kind "
                         "FROM daily_norms ORDER BY sort_order"
                     )
                 )

@@ -1,5 +1,7 @@
 """Схемы ответов норм и источников."""
 
+from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -27,6 +29,9 @@ class NormRowOut(BaseModel):
     basis: str | None = None
     # Значение есть не у всех ингредиентов рецептуры: сумма неполная.
     partial: bool = False
+    # norm — физиологическая норма; adequate — адекватный уровень потребления;
+    # None — нормы нет.
+    kind: Literal["norm", "adequate"] | None = None
 
 
 class NormsInfoOut(BaseModel):
