@@ -4,7 +4,7 @@ from .calculator import Recipe, RecipeItem, ReferenceProtein, ReferenceProteinVa
 from .catalog import Category, NutrientName, NutrientType, Region, Subcategory, Unit
 from .norms import DailyNorm, Source
 from .product import Nutrient, Product
-from .users import RecipeGroup, SavedRecipe, SavedRecipeItem, User
+from .users import PasswordResetCode, RecipeGroup, SavedRecipe, SavedRecipeItem, User
 
 __all__ = [
     "AppVersion",
@@ -14,6 +14,7 @@ __all__ = [
     "Nutrient",
     "NutrientName",
     "NutrientType",
+    "PasswordResetCode",
     "Product",
     "Recipe",
     "RecipeGroup",
