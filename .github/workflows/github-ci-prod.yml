@@ -38,15 +38,29 @@ jobs:
     runs-on: afaci-runner-01
     needs:
       - ruff-sca
+  
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
+  
       - name: Extract Tag Name
-        id: vars
         run: echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-
-      - run: docker build -f docker/Dockerfile.prod -t afaci-ai-backend:${{ env.TAG_NAME }} -t afaci-ai-backend:prod .
+  
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+  
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.prod
+          push: false
+          load: true
+          tags: |
+            afaci-ai-backend:${{ env.TAG_NAME }}
+            afaci-ai-backend:prod
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
 
   deploy:
@@ -60,14 +74,15 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
-          envs: APP_PATH
+          envs: APP_PATH,GH_PAT
           script: |
             cd $APP_PATH
-            git fetch --tags
+            git fetch https://x-access-token:${GH_PAT}@github.com/afaci-AI/afaci-ai-backend.git --tags --force
             git checkout tags/${{ github.ref_name }}
             docker compose -f docker/docker-compose.prod.yml --project-directory . up --build -d
         env:
           APP_PATH: ${{ vars.APP_PATH }}
+          GH_PAT: ${{ secrets.GH_PAT }}
 
 
   create-release:
