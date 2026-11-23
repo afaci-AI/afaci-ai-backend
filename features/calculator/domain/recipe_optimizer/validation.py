@@ -9,6 +9,7 @@ import numpy as np
 from ..candidates import CandidateItem
 from ..formulas import NAK_GROUPS
 from .errors import RecipeOptimizationError
+from .modes import MODES
 
 
 def is_finite(value) -> bool:
@@ -55,7 +56,7 @@ def validate_request(
     """Проверяет запрос; возвращает (lower, upper, baseline, prices)."""
     if not candidates or len(candidates) != len(baseline_amounts):
         raise RecipeOptimizationError("Не передан исходный состав рецептуры.")
-    if mode not in ("basic", "cost"):
+    if mode not in MODES:
         raise RecipeOptimizationError("Неизвестный режим оптимизации.")
     lower = np.array([c.min_amount_g for c in candidates], dtype=float)
     upper = np.array([c.max_amount_g for c in candidates], dtype=float)
