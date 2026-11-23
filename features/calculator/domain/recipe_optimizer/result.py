@@ -6,10 +6,8 @@ import numpy as np
 
 from ..candidates import CandidateItem
 from .errors import COMPARISON_TOLERANCE, METRICS
-from .search import EvaluatedRecipe
-
-# Стоимость считается на 100 г; интерфейсу нужна цена за килограмм.
-PER_KILOGRAM = 10.0
+from .modes import OptimizationMode
+from .recipe import EvaluatedRecipe
 
 FAILURE_MESSAGE = (
     "Цель недостижима в заданных диапазонах; показан состав с наименьшим нарушением."
@@ -61,7 +59,7 @@ def violations(original: dict, selected: EvaluatedRecipe, scales: np.ndarray) ->
 
 def build_result(
     *,
-    mode: str,
+    mode: OptimizationMode,
     candidates: list[CandidateItem],
     baseline: np.ndarray,
     selected: EvaluatedRecipe,
@@ -72,17 +70,15 @@ def build_result(
     scales: np.ndarray,
     base_cost: float,
 ) -> dict:
-    is_cost = mode == "cost"
-    savings = base_cost - selected.cost
     return {
-        "mode": mode,
+        "mode": mode.name,
         "status": "goal_achieved" if success else "goal_not_achieved",
         "message": "Цель достигнута." if success else FAILURE_MESSAGE,
         "optimal_items": [
             {
                 "product_id": c.product_id,
                 "amount_g": float(selected.amounts[i]),
-                "price_per_kg": c.price_per_kg if is_cost else None,
+                "price_per_kg": mode.price(c),
             }
             for i, c in enumerate(candidates)
         ],
@@ -101,16 +97,5 @@ def build_result(
         "comparison": comparison(original, selected),
         "violations": violations(original, selected, scales),
         "comparison_tolerance": COMPARISON_TOLERANCE,
-        # Поля `*_per_100g` устарели: оставлены для выпущенных клиентов.
-        "baseline_cost_per_100g": base_cost if is_cost else None,
-        "total_cost_per_100g": selected.cost if is_cost else None,
-        "cost_change_per_100g": -savings if is_cost else None,
-        "savings_per_100g": savings if is_cost else None,
-        "baseline_cost_per_kg": base_cost * PER_KILOGRAM if is_cost else None,
-        "total_cost_per_kg": selected.cost * PER_KILOGRAM if is_cost else None,
-        "cost_change_per_kg": -savings * PER_KILOGRAM if is_cost else None,
-        "savings_per_kg": savings * PER_KILOGRAM if is_cost else None,
-        "savings_percent": savings / base_cost * 100
-        if is_cost and base_cost != 0
-        else None,
+        **mode.summary(base_cost=base_cost, cost=selected.cost),
     }
