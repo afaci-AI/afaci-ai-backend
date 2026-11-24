@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from uuid import UUID
+from dataclasses import replace
 
+from ..domain.filters import ExactIds, Page, Sorting, TableFilters
 from ..domain.shapes import (
     CSV_SORT_COLUMNS,
     NUTRIENT_COLUMNS,
@@ -17,48 +18,42 @@ from ..domain.shapes import (
 from .ports import TableQueries
 
 
+def _safe(sorting: Sorting, allowed: frozenset[str]) -> Sorting:
+    return replace(sorting, by=safe_sort(sorting.by, allowed))
+
+
 class TableService:
     def __init__(self, queries: TableQueries) -> None:
         self._queries = queries
 
     async def nutrients(
-        self, filters: dict, sort_by: str, sort_order: str, limit: int, offset: int
+        self, filters: TableFilters, sorting: Sorting, page: Page
     ) -> list[dict]:
-        sort_by = safe_sort(sort_by, NUTRIENT_COLUMNS)
         return await self._queries.nutrients(
-            filters, sort_by, sort_order, limit, offset
+            filters, _safe(sorting, NUTRIENT_COLUMNS), page
         )
 
     async def products(
-        self,
-        filters: dict,
-        product: str | None,
-        ids: dict[str, UUID | None],
-        sort_by: str,
-        sort_order: str,
-        limit: int,
-        offset: int,
+        self, filters: TableFilters, ids: ExactIds, sorting: Sorting, page: Page
     ) -> list[dict]:
-        sort_by = safe_sort(sort_by, PRODUCT_COLUMNS)
         return await self._queries.products(
-            filters, product, ids, sort_by, sort_order, limit, offset
+            filters, ids, _safe(sorting, PRODUCT_COLUMNS), page
         )
 
-    async def pivot(self, filters: dict) -> list[dict]:
+    async def pivot(self, filters: TableFilters) -> list[dict]:
         return pivot_rows(await self._queries.pivot_rows(filters))
 
-    async def nutrient_map(
-        self, filters: dict, sort_by: str, sort_order: str
-    ) -> list[dict]:
-        sort_by = safe_sort(sort_by, PRODUCT_COLUMNS)
-        return nutrient_map(await self._queries.map_rows(filters, sort_by, sort_order))
+    async def nutrient_map(self, filters: TableFilters, sorting: Sorting) -> list[dict]:
+        rows = await self._queries.map_rows(filters, _safe(sorting, PRODUCT_COLUMNS))
+        return nutrient_map(rows)
 
-    async def product_map(self, filters: dict) -> dict:
+    async def product_map(self, filters: TableFilters) -> dict:
         return product_tree(await self._queries.product_rows(filters))
 
     async def nutrients_csv(
-        self, filters: dict, sort_by: str, sort_order: str, limit: int, offset: int
+        self, filters: TableFilters, sorting: Sorting, page: Page
     ) -> bytes:
-        sort_by = safe_sort(sort_by, CSV_SORT_COLUMNS)
-        rows = await self._queries.csv_rows(filters, sort_by, sort_order, limit, offset)
+        rows = await self._queries.csv_rows(
+            filters, _safe(sorting, CSV_SORT_COLUMNS), page
+        )
         return nutrients_csv(rows)

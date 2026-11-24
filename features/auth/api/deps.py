@@ -10,13 +10,18 @@ from core.mail import SmtpMailer
 
 from ..app import AuthService, PasswordResetService
 from ..infra.reset_codes import SqlResetCodeRepository
-from ..infra.security_adapter import SecurityCredentials, SqlAccountRepository
+from ..infra.security_adapter import (
+    BcryptPasswords,
+    HmacResetCodes,
+    JwtTokens,
+    SqlAccountRepository,
+)
 
 
 async def get_auth_service(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> AuthService:
-    return AuthService(SqlAccountRepository(db), SecurityCredentials())
+    return AuthService(SqlAccountRepository(db), BcryptPasswords(), JwtTokens())
 
 
 async def get_password_reset_service(
@@ -25,6 +30,7 @@ async def get_password_reset_service(
     return PasswordResetService(
         SqlAccountRepository(db),
         SqlResetCodeRepository(db),
-        SecurityCredentials(),
+        BcryptPasswords(),
+        HmacResetCodes(),
         SmtpMailer(),
     )

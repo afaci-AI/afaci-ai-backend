@@ -3,44 +3,26 @@
 import re
 import unittest
 from datetime import UTC, datetime, timedelta
-from types import SimpleNamespace
 from uuid import uuid4
 
 from fastapi import HTTPException
 
 from core import mail, security
-from core.errors import ConflictError, ForbiddenError, ServiceUnavailableError
+from core.errors import (
+    BadRequestError,
+    ConflictError,
+    ForbiddenError,
+    ServiceUnavailableError,
+)
 from features.auth.app import AuthService
-from features.auth.infra.security_adapter import SecurityCredentials
+from features.auth.infra.security_adapter import BcryptPasswords, JwtTokens
 from features.users.app import UserService
 from features.users.app.credentials import (
     TEMP_PASSWORD_TTL,
     generate_temp_password,
 )
 from features.users.infra.sql_repo import BcryptHasher
-
-NOW = datetime(2026, 11, 21, 12, 0, tzinfo=UTC)
-
-
-class FakeUsers:
-    def __init__(self):
-        self.rows = {}
-
-    async def find_by_email(self, email):
-        return next((u for u in self.rows.values() if u.email == email), None)
-
-    async def get(self, user_id):
-        return self.rows.get(user_id)
-
-    async def add(self, data):
-        row = SimpleNamespace(
-            id=uuid4(), is_active=True, token_version=0, created_at=NOW, **data
-        )
-        self.rows[row.id] = row
-        return row
-
-    async def save(self, row):
-        return row
+from tests.account_fakes import NOW, FakeAccounts
 
 
 class FakeMailer:
@@ -66,12 +48,12 @@ def password_from(text):
 class TemporaryPasswordFlow(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.now = NOW
-        self.users = FakeUsers()
+        self.users = FakeAccounts()
         self.mailer = FakeMailer()
         self.service = UserService(
             self.users, BcryptHasher(), NoAudit(), self.mailer, now=lambda: self.now
         )
-        self.auth = AuthService(self.users, SecurityCredentials())
+        self.auth = AuthService(self.users, BcryptPasswords(), JwtTokens())
 
     async def create(self):
         return await self.service.create(
@@ -108,13 +90,13 @@ class TemporaryPasswordFlow(unittest.IsolatedAsyncioTestCase):
         self.now = NOW + timedelta(hours=1)
         same, delivery = await self.service.resend_credentials(user.id)
         second = password_from(self.mailer.sent[1][1])
-        self.assertIs(same, user)
+        self.assertEqual(same.id, user.id)
         self.assertEqual(len(self.users.rows), 1)
         self.assertTrue(delivery["sent"])
-        self.assertFalse(security.verify_password(first, user.password_hash))
-        self.assertTrue(security.verify_password(second, user.password_hash))
-        self.assertEqual(user.token_version, 1)
-        self.assertEqual(user.temp_password_expires_at, self.now + TEMP_PASSWORD_TTL)
+        self.assertFalse(security.verify_password(first, same.password_hash))
+        self.assertTrue(security.verify_password(second, same.password_hash))
+        self.assertEqual(same.token_version, 1)
+        self.assertEqual(same.temp_password_expires_at, self.now + TEMP_PASSWORD_TTL)
 
     async def test_resend_mail_failure_keeps_previous_password(self):
         user, _ = await self.create()
@@ -122,11 +104,12 @@ class TemporaryPasswordFlow(unittest.IsolatedAsyncioTestCase):
         self.mailer.fail = True
         with self.assertRaises(ServiceUnavailableError):
             await self.service.resend_credentials(user.id)
-        self.assertTrue(security.verify_password(first, user.password_hash))
+        stored = self.users.row(user.id)
+        self.assertTrue(security.verify_password(first, stored.password_hash))
 
     async def test_resend_refused_after_user_set_own_password(self):
         user, _ = await self.create()
-        user.must_change_password = False
+        self.users.row(user.id).must_change_password = False
         with self.assertRaises(ConflictError):
             await self.service.resend_credentials(user.id)
 
@@ -138,25 +121,70 @@ class TemporaryPasswordFlow(unittest.IsolatedAsyncioTestCase):
             await security.get_current_user(logged)
         self.assertEqual(ctx.exception.status_code, 403)
 
-        await self.auth.change_password(user, password, "my-own-secret")
-        self.assertFalse(user.must_change_password)
-        self.assertIsNone(user.temp_password_expires_at)
-        self.assertIs(await security.get_current_user(user), user)
+        await self.auth.change_password(user.id, password, "my-own-secret")
+        stored = self.users.row(user.id)
+        self.assertFalse(stored.must_change_password)
+        self.assertIsNone(stored.temp_password_expires_at)
+        self.assertEqual(stored.token_version, 0)
+        self.assertIs(await security.get_current_user(stored), stored)
 
     async def test_expired_temporary_password_is_rejected(self):
         user, _ = await self.create()
         password = password_from(self.mailer.sent[0][1])
-        user.temp_password_expires_at = datetime.now(UTC) - timedelta(minutes=1)
+        stored = self.users.row(user.id)
+        stored.temp_password_expires_at = datetime.now(UTC) - timedelta(minutes=1)
         with self.assertRaises(ForbiddenError):
             await self.auth.login("new@example.com", password)
 
     async def test_new_password_must_differ(self):
         user, _ = await self.create()
         password = password_from(self.mailer.sent[0][1])
-        from core.errors import BadRequestError
-
         with self.assertRaises(BadRequestError):
-            await self.auth.change_password(user, password, password)
+            await self.auth.change_password(user.id, password, password)
+
+
+class AdminEditsUser(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.users = FakeAccounts()
+        self.service = UserService(self.users, BcryptHasher(), NoAudit())
+        self.user, _ = await self.service.create(
+            {
+                "email": "a@example.com",
+                "name": "Анна",
+                "role": "viewer",
+                "access_expires_at": datetime(2030, 1, 1, tzinfo=UTC),
+            }
+        )
+
+    async def test_only_sent_fields_change(self):
+        updated = await self.service.update(
+            self.user.id, {"name": "  Анна К.  "}, admin_id=uuid4()
+        )
+        self.assertEqual(updated.name, "Анна К.")
+        self.assertEqual(updated.role, "viewer")
+        self.assertEqual(updated.access_expires_at, self.user.access_expires_at)
+
+    async def test_unlimited_access_clears_expiry(self):
+        updated = await self.service.update(
+            self.user.id,
+            {"access_expires_at_unlimited": True, "role": "editor"},
+            admin_id=uuid4(),
+        )
+        self.assertIsNone(updated.access_expires_at)
+        self.assertEqual(updated.role, "editor")
+
+    async def test_admin_cannot_deactivate_self(self):
+        with self.assertRaises(BadRequestError):
+            await self.service.update(
+                self.user.id, {"is_active": False}, admin_id=self.user.id
+            )
+        self.assertTrue(self.users.row(self.user.id).is_active)
+
+    async def test_deactivate_keeps_other_fields(self):
+        await self.service.deactivate(self.user.id, admin_id=uuid4())
+        stored = self.users.row(self.user.id)
+        self.assertFalse(stored.is_active)
+        self.assertEqual(stored.name, "Анна")
 
 
 class TemporaryPasswordShape(unittest.TestCase):

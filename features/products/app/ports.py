@@ -1,4 +1,9 @@
-"""Порты продуктов и нутриентов. Записи — непрозрачные объекты хранилища."""
+"""Порты продуктов и нутриентов.
+
+Записи продуктов и справочников — объекты хранилища (ORM): DTO для этой фичи
+не вводятся по решению от 2026-11-09, сущности есть только у рецептур. Порты
+разделены по ответственности: хранилище, справочники, единица работы.
+"""
 
 from __future__ import annotations
 
@@ -6,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 from uuid import UUID
 
+# Запись хранилища: сервис читает поля, но не меняет их напрямую.
 Row = Any
 
 
@@ -46,6 +52,8 @@ class ProductRepository(Protocol):
 
     async def by_category(self, category_id: UUID) -> list[Row]: ...
 
+    async def find_in_region(self, name: str, region_id: UUID) -> Row | None: ...
+
     async def add(self, data: dict) -> Row:
         """Создаёт продукт и сохраняет. DuplicateError при нарушении уникальности."""
 
@@ -57,14 +65,26 @@ class ProductRepository(Protocol):
 
     async def delete(self, row: Row) -> None: ...
 
-    # ------------------------------------------------ автосоздание продуктов
-    async def get_or_create_named(self, kind: str, name: str) -> Row:
-        """Категория, регион или подкатегория по имени (создаётся и сбрасывается в БД)."""
-
-    async def find_in_region(self, name: str, region_id: UUID) -> Row | None: ...
-
     async def stage(self, data: dict) -> Row:
-        """Добавляет продукт в транзакцию и сбрасывает в БД без фиксации."""
+        """Добавляет продукт в текущую единицу работы без фиксации.
+
+        DuplicateError при нарушении уникальности; единица работы после этого
+        годится только для `rollback`.
+        """
+
+
+class ReferenceNames(Protocol):
+    """Справочники по имени: найти или добавить в текущую единицу работы."""
+
+    async def category(self, name: str) -> Row: ...
+
+    async def region(self, name: str) -> Row: ...
+
+    async def subcategory(self, name: str) -> Row: ...
+
+
+class UnitOfWork(Protocol):
+    """Транзакция, общая для операций `stage` и справочников."""
 
     async def commit(self) -> None:
         """Фиксирует транзакцию. DuplicateError при нарушении уникальности."""

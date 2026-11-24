@@ -1,35 +1,73 @@
-"""Порты управления пользователями. Запись пользователя — объект хранилища."""
+"""Порты управления пользователями: хранилище отдаёт и принимает данные, не ORM."""
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Protocol
 from uuid import UUID
 
+from core.accounts import Account
 from core.mail import MailError as MailFailure
 
-Row = Any
-
 __all__ = [
+    "Account",
+    "AccountEdit",
     "ChangeAudit",
     "MailFailure",
     "Mailer",
+    "NewAccount",
     "PasswordHasher",
-    "Row",
     "UserRepository",
 ]
 
 
+@dataclass(frozen=True, slots=True)
+class NewAccount:
+    email: str
+    name: str
+    password_hash: str
+    role: str
+    access_expires_at: datetime | None
+    temp_password_expires_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class AccountEdit:
+    """Поля, которые меняет администратор; значения — итоговые, не дельта."""
+
+    role: str
+    is_active: bool
+    name: str
+    access_expires_at: datetime | None
+
+    @classmethod
+    def of(cls, user: Account) -> AccountEdit:
+        return cls(
+            role=user.role,
+            is_active=user.is_active,
+            name=user.name,
+            access_expires_at=user.access_expires_at,
+        )
+
+
 class UserRepository(Protocol):
-    async def list(self, role: str | None) -> list[Row]:
+    async def list(self, role: str | None) -> list[Account]:
         """Пользователи по убыванию даты создания, при `role` — только этой роли."""
 
-    async def get(self, user_id: UUID) -> Row | None: ...
+    async def get(self, user_id: UUID) -> Account | None: ...
 
-    async def find_by_email(self, email: str) -> Row | None: ...
+    async def find_by_email(self, email: str) -> Account | None: ...
 
-    async def add(self, data: dict) -> Row: ...
+    async def add(self, new: NewAccount) -> Account:
+        """Новая запись с временным паролем, который нужно сменить при входе."""
 
-    async def save(self, row: Row) -> Row: ...
+    async def update(self, user_id: UUID, edit: AccountEdit) -> Account: ...
+
+    async def set_temp_password(
+        self, user_id: UUID, password_hash: str, expires_at: datetime
+    ) -> Account:
+        """Новый временный пароль; сессии со старым паролем завершаются."""
 
 
 class PasswordHasher(Protocol):
@@ -38,7 +76,7 @@ class PasswordHasher(Protocol):
 
 class ChangeAudit(Protocol):
     def user_updated(
-        self, admin_id: UUID, user: Row, user_id: UUID, changes: dict
+        self, admin_id: UUID, user: Account, user_id: UUID, changes: dict
     ) -> None: ...
 
 

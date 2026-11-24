@@ -8,6 +8,7 @@
   POST /api/v1/calculator/optimize-recipe     — оптимизация относительно исходного состава
 """
 
+from dataclasses import asdict
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
@@ -20,6 +21,7 @@ from features.norms.app import NormsService
 from features.norms.domain.daily_norms import amounts_from_macros
 
 from ..app import RecipeCalculator, ReferenceCatalog
+from ..app.ports import ReferenceEntry
 from .deps import get_calculator, get_reference_catalog
 from .schemas import (
     CalcRequest,
@@ -33,22 +35,35 @@ TAG = "Calculator"
 router = APIRouter(prefix="/api/v1/calculator", tags=[TAG])
 
 
-def _source_out(source: dict | None, request: Request) -> ReferenceSourceOut | None:
+def _source_out(entry: ReferenceEntry, request: Request) -> ReferenceSourceOut | None:
+    source = entry.source
     if source is None:
         return None
-    filename = source["pdf_filename"]
+    filename = entry.source_pdf_filename
     pdf_url = (
         str(request.url_for("get_reference_document", filename=filename))
         if filename and document_path(filename) is not None
         else None
     )
     return ReferenceSourceOut(
-        title=source["title"],
-        authors=source["authors"],
-        year=source["year"],
-        location=source["location"],
-        url=source["url"],
+        title=source.title,
+        authors=source.authors,
+        year=source.year,
+        location=source.location,
+        url=source.url,
         pdf_url=pdf_url,
+    )
+
+
+def _reference_out(entry: ReferenceEntry, request: Request) -> ReferenceProteinOut:
+    return ReferenceProteinOut(
+        id=entry.id,
+        name=entry.name,
+        year=entry.year,
+        is_default=entry.is_default,
+        description=entry.description,
+        values=[asdict(value) for value in entry.values],
+        source=_source_out(entry, request),
     )
 
 
@@ -58,8 +73,8 @@ async def list_reference_proteins(
     catalog: Annotated[ReferenceCatalog, Depends(get_reference_catalog)],
 ) -> list[ReferenceProteinOut]:
     return [
-        {**rp, "source": _source_out(rp["source"], request)}
-        for rp in await catalog.list_reference_proteins()
+        _reference_out(entry, request)
+        for entry in await catalog.list_reference_proteins()
     ]
 
 
@@ -67,7 +82,7 @@ async def list_reference_proteins(
 async def list_recipes(
     catalog: Annotated[ReferenceCatalog, Depends(get_reference_catalog)],
 ):
-    return await catalog.list_example_recipes()
+    return [asdict(recipe) for recipe in await catalog.list_example_recipes()]
 
 
 # --------------------------- расчёт ------------------------------

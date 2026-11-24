@@ -30,7 +30,12 @@ from features.products.api.schemas import (
 from features.products.app import Caller, NutrientService, ProductService
 from features.products.app.service import _unit_for
 from features.products.infra.audit import FoodAuditTrail
-from features.products.infra.sql_repo import SqlNutrientRepository, SqlProductRepository
+from features.products.infra.sql_repo import (
+    SqlNutrientRepository,
+    SqlProductRepository,
+    SqlReferenceNames,
+    SqlUnitOfWork,
+)
 
 NO_CALLER = Caller(None, None)
 
@@ -71,7 +76,12 @@ async def api_update_nutrient_name(item_id, data, db):
 
 
 async def api_count_products(db):
-    service = ProductService(SqlProductRepository(db), FoodAuditTrail())
+    service = ProductService(
+        SqlProductRepository(db),
+        SqlReferenceNames(db),
+        SqlUnitOfWork(db),
+        FoodAuditTrail(),
+    )
     return ProductCount(count=await service.count())
 
 

@@ -1,18 +1,32 @@
 """Плоские таблицы продуктов и нутриентов (для pandas, Excel и клиентов)."""
 
 import io
-from typing import Annotated, Literal
-from uuid import UUID
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
 from ..app import TableService
+from ..domain.filters import ExactIds, Page, Sorting, TableFilters
 from .deps import get_table_service
+from .filters import (
+    csv_filters,
+    csv_page,
+    csv_sorting,
+    exact_ids,
+    map_sorting,
+    nutrient_filters,
+    pivot_filters,
+    product_filters,
+    table_page,
+    table_sorting,
+)
 
 TAG = "Table (Flat)"
 
 router = APIRouter(prefix="/api/v1/table", tags=[TAG])
+
+Service = Annotated[TableService, Depends(get_table_service)]
 
 
 @router.get(
@@ -27,47 +41,12 @@ router = APIRouter(prefix="/api/v1/table", tags=[TAG])
     ),
 )
 async def table_nutrients(
-    service: Annotated[TableService, Depends(get_table_service)],
-    region: Annotated[
-        str | None, Query(description="Фильтр по региону (часть, без учёта регистра)")
-    ] = None,
-    category: Annotated[
-        str | None, Query(description="Фильтр по категории (часть, без учёта регистра)")
-    ] = None,
-    subcategory: Annotated[
-        str | None,
-        Query(description="Фильтр по подкатегории (часть, без учёта регистра)"),
-    ] = None,
-    product: Annotated[
-        str | None,
-        Query(description="Фильтр по названию продукта (часть, без учёта регистра)"),
-    ] = None,
-    nutrient_type: Annotated[
-        str | None,
-        Query(description="Фильтр по типу нутриента (часть, без учёта регистра)"),
-    ] = None,
-    nutrient_name: Annotated[
-        str | None,
-        Query(description="Фильтр по названию нутриента (часть, без учёта регистра)"),
-    ] = None,
-    sort_by: Annotated[
-        str, Query(description="Колонка для сортировки")
-    ] = "product_name",
-    sort_order: Annotated[
-        Literal["asc", "desc"], Query(description="Направление сортировки")
-    ] = "asc",
-    limit: Annotated[int, Query(ge=1, le=10000, description="Максимум строк")] = 1000,
-    offset: Annotated[int, Query(ge=0, description="Сдвиг (пагинация)")] = 0,
+    service: Service,
+    filters: Annotated[TableFilters, Depends(nutrient_filters)],
+    sorting: Annotated[Sorting, Depends(table_sorting)],
+    page: Annotated[Page, Depends(table_page)],
 ):
-    filters = {
-        "region": region,
-        "category": category,
-        "subcategory": subcategory,
-        "product": product,
-        "nutrient_type": nutrient_type,
-        "nutrient_name": nutrient_name,
-    }
-    return await service.nutrients(filters, sort_by, sort_order, limit, offset)
+    return await service.nutrients(filters, sorting, page)
 
 
 @router.get(
@@ -81,48 +60,13 @@ async def table_nutrients(
     ),
 )
 async def table_products(
-    service: Annotated[TableService, Depends(get_table_service)],
-    region: Annotated[
-        str | None, Query(description="Фильтр по региону (часть, без учёта регистра)")
-    ] = None,
-    category: Annotated[
-        str | None, Query(description="Фильтр по категории (часть, без учёта регистра)")
-    ] = None,
-    subcategory: Annotated[
-        str | None,
-        Query(description="Фильтр по подкатегории (часть, без учёта регистра)"),
-    ] = None,
-    product: Annotated[
-        str | None,
-        Query(description="Фильтр по названию продукта (часть, без учёта регистра)"),
-    ] = None,
-    category_id: Annotated[
-        UUID | None, Query(description="Точный фильтр по категории (ID)")
-    ] = None,
-    subcategory_id: Annotated[
-        UUID | None, Query(description="Точный фильтр по подкатегории (ID)")
-    ] = None,
-    region_id: Annotated[
-        UUID | None, Query(description="Точный фильтр по региону (ID)")
-    ] = None,
-    sort_by: Annotated[
-        str, Query(description="Колонка для сортировки")
-    ] = "product_name",
-    sort_order: Annotated[
-        Literal["asc", "desc"], Query(description="Направление сортировки")
-    ] = "asc",
-    limit: Annotated[int, Query(ge=1, le=10000, description="Максимум строк")] = 1000,
-    offset: Annotated[int, Query(ge=0, description="Сдвиг (пагинация)")] = 0,
+    service: Service,
+    filters: Annotated[TableFilters, Depends(product_filters)],
+    ids: Annotated[ExactIds, Depends(exact_ids)],
+    sorting: Annotated[Sorting, Depends(table_sorting)],
+    page: Annotated[Page, Depends(table_page)],
 ):
-    filters = {"region": region, "category": category, "subcategory": subcategory}
-    ids = {
-        "p.category_id": category_id,
-        "p.subcategory_id": subcategory_id,
-        "p.region_id": region_id,
-    }
-    return await service.products(
-        filters, product, ids, sort_by, sort_order, limit, offset
-    )
+    return await service.products(filters, ids, sorting, page)
 
 
 @router.get(
@@ -135,33 +79,9 @@ async def table_products(
     ),
 )
 async def table_nutrients_pivot(
-    service: Annotated[TableService, Depends(get_table_service)],
-    region: Annotated[
-        str | None, Query(description="Фильтр по региону (часть, без учёта регистра)")
-    ] = None,
-    category: Annotated[
-        str | None, Query(description="Фильтр по категории (часть, без учёта регистра)")
-    ] = None,
-    subcategory: Annotated[
-        str | None,
-        Query(description="Фильтр по подкатегории (часть, без учёта регистра)"),
-    ] = None,
-    product: Annotated[
-        str | None,
-        Query(description="Фильтр по названию продукта (часть, без учёта регистра)"),
-    ] = None,
-    nutrient_type: Annotated[
-        str | None,
-        Query(description="Фильтр по типу нутриента (часть, без учёта регистра)"),
-    ] = None,
+    service: Service,
+    filters: Annotated[TableFilters, Depends(pivot_filters)],
 ):
-    filters = {
-        "region": region,
-        "category": category,
-        "subcategory": subcategory,
-        "product": product,
-        "nutrient_type": nutrient_type,
-    }
     return await service.pivot(filters)
 
 
@@ -174,48 +94,11 @@ async def table_nutrients_pivot(
     ),
 )
 async def table_nutrients_map(
-    service: Annotated[TableService, Depends(get_table_service)],
-    region: Annotated[
-        str | None, Query(description="Фильтр по региону (часть, без учёта регистра)")
-    ] = None,
-    category: Annotated[
-        str | None, Query(description="Фильтр по категории (часть, без учёта регистра)")
-    ] = None,
-    subcategory: Annotated[
-        str | None,
-        Query(description="Фильтр по подкатегории (часть, без учёта регистра)"),
-    ] = None,
-    product: Annotated[
-        str | None,
-        Query(description="Фильтр по названию продукта (часть, без учёта регистра)"),
-    ] = None,
-    nutrient_type: Annotated[
-        str | None,
-        Query(description="Фильтр по типу нутриента (часть, без учёта регистра)"),
-    ] = None,
-    nutrient_name: Annotated[
-        str | None,
-        Query(description="Фильтр по названию нутриента (часть, без учёта регистра)"),
-    ] = None,
-    sort_by: Annotated[
-        str,
-        Query(
-            description="Колонка для сортировки (product_name, category_name, region_name)"
-        ),
-    ] = "product_name",
-    sort_order: Annotated[
-        Literal["asc", "desc"], Query(description="Направление сортировки")
-    ] = "asc",
+    service: Service,
+    filters: Annotated[TableFilters, Depends(nutrient_filters)],
+    sorting: Annotated[Sorting, Depends(map_sorting)],
 ):
-    filters = {
-        "region": region,
-        "category": category,
-        "subcategory": subcategory,
-        "product": product,
-        "nutrient_type": nutrient_type,
-        "nutrient_name": nutrient_name,
-    }
-    return await service.nutrient_map(filters, sort_by, sort_order)
+    return await service.nutrient_map(filters, sorting)
 
 
 @router.get(
@@ -223,28 +106,9 @@ async def table_nutrients_map(
     summary="Продукты в виде карты  category → region → [products]",
 )
 async def table_products_map(
-    service: Annotated[TableService, Depends(get_table_service)],
-    region: Annotated[
-        str | None, Query(description="Фильтр по региону (часть, без учёта регистра)")
-    ] = None,
-    category: Annotated[
-        str | None, Query(description="Фильтр по категории (часть, без учёта регистра)")
-    ] = None,
-    subcategory: Annotated[
-        str | None,
-        Query(description="Фильтр по подкатегории (часть, без учёта регистра)"),
-    ] = None,
-    product: Annotated[
-        str | None,
-        Query(description="Фильтр по названию продукта (часть, без учёта регистра)"),
-    ] = None,
+    service: Service,
+    filters: Annotated[TableFilters, Depends(product_filters)],
 ):
-    filters = {
-        "region": region,
-        "category": category,
-        "subcategory": subcategory,
-        "product": product,
-    }
     return await service.product_map(filters)
 
 
@@ -253,40 +117,12 @@ async def table_products_map(
     summary="Нутриенты — 4 колонки (Продукт, Регион, Показатель, Значение)",
 )
 async def table_nutrients_csv(
-    service: Annotated[TableService, Depends(get_table_service)],
-    region: Annotated[
-        str | None, Query(description="Фильтр по региону (часть, без учёта регистра)")
-    ] = None,
-    category: Annotated[
-        str | None, Query(description="Фильтр по категории (часть, без учёта регистра)")
-    ] = None,
-    product: Annotated[
-        str | None,
-        Query(description="Фильтр по названию продукта (часть, без учёта регистра)"),
-    ] = None,
-    nutrient_type: Annotated[
-        str | None,
-        Query(description="Фильтр по типу нутриента (часть, без учёта регистра)"),
-    ] = None,
-    nutrient_name: Annotated[
-        str | None,
-        Query(description="Фильтр по названию нутриента (часть, без учёта регистра)"),
-    ] = None,
-    sort_by: Annotated[
-        str, Query(description="product_name / region_name / nutrient_name / quantity")
-    ] = "product_name",
-    sort_order: Annotated[Literal["asc", "desc"], Query()] = "asc",
-    limit: Annotated[int, Query(ge=1, le=50000)] = 10000,
-    offset: Annotated[int, Query(ge=0)] = 0,
+    service: Service,
+    filters: Annotated[TableFilters, Depends(csv_filters)],
+    sorting: Annotated[Sorting, Depends(csv_sorting)],
+    page: Annotated[Page, Depends(csv_page)],
 ):
-    filters = {
-        "region": region,
-        "category": category,
-        "product": product,
-        "nutrient_type": nutrient_type,
-        "nutrient_name": nutrient_name,
-    }
-    content = await service.nutrients_csv(filters, sort_by, sort_order, limit, offset)
+    content = await service.nutrients_csv(filters, sorting, page)
     return StreamingResponse(
         io.BytesIO(content),
         media_type="text/csv; charset=utf-8-sig",

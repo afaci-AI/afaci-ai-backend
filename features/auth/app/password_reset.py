@@ -16,12 +16,14 @@ from core.errors import BadRequestError, ServiceUnavailableError
 from core.mail_layout import Email, render_html, render_text
 
 from .ports import (
+    Account,
     AccountRepository,
-    Credentials,
     Mailer,
     MailFailure,
+    PasswordHasher,
+    ResetCode,
+    ResetCodeHasher,
     ResetCodeRepository,
-    Row,
 )
 
 CODE_TTL = timedelta(minutes=30)
@@ -77,19 +79,21 @@ class PasswordResetService:
         self,
         accounts: AccountRepository,
         codes: ResetCodeRepository,
-        credentials: Credentials,
+        passwords: PasswordHasher,
+        code_hasher: ResetCodeHasher,
         mailer: Mailer,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self._accounts = accounts
         self._codes = codes
-        self._credentials = credentials
+        self._passwords = passwords
+        self._code_hasher = code_hasher
         self._mailer = mailer
         self._now = now
 
-    async def _eligible(self, email: str) -> Row | None:
+    async def _eligible(self, email: str) -> Account | None:
         user = await self._accounts.find_by_email(email.strip().lower())
-        if user is None or not user.is_active or self._credentials.is_expired(user):
+        if user is None or not user.is_active or user.access_expired(self._now()):
             return None
         return user
 
@@ -108,8 +112,8 @@ class PasswordResetService:
             return _accepted()
 
         code = _new_code()
-        row = await self._codes.add(
-            user.id, self._credentials.hash_reset_code(user.id, code), now + CODE_TTL
+        reset = await self._codes.add(
+            user.id, self._code_hasher.hash(user.id, code), now + CODE_TTL
         )
         try:
             email = reset_email(user.name, code)
@@ -117,26 +121,25 @@ class PasswordResetService:
                 user.email, SUBJECT, render_text(email), render_html(email)
             )
         except MailFailure as exc:
-            await self._codes.delete(row)
+            await self._codes.delete(reset.id)
             raise ServiceUnavailableError(MAIL_FAILED) from exc
         # Прежние коды перестают действовать только после успешной отправки.
-        await self._codes.invalidate_others(user.id, keep=row.id, at=now)
+        await self._codes.invalidate_others(user.id, keep=reset.id, at=now)
         return _accepted()
 
-    async def _matching_code(self, email: str, code: str) -> tuple[Row, Row]:
+    async def _matching_code(self, email: str, code: str) -> tuple[Account, ResetCode]:
         """(пользователь, код) или 400; неверный код тратит попытку."""
         user = await self._eligible(email)
         if user is None:
             raise BadRequestError(INVALID_CODE)
-        row = await self._codes.latest_active(user.id, self._now(), MAX_ATTEMPTS)
-        if row is None:
+        reset = await self._codes.latest_active(user.id, self._now(), MAX_ATTEMPTS)
+        if reset is None:
             raise BadRequestError(INVALID_CODE)
-        expected = self._credentials.hash_reset_code(user.id, code.strip())
-        if not hmac.compare_digest(row.code_hash, expected):
-            row.attempts += 1
-            await self._codes.save(row)
+        expected = self._code_hasher.hash(user.id, code.strip())
+        if not hmac.compare_digest(reset.code_hash, expected):
+            await self._codes.add_failed_attempt(reset.id)
             raise BadRequestError(INVALID_CODE)
-        return user, row
+        return user, reset
 
     async def verify(self, email: str, code: str) -> dict:
         """Проверка кода перед вводом нового пароля; код остаётся действующим."""
@@ -144,14 +147,11 @@ class PasswordResetService:
         return {"status": "ok"}
 
     async def confirm(self, email: str, code: str, new_password: str) -> dict:
-        user, row = await self._matching_code(email, code)
-        now = self._now()
-        row.used_at = now
-        user.password_hash = self._credentials.hash_password(new_password)
-        user.must_change_password = False
-        user.temp_password_expires_at = None
+        user, reset = await self._matching_code(email, code)
+        # Сначала код: при сбое на смене пароля он уже не сработает повторно.
+        await self._codes.consume(reset, self._now())
         # Все выданные ранее токены (другие устройства, вкладки) отклоняются.
-        user.token_version = (user.token_version or 0) + 1
-        await self._codes.invalidate_others(user.id, keep=row.id, at=now)
-        await self._accounts.save(user)
+        await self._accounts.set_password(
+            user.id, self._passwords.hash(new_password), revoke_tokens=True
+        )
         return {"status": "ok"}

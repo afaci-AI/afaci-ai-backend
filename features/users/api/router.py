@@ -14,6 +14,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends
 
+from core.accounts import Account
 from core.db.models import User
 from core.security import require_admin, user_public
 
@@ -42,7 +43,7 @@ async def get_user(id: UUID, service: Service, _admin: Admin):
     return user_public(await service.get(id))
 
 
-def _with_delivery(user: User, delivery: dict) -> dict:
+def _with_delivery(user: Account, delivery: dict) -> dict:
     """Пользователь и отдельно — результат отправки письма с данными для входа."""
     return {**user_public(user), "credentialsEmail": delivery}
 
