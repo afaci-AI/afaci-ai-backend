@@ -1,4 +1,4 @@
-from .ports import AuditTrail, Caller, DuplicateError
+from .ports import AuditTrail, Caller, DuplicateError, ReferenceNames, UnitOfWork
 from .service import NutrientService, ProductService
 
 __all__ = [
@@ -7,4 +7,6 @@ __all__ = [
     "DuplicateError",
     "NutrientService",
     "ProductService",
+    "ReferenceNames",
+    "UnitOfWork",
 ]

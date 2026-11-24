@@ -1,5 +1,6 @@
 from .candidates import CandidateItem, CostOptimizationConstraints, build_items
 from .cost_optimizer import optimize_cost
+from .entities import ProductNutrients, ReferenceProtein, ReferenceSource
 from .exceptions import (
     DomainError,
     EmptyRecipeError,
@@ -21,8 +22,11 @@ __all__ = [
     "EmptyRecipeError",
     "InvalidRecipeSumError",
     "OptimizationInfeasibleError",
+    "ProductNutrients",
     "RecipeOptimizationError",
+    "ReferenceProtein",
     "ReferenceProteinNotFoundError",
+    "ReferenceSource",
     "build_items",
     "compute_report",
     "optimize_cost",

@@ -1,61 +1,92 @@
-"""Порты аутентификации: пользователи, пароли, токены, коды восстановления, почта."""
+"""Порты аутентификации: учётные записи, пароли, токены, коды восстановления, почта."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Protocol
+from typing import Protocol
 from uuid import UUID
 
+from core.accounts import Account
 from core.mail import MailError as MailFailure
 
-Row = Any
-
 __all__ = [
+    "Account",
     "AccountRepository",
-    "Credentials",
     "MailFailure",
     "Mailer",
+    "PasswordHasher",
+    "ResetCode",
+    "ResetCodeHasher",
     "ResetCodeRepository",
-    "Row",
+    "TokenIssuer",
 ]
 
 
+@dataclass(frozen=True, slots=True)
+class ResetCode:
+    """Действующий код восстановления: только то, что нужно для проверки."""
+
+    id: UUID
+    user_id: UUID
+    code_hash: str
+    attempts: int
+
+
 class AccountRepository(Protocol):
-    async def find_by_email(self, email: str) -> Row | None: ...
+    async def find_by_email(self, email: str) -> Account | None: ...
 
-    async def save(self, row: Row) -> Row:
-        """Сохраняет изменения и обновляет запись."""
+    async def get(self, user_id: UUID) -> Account | None: ...
+
+    async def record_login(self, user_id: UUID, at: datetime) -> Account:
+        """Отмечает вход и возвращает обновлённую запись."""
+
+    async def set_password(
+        self, user_id: UUID, password_hash: str, *, revoke_tokens: bool
+    ) -> None:
+        """Постоянный пароль: снимает требование смены и срок временного пароля.
+
+        `revoke_tokens` повышает версию токенов, и выданные ранее токены
+        перестают приниматься.
+        """
 
 
-class Credentials(Protocol):
-    def verify_password(self, password: str, password_hash: str) -> bool: ...
+class PasswordHasher(Protocol):
+    def verify(self, password: str, password_hash: str) -> bool: ...
 
-    def hash_password(self, password: str) -> str: ...
+    def hash(self, password: str) -> str: ...
 
-    def hash_reset_code(self, user_id: UUID, code: str) -> str: ...
 
-    def issue_token(self, user: Row) -> str: ...
+class TokenIssuer(Protocol):
+    def issue(self, user_id: UUID, version: int) -> str: ...
 
-    def is_expired(self, user: Row) -> bool: ...
+
+class ResetCodeHasher(Protocol):
+    def hash(self, user_id: UUID, code: str) -> str: ...
 
 
 class ResetCodeRepository(Protocol):
     async def count_since(self, user_id: UUID, since: datetime) -> int:
         """Сколько кодов выдано пользователю позже `since`."""
 
-    async def add(self, user_id: UUID, code_hash: str, expires_at: datetime) -> Row: ...
+    async def add(
+        self, user_id: UUID, code_hash: str, expires_at: datetime
+    ) -> ResetCode: ...
 
-    async def delete(self, row: Row) -> None: ...
+    async def delete(self, code_id: UUID) -> None: ...
 
     async def latest_active(
         self, user_id: UUID, now: datetime, max_attempts: int
-    ) -> Row | None:
+    ) -> ResetCode | None:
         """Последний неиспользованный, неистёкший код с запасом попыток."""
+
+    async def add_failed_attempt(self, code_id: UUID) -> None: ...
 
     async def invalidate_others(self, user_id: UUID, keep: UUID, at: datetime) -> None:
         """Пометить использованными все активные коды, кроме `keep`."""
 
-    async def save(self, row: Row) -> Row: ...
+    async def consume(self, code: ResetCode, at: datetime) -> None:
+        """Пометить использованными `code` и все остальные активные коды."""
 
 
 class Mailer(Protocol):

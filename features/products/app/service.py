@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import NamedTuple
 from uuid import UUID
 
 from core.errors import BadRequestError, NotFoundError, UnprocessableError
@@ -16,13 +17,24 @@ from .ports import (
     DuplicateError,
     NutrientRepository,
     ProductRepository,
+    ReferenceNames,
     Row,
+    UnitOfWork,
 )
 
 FOOD_CREATED = "FOOD_PRODUCT_CREATED"
 FOOD_UPDATED = "FOOD_PRODUCT_UPDATED"
 FOOD_DELETED = "FOOD_PRODUCT_DELETED"
 FOOD_BULK_CREATED = "FOOD_PRODUCT_BULK_CREATED"
+BULK_CONFLICT = "Transaction rolled back due to conflict"
+
+
+class AutoRefs(NamedTuple):
+    """Справочники продукта, найденные или добавленные по имени."""
+
+    category: Row
+    region: Row
+    subcategory: Row | None
 
 
 def _unit_for(name: Row, requested: UUID | None) -> UUID:
@@ -46,8 +58,16 @@ def _bulk_changes(count: int, ids: list[str], **extra) -> dict:
 
 
 class ProductService:
-    def __init__(self, repo: ProductRepository, audit: AuditTrail) -> None:
+    def __init__(
+        self,
+        repo: ProductRepository,
+        names: ReferenceNames,
+        uow: UnitOfWork,
+        audit: AuditTrail,
+    ) -> None:
         self._repo = repo
+        self._names = names
+        self._uow = uow
         self._audit = audit
 
     async def get(self, product_id: UUID) -> Row:
@@ -126,33 +146,31 @@ class ProductService:
         return {"inserted": len(created)}
 
     # ------------------------------------------------ автосоздание продуктов
-    async def _auto_refs(self, data: dict) -> tuple[Row, Row, Row | None]:
-        category = await self._repo.get_or_create_named(
-            "category", data["category_name"]
-        )
-        region = await self._repo.get_or_create_named("region", data["region_name"])
+    async def _auto_refs(self, data: dict) -> AutoRefs:
+        category = await self._names.category(data["category_name"])
+        region = await self._names.region(data["region_name"])
         subcategory = None
         if data.get("subcategory_name"):
-            subcategory = await self._repo.get_or_create_named(
-                "subcategory", data["subcategory_name"]
-            )
-        return category, region, subcategory
+            subcategory = await self._names.subcategory(data["subcategory_name"])
+        return AutoRefs(category, region, subcategory)
+
+    async def _stage(self, data: dict, refs: AutoRefs) -> Row:
+        return await self._repo.stage(
+            {
+                "name": data["name"],
+                "category_id": refs.category.id,
+                "region_id": refs.region.id,
+                "subcategory_id": refs.subcategory.id if refs.subcategory else None,
+            }
+        )
 
     async def auto_create(self, data: dict, caller: Caller) -> Row:
         try:
-            category, region, subcategory = await self._auto_refs(data)
-            product = await self._repo.stage(
-                {
-                    "name": data["name"],
-                    "category_id": category.id,
-                    "region_id": region.id,
-                    "subcategory_id": subcategory.id if subcategory else None,
-                }
-            )
-            await self._repo.commit()
-            await self._repo.refresh(product)
+            product = await self._stage(data, await self._auto_refs(data))
+            await self._uow.commit()
+            await self._uow.refresh(product)
         except DuplicateError as exc:
-            await self._repo.rollback()
+            await self._uow.rollback()
             raise BadRequestError("Product already exists") from exc
         self._audit.log(
             FOOD_CREATED,
@@ -163,37 +181,34 @@ class ProductService:
         return product
 
     async def auto_bulk(self, items: list[dict], caller: Caller) -> dict:
+        """Строки с уже существующим продуктом пропускаются с ошибкой в ответе.
+
+        Конфликт уникальности откатывает всю пачку; прочие сбои тоже
+        откатывают её и не подменяются текстом ошибки.
+        """
         created: list[Row] = []
         errors: list[str] = []
-        for idx, data in enumerate(items):
-            try:
-                category, region, subcategory = await self._auto_refs(data)
-                if await self._repo.find_in_region(data["name"], region.id):
-                    errors.append(
-                        f"Row {idx}: Product '{data['name']}' already exists in region"
-                    )
-                    continue
-                created.append(
-                    await self._repo.stage(
-                        {
-                            "name": data["name"],
-                            "category_id": category.id,
-                            "region_id": region.id,
-                            "subcategory_id": subcategory.id if subcategory else None,
-                        }
-                    )
-                )
-            except Exception as e:  # noqa: BLE001
-                errors.append(f"Row {idx}: {e!s}")
-
         try:
-            await self._repo.commit()
+            for idx, data in enumerate(items):
+                try:
+                    refs = await self._auto_refs(data)
+                    if await self._repo.find_in_region(data["name"], refs.region.id):
+                        errors.append(
+                            f"Row {idx}: Product '{data['name']}' "
+                            "already exists in region"
+                        )
+                        continue
+                    created.append(await self._stage(data, refs))
+                except DuplicateError as exc:
+                    errors.append(f"Row {idx}: {exc!s}")
+                    raise
+            await self._uow.commit()
         except DuplicateError:
-            await self._repo.rollback()
-            return {
-                "warning": "Transaction rolled back due to conflict",
-                "errors": errors,
-            }
+            await self._uow.rollback()
+            return {"warning": BULK_CONFLICT, "errors": errors}
+        except Exception:
+            await self._uow.rollback()
+            raise
 
         if created:
             self._audit.log(

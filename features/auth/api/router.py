@@ -51,7 +51,7 @@ async def change_password(
     service: Service,
 ):
     return await service.change_password(
-        current, req.current_password, req.new_password
+        current.id, req.current_password, req.new_password
     )
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -28,11 +29,13 @@ from .credentials import (
     welcome_email,
 )
 from .ports import (
+    Account,
+    AccountEdit,
     ChangeAudit,
     Mailer,
     MailFailure,
+    NewAccount,
     PasswordHasher,
-    Row,
     UserRepository,
 )
 
@@ -66,7 +69,7 @@ class UserService:
         self._mailer = mailer
         self._now = now
 
-    async def _send_credentials(self, user: Row, password: str) -> dict:
+    async def _send_credentials(self, user: Account, password: str) -> dict:
         """Отправка письма; результат отдельно от создания аккаунта."""
         if self._mailer is None:
             return {"sent": False, "error": MAIL_FAILED}
@@ -79,23 +82,23 @@ class UserService:
             return {"sent": False, "error": MAIL_FAILED}
         return {"sent": True, "error": None}
 
-    async def _get(self, user_id: UUID) -> Row:
+    async def _get(self, user_id: UUID) -> Account:
         user = await self._repo.get(user_id)
         if not user:
             raise NotFoundError(NOT_FOUND)
         return user
 
-    async def list(self, role: str | None, search: str | None) -> list[Row]:
+    async def list(self, role: str | None, search: str | None) -> list[Account]:
         users = await self._repo.list(role)
         if search:
             s = search.lower()
             users = [u for u in users if s in u.email.lower() or s in u.name.lower()]
         return users
 
-    async def get(self, user_id: UUID) -> Row:
+    async def get(self, user_id: UUID) -> Account:
         return await self._get(user_id)
 
-    async def create(self, data: dict) -> tuple[Row, dict]:
+    async def create(self, data: dict) -> tuple[Account, dict]:
         """Аккаунт с временным паролем и письмом. Сбой почты аккаунт не отменяет."""
         _rule(validate_role, data["role"])
         _rule(validate_expiry, data["access_expires_at"])
@@ -104,19 +107,18 @@ class UserService:
             raise ConflictError("Пользователь с таким email уже существует.")
         password = generate_temp_password()
         user = await self._repo.add(
-            {
-                "email": email,
-                "name": data["name"].strip(),
-                "password_hash": self._hasher.hash(password),
-                "role": data["role"],
-                "access_expires_at": data["access_expires_at"],
-                "must_change_password": True,
-                "temp_password_expires_at": self._now() + TEMP_PASSWORD_TTL,
-            }
+            NewAccount(
+                email=email,
+                name=data["name"].strip(),
+                password_hash=self._hasher.hash(password),
+                role=data["role"],
+                access_expires_at=data["access_expires_at"],
+                temp_password_expires_at=self._now() + TEMP_PASSWORD_TTL,
+            )
         )
         return user, await self._send_credentials(user, password)
 
-    async def resend_credentials(self, user_id: UUID) -> tuple[Row, dict]:
+    async def resend_credentials(self, user_id: UUID) -> tuple[Account, dict]:
         """Новый временный пароль взамен прежнего; без письма ничего не меняется."""
         user = await self._get(user_id)
         if not user.must_change_password:
@@ -127,45 +129,45 @@ class UserService:
         delivery = await self._send_credentials(user, password)
         if not delivery["sent"]:
             raise ServiceUnavailableError(MAIL_FAILED)
-        user.password_hash = self._hasher.hash(password)
-        user.temp_password_expires_at = self._now() + TEMP_PASSWORD_TTL
         # Сессии, открытые прежним временным паролем, завершаются.
-        user.token_version = (user.token_version or 0) + 1
-        return await self._repo.save(user), delivery
+        user = await self._repo.set_temp_password(
+            user.id, self._hasher.hash(password), self._now() + TEMP_PASSWORD_TTL
+        )
+        return user, delivery
 
-    async def update(self, user_id: UUID, changes: dict, admin_id: UUID) -> Row:
+    async def update(self, user_id: UUID, changes: dict, admin_id: UUID) -> Account:
         """changes — поля запроса, переданные клиентом (exclude_unset)."""
         user = await self._get(user_id)
         is_self = user.id == admin_id
+        edit = AccountEdit.of(user)
 
         role = changes.get("role")
         if role is not None:
             _rule(validate_role, role)
             _rule(validate_not_self_demotion, is_self, role)
-            user.role = role
+            edit = replace(edit, role=role)
 
         is_active = changes.get("is_active")
         if is_active is not None:
             if not is_active:
                 _rule(validate_not_self_deactivation, is_self)
-            user.is_active = is_active
+            edit = replace(edit, is_active=is_active)
 
         if changes.get("name") is not None:
-            user.name = changes["name"].strip()
+            edit = replace(edit, name=changes["name"].strip())
 
         if changes.get("access_expires_at_unlimited"):
-            user.access_expires_at = None
+            edit = replace(edit, access_expires_at=None)
         elif changes.get("access_expires_at") is not None:
             _rule(validate_expiry, changes["access_expires_at"])
-            user.access_expires_at = changes["access_expires_at"]
+            edit = replace(edit, access_expires_at=changes["access_expires_at"])
 
-        user = await self._repo.save(user)
+        user = await self._repo.update(user.id, edit)
         self._audit.user_updated(admin_id, user, user_id, changes)
         return user
 
     async def deactivate(self, user_id: UUID, admin_id: UUID) -> dict:
         _rule(validate_not_self_deactivation, user_id == admin_id)
         user = await self._get(user_id)
-        user.is_active = False
-        await self._repo.save(user)
+        await self._repo.update(user.id, replace(AccountEdit.of(user), is_active=False))
         return {"status": "deactivated"}

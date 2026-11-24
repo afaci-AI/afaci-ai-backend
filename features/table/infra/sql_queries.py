@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from uuid import UUID
 
 from sqlalchemy import text
@@ -18,6 +19,8 @@ from core.db.text_filters import (
     tokens_sql,
 )
 
+from ..domain.filters import ExactIds, Page, Sorting, TableFilters
+
 # Смысловое имя фильтра → колонка в запросе.
 FILTER_COLUMNS = {
     "region": "r.name",
@@ -26,6 +29,13 @@ FILTER_COLUMNS = {
     "product": "p.name",
     "nutrient_type": "nt.name",
     "nutrient_name": "nn.name",
+}
+
+# Точный фильтр по ID → колонка в запросе.
+ID_COLUMNS = {
+    "category_id": "p.category_id",
+    "subcategory_id": "p.subcategory_id",
+    "region_id": "p.region_id",
 }
 
 NUTRIENT_JOINS = """
@@ -88,11 +98,12 @@ class SqlTableQueries:
         return list(result.mappings().all())
 
     async def nutrients(
-        self, filters: dict, sort_by: str, sort_order: str, limit: int, offset: int
+        self, filters: TableFilters, sorting: Sorting, page: Page
     ) -> list[dict]:
-        where, params = build_where(filters)
-        params["_limit"] = limit
-        params["_offset"] = offset
+        where, params = build_where(filters.by_name())
+        sort_by, sort_order = sorting.by, sorting.order
+        params["_limit"] = page.limit
+        params["_offset"] = page.offset
         sql = text(f"""
         SELECT
             p.id::text             AS product_id,
@@ -113,16 +124,12 @@ class SqlTableQueries:
         return [dict(r) for r in await self._rows(sql, params)]
 
     async def products(
-        self,
-        filters: dict,
-        product: str | None,
-        ids: dict[str, UUID | None],
-        sort_by: str,
-        sort_order: str,
-        limit: int,
-        offset: int,
+        self, filters: TableFilters, ids: ExactIds, sorting: Sorting, page: Page
     ) -> list[dict]:
-        where, params = build_where(filters)
+        product = filters.product
+        sort_by, sort_order = sorting.by, sorting.order
+        # Название продукта ищется по словам ниже, а не подстрокой.
+        where, params = build_where(replace(filters, product=None).by_name())
 
         # Поиск по названию: слова в любом порядке и ранжирование по релевантности.
         # Приоритет идёт перед выбранной сортировкой, внутри приоритета — сортировка.
@@ -168,9 +175,10 @@ class SqlTableQueries:
             where = f"{where} AND {condition}" if where else f"WHERE {condition}"
             relevance_order = f"{relevance}, "
 
-        where = add_exact_ids(where, params, ids)
-        params["_limit"] = limit
-        params["_offset"] = offset
+        exact = {ID_COLUMNS[name]: value for name, value in ids.by_name().items()}
+        where = add_exact_ids(where, params, exact)
+        params["_limit"] = page.limit
+        params["_offset"] = page.offset
         sql = text(f"""
         SELECT {PRODUCT_COLUMNS_SQL}
         FROM products p
@@ -184,8 +192,8 @@ class SqlTableQueries:
     """)
         return [dict(r) for r in await self._rows(sql, params)]
 
-    async def pivot_rows(self, filters: dict) -> list:
-        where, params = build_where(filters)
+    async def pivot_rows(self, filters: TableFilters) -> list:
+        where, params = build_where(filters.by_name())
         sql = text(f"""
         SELECT
             p.id::text             AS product_id,
@@ -202,8 +210,9 @@ class SqlTableQueries:
     """)
         return await self._rows(sql, params)
 
-    async def map_rows(self, filters: dict, sort_by: str, sort_order: str) -> list:
-        where, params = build_where(filters)
+    async def map_rows(self, filters: TableFilters, sorting: Sorting) -> list:
+        where, params = build_where(filters.by_name())
+        sort_by, sort_order = sorting.by, sorting.order
         sql = text(f"""
         SELECT
             p.id::text             AS product_id,
@@ -219,8 +228,8 @@ class SqlTableQueries:
     """)
         return await self._rows(sql, params)
 
-    async def product_rows(self, filters: dict) -> list:
-        where, params = build_where(filters)
+    async def product_rows(self, filters: TableFilters) -> list:
+        where, params = build_where(filters.by_name())
         sql = text(f"""
         SELECT {PRODUCT_COLUMNS_SQL}
         FROM products p
@@ -233,11 +242,12 @@ class SqlTableQueries:
         return await self._rows(sql, params)
 
     async def csv_rows(
-        self, filters: dict, sort_by: str, sort_order: str, limit: int, offset: int
+        self, filters: TableFilters, sorting: Sorting, page: Page
     ) -> list:
-        where, params = build_where(filters)
-        params["_limit"] = limit
-        params["_offset"] = offset
+        where, params = build_where(filters.by_name())
+        sort_by, sort_order = sorting.by, sorting.order
+        params["_limit"] = page.limit
+        params["_offset"] = page.offset
         sql = text(f"""
         SELECT
             p.name   AS product_name,

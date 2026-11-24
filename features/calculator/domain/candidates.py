@@ -6,6 +6,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from .entities import ProductNutrients
+
 
 @dataclass
 class CandidateItem:
@@ -18,6 +20,22 @@ class CandidateItem:
     max_amount_g: float = 100.0
     region: str | None = None
     subcategory: str | None = None
+
+    @classmethod
+    def of(
+        cls, product: ProductNutrients, price: float, low: float, high: float
+    ) -> CandidateItem:
+        return cls(
+            product_id=product.product_id,
+            name=product.name,
+            chem=product.chem,
+            amino=product.amino,
+            region=product.region,
+            subcategory=product.subcategory,
+            price_per_kg=price,
+            min_amount_g=low,
+            max_amount_g=high,
+        )
 
 
 @dataclass

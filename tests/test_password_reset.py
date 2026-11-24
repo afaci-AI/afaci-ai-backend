@@ -2,9 +2,7 @@
 
 import os
 import unittest
-from datetime import UTC, datetime, timedelta
-from types import SimpleNamespace
-from uuid import uuid4
+from datetime import timedelta
 
 from core import mail, security
 from core.errors import BadRequestError, ServiceUnavailableError
@@ -17,68 +15,8 @@ from features.auth.app.password_reset import (
     RESEND_COOLDOWN,
     PasswordResetService,
 )
-from features.auth.infra.security_adapter import SecurityCredentials
-
-NOW = datetime(2026, 11, 21, 12, 0, tzinfo=UTC)
-
-
-class FakeAccounts:
-    def __init__(self, *users):
-        self.users = {u.email: u for u in users}
-        self.saved = []
-
-    async def find_by_email(self, email):
-        return self.users.get(email)
-
-    async def save(self, row):
-        self.saved.append(row)
-        return row
-
-
-class FakeCodes:
-    def __init__(self, clock=lambda: NOW):
-        self.rows = []
-        self.clock = clock
-
-    async def count_since(self, user_id, since):
-        return sum(
-            1 for r in self.rows if r.user_id == user_id and r.created_at > since
-        )
-
-    async def add(self, user_id, code_hash, expires_at):
-        row = SimpleNamespace(
-            id=uuid4(),
-            user_id=user_id,
-            code_hash=code_hash,
-            expires_at=expires_at,
-            attempts=0,
-            used_at=None,
-            created_at=self.clock(),
-        )
-        self.rows.append(row)
-        return row
-
-    async def delete(self, row):
-        self.rows.remove(row)
-
-    async def latest_active(self, user_id, now, max_attempts):
-        active = [
-            r
-            for r in self.rows
-            if r.user_id == user_id
-            and r.used_at is None
-            and r.expires_at > now
-            and r.attempts < max_attempts
-        ]
-        return active[-1] if active else None
-
-    async def invalidate_others(self, user_id, keep, at):
-        for r in self.rows:
-            if r.user_id == user_id and r.id != keep and r.used_at is None:
-                r.used_at = at
-
-    async def save(self, row):
-        return row
+from features.auth.infra.security_adapter import BcryptPasswords, HmacResetCodes
+from tests.account_fakes import NOW, FakeAccounts, FakeCodes, account_row
 
 
 class FakeMailer:
@@ -94,17 +32,11 @@ class FakeMailer:
 
 def make_user(**overrides):
     data = {
-        "id": uuid4(),
-        "email": "user@example.com",
-        "name": "Анна",
         "password_hash": security.hash_password("old-secret"),
-        "is_active": True,
-        "access_expires_at": None,
         "must_change_password": True,
-        "token_version": 0,
     }
     data.update(overrides)
-    return SimpleNamespace(**data)
+    return account_row(**data)
 
 
 def sent_code(mailer):
@@ -125,7 +57,8 @@ class PasswordResetFlow(unittest.IsolatedAsyncioTestCase):
         return PasswordResetService(
             self.accounts,
             self.codes,
-            SecurityCredentials(),
+            BcryptPasswords(),
+            HmacResetCodes(),
             mailer,
             now=lambda: self.now,
         )
@@ -155,7 +88,7 @@ class PasswordResetFlow(unittest.IsolatedAsyncioTestCase):
         expired = make_user(
             email="late@example.com", access_expires_at=NOW - timedelta(days=1)
         )
-        self.accounts.users.update({blocked.email: blocked, expired.email: expired})
+        self.accounts.rows.update({blocked.id: blocked, expired.id: expired})
         for email in ("nobody@example.com", blocked.email, expired.email):
             with self.subTest(email=email):
                 result = await self.service.request(email)

@@ -5,12 +5,18 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.db.models import PasswordResetCode
 
-from ..app.ports import Row
+from ..app.ports import ResetCode
+
+
+def _code(row: PasswordResetCode) -> ResetCode:
+    return ResetCode(
+        id=row.id, user_id=row.user_id, code_hash=row.code_hash, attempts=row.attempts
+    )
 
 
 class SqlResetCodeRepository:
@@ -24,22 +30,26 @@ class SqlResetCodeRepository:
         )
         return int((await self._db.execute(query)).scalar_one())
 
-    async def add(self, user_id: UUID, code_hash: str, expires_at: datetime) -> Row:
+    async def add(
+        self, user_id: UUID, code_hash: str, expires_at: datetime
+    ) -> ResetCode:
         row = PasswordResetCode(
             user_id=user_id, code_hash=code_hash, expires_at=expires_at, attempts=0
         )
         self._db.add(row)
         await self._db.commit()
         await self._db.refresh(row)
-        return row
+        return _code(row)
 
-    async def delete(self, row: Row) -> None:
-        await self._db.delete(row)
+    async def delete(self, code_id: UUID) -> None:
+        await self._db.execute(
+            delete(PasswordResetCode).where(PasswordResetCode.id == code_id)
+        )
         await self._db.commit()
 
     async def latest_active(
         self, user_id: UUID, now: datetime, max_attempts: int
-    ) -> Row | None:
+    ) -> ResetCode | None:
         query = (
             select(PasswordResetCode)
             .where(
@@ -51,7 +61,16 @@ class SqlResetCodeRepository:
             .order_by(PasswordResetCode.created_at.desc())
             .limit(1)
         )
-        return (await self._db.execute(query)).scalar_one_or_none()
+        row = (await self._db.execute(query)).scalar_one_or_none()
+        return _code(row) if row is not None else None
+
+    async def add_failed_attempt(self, code_id: UUID) -> None:
+        await self._db.execute(
+            update(PasswordResetCode)
+            .where(PasswordResetCode.id == code_id)
+            .values(attempts=PasswordResetCode.attempts + 1)
+        )
+        await self._db.commit()
 
     async def invalidate_others(self, user_id: UUID, keep: UUID, at: datetime) -> None:
         await self._db.execute(
@@ -65,7 +84,13 @@ class SqlResetCodeRepository:
         )
         await self._db.commit()
 
-    async def save(self, row: Row) -> Row:
+    async def consume(self, code: ResetCode, at: datetime) -> None:
+        await self._db.execute(
+            update(PasswordResetCode)
+            .where(
+                PasswordResetCode.user_id == code.user_id,
+                PasswordResetCode.used_at.is_(None),
+            )
+            .values(used_at=at)
+        )
         await self._db.commit()
-        await self._db.refresh(row)
-        return row

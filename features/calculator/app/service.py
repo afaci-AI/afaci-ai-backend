@@ -18,6 +18,7 @@ from ..domain import (
     CandidateItem,
     CostOptimizationConstraints,
     OptimizationInfeasibleError,
+    ProductNutrients,
     RecipeOptimizationError,
     compute_report,
     optimize_cost,
@@ -35,16 +36,19 @@ class RecipeCalculator:
 
     # ------------------------------------------------------------ общее
     async def _reference(self, reference_id: UUID) -> dict:
+        """Эталон в формате формул."""
         reference = await self._references.get_reference(reference_id)
         if reference is None:
             raise NotFoundError("Эталонный белок не найден.")
-        return reference
+        return reference.formula_input()
 
-    async def _products_by_id(self, ids: list[UUID]) -> dict:
+    async def _products_by_id(self, ids: list[UUID]) -> dict[str, ProductNutrients]:
         return await self._products.load_products(ids)
 
     @staticmethod
-    def _require_found(requested: list[str], products: dict) -> None:
+    def _require_found(
+        requested: list[str], products: dict[str, ProductNutrients]
+    ) -> None:
         missing = [pid for pid in requested if pid not in products]
         if missing:
             raise NotFoundError(f"Продукты не найдены: {', '.join(missing)}")
@@ -71,8 +75,7 @@ class RecipeCalculator:
         self._require_found([str(it["product_id"]) for it in items], products)
 
         enriched = [
-            {**products[str(it["product_id"])], "amount_g": it["amount_g"]}
-            for it in items
+            products[str(it["product_id"])].report_item(it["amount_g"]) for it in items
         ]
         return compute_report(enriched, reference)
 
@@ -119,7 +122,7 @@ class RecipeCalculator:
 
         amounts = opt["amounts"]
         enriched = [
-            {**products[c.product_id], "amount_g": amounts[i]}
+            products[c.product_id].report_item(amounts[i])
             for i, c in enumerate(domain_candidates)
         ]
         return {
@@ -171,20 +174,9 @@ class RecipeCalculator:
 
 def _candidate(
     product_id: str,
-    products: dict,
+    products: dict[str, ProductNutrients],
     price: float,
     low: float,
     high: float,
 ) -> CandidateItem:
-    product = products[product_id]
-    return CandidateItem(
-        product_id=product_id,
-        name=product["name"],
-        chem=product["chem"],
-        amino=product["amino"],
-        region=product.get("region"),
-        subcategory=product.get("subcategory"),
-        price_per_kg=price,
-        min_amount_g=low,
-        max_amount_g=high,
-    )
+    return CandidateItem.of(products[product_id], price, low, high)

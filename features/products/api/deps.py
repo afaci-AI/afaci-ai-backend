@@ -9,13 +9,23 @@ from core.db.session import get_db
 
 from ..app import NutrientService, ProductService
 from ..infra.audit import FoodAuditTrail
-from ..infra.sql_repo import SqlNutrientRepository, SqlProductRepository
+from ..infra.sql_repo import (
+    SqlNutrientRepository,
+    SqlProductRepository,
+    SqlReferenceNames,
+    SqlUnitOfWork,
+)
 
 
 async def get_product_service(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ProductService:
-    return ProductService(SqlProductRepository(db), FoodAuditTrail())
+    return ProductService(
+        SqlProductRepository(db),
+        SqlReferenceNames(db),
+        SqlUnitOfWork(db),
+        FoodAuditTrail(),
+    )
 
 
 async def get_nutrient_service(

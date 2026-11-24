@@ -12,11 +12,12 @@ from core.db import models
 
 from ..app.ports import DuplicateError, Row
 
-NAMED = {
-    "category": models.Category,
-    "region": models.Region,
-    "subcategory": models.Subcategory,
-}
+
+async def _flush(db: AsyncSession) -> None:
+    try:
+        await db.flush()
+    except IntegrityError as exc:
+        raise DuplicateError(str(exc)) from exc
 
 
 class SqlProductRepository:
@@ -84,17 +85,6 @@ class SqlProductRepository:
         await self._db.delete(row)
         await self._db.commit()
 
-    # ------------------------------------------------ автосоздание продуктов
-    async def get_or_create_named(self, kind: str, name: str) -> Row:
-        model = NAMED[kind]
-        res = await self._db.execute(select(model).where(model.name == name))
-        item = res.scalar_one_or_none()
-        if not item:
-            item = model(name=name)
-            self._db.add(item)
-            await self._flush()
-        return item
-
     async def find_in_region(self, name: str, region_id: UUID) -> Row | None:
         res = await self._db.execute(
             select(models.Product).where(
@@ -107,14 +97,38 @@ class SqlProductRepository:
     async def stage(self, data: dict) -> Row:
         product = models.Product(**data)
         self._db.add(product)
-        await self._flush()
+        await _flush(self._db)
         return product
 
-    async def _flush(self) -> None:
-        try:
-            await self._db.flush()
-        except IntegrityError as exc:
-            raise DuplicateError(str(exc)) from exc
+
+class SqlReferenceNames:
+    """Категории, регионы и подкатегории по имени; новые — без фиксации."""
+
+    def __init__(self, db: AsyncSession) -> None:
+        self._db = db
+
+    async def _named(self, model, name: str) -> Row:
+        res = await self._db.execute(select(model).where(model.name == name))
+        item = res.scalar_one_or_none()
+        if not item:
+            item = model(name=name)
+            self._db.add(item)
+            await _flush(self._db)
+        return item
+
+    async def category(self, name: str) -> Row:
+        return await self._named(models.Category, name)
+
+    async def region(self, name: str) -> Row:
+        return await self._named(models.Region, name)
+
+    async def subcategory(self, name: str) -> Row:
+        return await self._named(models.Subcategory, name)
+
+
+class SqlUnitOfWork:
+    def __init__(self, db: AsyncSession) -> None:
+        self._db = db
 
     async def commit(self) -> None:
         try:

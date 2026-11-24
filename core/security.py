@@ -16,6 +16,7 @@ from fastapi import Depends, Header, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.accounts import Account, access_expired
 from core.db.models import User
 from core.db.session import get_db
 
@@ -82,15 +83,12 @@ def _extract_bearer(authorization: str | None) -> str | None:
 
 
 # ----------------------- срок действия доступа ----------------------
-def is_expired(user: User) -> bool:
+def is_expired(user: User | Account) -> bool:
     """access_expires_at = null значит безлимитный доступ."""
-    return (
-        user.access_expires_at is not None
-        and user.access_expires_at <= datetime.now(UTC)
-    )
+    return access_expired(user.access_expires_at, datetime.now(UTC))
 
 
-def user_status(user: User) -> str:
+def user_status(user: User | Account) -> str:
     if not user.is_active:
         return "blocked"
     if is_expired(user):
@@ -181,7 +179,7 @@ async def get_current_user_optional(
     return user
 
 
-def user_public(user: User) -> dict:
+def user_public(user: User | Account) -> dict:
     """Сериализация пользователя для фронтенда (без пароля)."""
     return {
         "id": str(user.id),

@@ -7,8 +7,41 @@ from uuid import UUID
 from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..app.ports import (
+    ExampleRecipe,
+    ExampleRecipeItem,
+    ProductNutrients,
+    ReferenceEntry,
+    ReferenceProtein,
+    ReferenceSource,
+    ReferenceValue,
+)
+
 CHEM_TYPE = "Химический состав"
 AMINO_TYPE = "Аминокислотный состав"
+
+
+def _add_nutrient(parts: dict[str, dict], row) -> None:
+    name, quantity = row["nutrient"], row["quantity"]
+    if row["ntype"] == CHEM_TYPE:
+        parts["chem"][name] = quantity
+    elif row["ntype"] == AMINO_TYPE:
+        parts["amino"][name] = quantity
+    if row["nclass"] in ("micro", "other"):
+        parts[row["nclass"]][name] = quantity
+        parts["units"][name] = row["unit"]
+
+
+def _source(rp) -> ReferenceSource | None:
+    if not rp["source_title"]:
+        return None
+    return ReferenceSource(
+        title=rp["source_title"],
+        authors=rp["source_authors"],
+        year=rp["source_year"],
+        location=rp["source_location"],
+        url=rp["source_url"],
+    )
 
 
 class SqlCalculatorData:
@@ -18,7 +51,7 @@ class SqlCalculatorData:
         self._db = db
 
     # ------------------------------------------------- ReferenceReader
-    async def get_reference(self, reference_id: UUID) -> dict | None:
+    async def get_reference(self, reference_id: UUID) -> ReferenceProtein | None:
         rp = (
             (
                 await self._db.execute(
@@ -48,27 +81,17 @@ class SqlCalculatorData:
             .mappings()
             .all()
         )
-        return {
-            "id": str(rp["id"]),
-            "name": rp["name"],
-            "year": rp["year"],
-            "description": rp["description"],
-            "source": (
-                {
-                    "title": rp["source_title"],
-                    "authors": rp["source_authors"],
-                    "year": rp["source_year"],
-                    "location": rp["source_location"],
-                    "url": rp["source_url"],
-                }
-                if rp["source_title"]
-                else None
-            ),
-            "values": {v["amino_acid"]: v["value"] for v in vals},
-        }
+        return ReferenceProtein(
+            id=str(rp["id"]),
+            name=rp["name"],
+            year=rp["year"],
+            description=rp["description"],
+            source=_source(rp),
+            values={v["amino_acid"]: v["value"] for v in vals},
+        )
 
     # ------------------------------------------ ProductNutrientReader
-    async def load_products(self, ids: list[UUID]) -> dict:
+    async def load_products(self, ids: list[UUID]) -> dict[str, ProductNutrients]:
         q = text("""
             SELECT p.id AS product_id, p.name, r.name AS region, s.name AS subcategory,
                    nn.name AS nutrient, nt.name AS ntype, n.quantity,
@@ -84,36 +107,27 @@ class SqlCalculatorData:
         """).bindparams(bindparam("ids", expanding=True))
         rows = (await self._db.execute(q, {"ids": ids})).mappings().all()
 
-        products: dict = {}
+        # Нутриенты сначала собираются по продукту, запись создаётся готовой.
+        heads: dict[str, dict] = {}
+        parts: dict[str, dict[str, dict]] = {}
         for row in rows:
             pid = str(row["product_id"])
-            prod = products.setdefault(
-                pid,
-                {
+            if pid not in heads:
+                heads[pid] = {
                     "product_id": pid,
                     "name": row["name"],
                     "region": row["region"],
                     "subcategory": row["subcategory"],
-                    "chem": {},
-                    "amino": {},
-                    "micro": {},
-                    "other": {},
-                    "units": {},
-                },
-            )
-            if row["nutrient"] is None:
-                continue
-            if row["ntype"] == CHEM_TYPE:
-                prod["chem"][row["nutrient"]] = row["quantity"]
-            elif row["ntype"] == AMINO_TYPE:
-                prod["amino"][row["nutrient"]] = row["quantity"]
-            if row["nclass"] in ("micro", "other"):
-                prod[row["nclass"]][row["nutrient"]] = row["quantity"]
-                prod["units"][row["nutrient"]] = row["unit"]
-        return products
+                }
+                parts[pid] = {
+                    k: {} for k in ("chem", "amino", "micro", "other", "units")
+                }
+            if row["nutrient"] is not None:
+                _add_nutrient(parts[pid], row)
+        return {pid: ProductNutrients(**heads[pid], **parts[pid]) for pid in heads}
 
     # ------------------------------------------------ ReferenceCatalog
-    async def list_reference_proteins(self) -> list[dict]:
+    async def list_reference_proteins(self) -> list[ReferenceEntry]:
         rows = (
             (
                 await self._db.execute(
@@ -143,33 +157,21 @@ class SqlCalculatorData:
                 .mappings()
                 .all()
             )
-            source = None
-            if rp["source_title"]:
-                source = {
-                    "title": rp["source_title"],
-                    "authors": rp["source_authors"],
-                    "year": rp["source_year"],
-                    "location": rp["source_location"],
-                    "url": rp["source_url"],
-                    "pdf_filename": rp["source_pdf_filename"],
-                }
             result.append(
-                {
-                    "id": str(rp["id"]),
-                    "name": rp["name"],
-                    "year": rp["year"],
-                    "is_default": rp["is_default"],
-                    "description": rp["description"],
-                    "source": source,
-                    "values": [
-                        {"amino_acid": v["amino_acid"], "value": v["value"]}
-                        for v in vals
-                    ],
-                }
+                ReferenceEntry(
+                    id=str(rp["id"]),
+                    name=rp["name"],
+                    year=rp["year"],
+                    is_default=rp["is_default"],
+                    description=rp["description"],
+                    source=_source(rp),
+                    source_pdf_filename=rp["source_pdf_filename"],
+                    values=[ReferenceValue(v["amino_acid"], v["value"]) for v in vals],
+                )
             )
         return result
 
-    async def list_example_recipes(self) -> list[dict]:
+    async def list_example_recipes(self) -> list[ExampleRecipe]:
         recipes = (
             (
                 await self._db.execute(
@@ -203,21 +205,21 @@ class SqlCalculatorData:
                 .all()
             )
             result.append(
-                {
-                    "id": str(rc["id"]),
-                    "name": rc["name"],
-                    "description": rc["description"],
-                    "sample_type": rc["sample_type"],
-                    "items": [
-                        {
-                            "product_id": str(it["product_id"]),
-                            "name": it["product_name"],
-                            "region": it["region"],
-                            "subcategory": it["subcategory"],
-                            "amount_g": it["amount_g"],
-                        }
+                ExampleRecipe(
+                    id=str(rc["id"]),
+                    name=rc["name"],
+                    description=rc["description"],
+                    sample_type=rc["sample_type"],
+                    items=[
+                        ExampleRecipeItem(
+                            product_id=str(it["product_id"]),
+                            name=it["product_name"],
+                            region=it["region"],
+                            subcategory=it["subcategory"],
+                            amount_g=it["amount_g"],
+                        )
                         for it in items
                     ],
-                }
+                )
             )
         return result
