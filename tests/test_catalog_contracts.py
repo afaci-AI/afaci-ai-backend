@@ -11,15 +11,14 @@ from pydantic import ValidationError
 from core.db import models
 from core.errors import AppError
 from features.catalog.api import router as catalog_router
+from features.catalog.api.deps import build_catalog_service
 from features.catalog.api.schemas import (
     NutrientNameCreate,
     NutrientNameUpdate,
     SubcategoryCreate,
     SubcategoryUpdate,
 )
-from features.catalog.app import CatalogService
 from features.catalog.domain.rules import UNIT_MISMATCH
-from features.catalog.infra.sql_repo import SqlCatalogRepository
 from features.products.api import router as products_router
 from features.products.api.schemas import (
     NutrientBulkCreate,
@@ -41,7 +40,7 @@ NO_CALLER = Caller(None, None)
 
 
 def catalog(db):
-    return CatalogService(SqlCatalogRepository(db))
+    return build_catalog_service(db)
 
 
 def nutrients(db):

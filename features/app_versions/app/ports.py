@@ -4,11 +4,22 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Protocol
 from uuid import UUID
 
-Row = Any
 ReadChunk = Callable[[int], Awaitable[bytes]]
+
+
+class AppVersionRow(Protocol):
+    """Запись версии в хранилище (ORM); поля, которые читают и меняют сценарии."""
+
+    id: UUID
+    version: str
+    version_code: int
+    changelog: str | None
+    force_update: bool
+    min_supported_version_code: int | None
+    is_current: bool
 
 
 @dataclass
@@ -20,12 +31,12 @@ class StoredApk:
 
 
 class AppVersionRepository(Protocol):
-    async def current(self) -> Row | None: ...
+    async def current(self) -> AppVersionRow | None: ...
 
-    async def list(self) -> list[Row]:
+    async def list(self) -> list[AppVersionRow]:
         """Все версии по убыванию versionCode."""
 
-    async def get(self, version_id: UUID) -> Row | None: ...
+    async def get(self, version_id: UUID) -> AppVersionRow | None: ...
 
     async def lock_publication(self) -> None:
         """Сериализует публикации, в том числе параллельные загрузки."""
@@ -34,11 +45,11 @@ class AppVersionRepository(Protocol):
 
     async def clear_current(self) -> None: ...
 
-    async def add(self, data: dict) -> Row: ...
+    async def add(self, data: dict) -> AppVersionRow: ...
 
-    async def save(self, row: Row) -> Row: ...
+    async def save(self, row: AppVersionRow) -> AppVersionRow: ...
 
-    async def delete(self, row: Row) -> None: ...
+    async def delete(self, row: AppVersionRow) -> None: ...
 
     async def rollback(self) -> None: ...
 

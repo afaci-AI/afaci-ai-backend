@@ -11,18 +11,20 @@
 from dataclasses import asdict
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 
 from core.db.models import User
 from core.security import get_current_user
-from features.norms.api.deps import get_norms_service
-from features.norms.api.documents import document_path, pdf_url_builder
-from features.norms.app import NormsService
-from features.norms.domain.daily_norms import amounts_from_macros
 
-from ..app import RecipeCalculator, ReferenceCatalog
+from ..app import CompositionReport, RecipeCalculator, ReferenceCatalog
 from ..app.ports import ReferenceEntry
-from .deps import get_calculator, get_reference_catalog
+from .deps import (
+    PdfUrl,
+    get_calculator,
+    get_composition_report,
+    get_pdf_url,
+    get_reference_catalog,
+)
 from .schemas import (
     CalcRequest,
     OptimizeCostRequest,
@@ -35,27 +37,21 @@ TAG = "Calculator"
 router = APIRouter(prefix="/api/v1/calculator", tags=[TAG])
 
 
-def _source_out(entry: ReferenceEntry, request: Request) -> ReferenceSourceOut | None:
+def _source_out(entry: ReferenceEntry, pdf_url: PdfUrl) -> ReferenceSourceOut | None:
     source = entry.source
     if source is None:
         return None
-    filename = entry.source_pdf_filename
-    pdf_url = (
-        str(request.url_for("get_reference_document", filename=filename))
-        if filename and document_path(filename) is not None
-        else None
-    )
     return ReferenceSourceOut(
         title=source.title,
         authors=source.authors,
         year=source.year,
         location=source.location,
         url=source.url,
-        pdf_url=pdf_url,
+        pdf_url=pdf_url(entry.source_pdf_filename),
     )
 
 
-def _reference_out(entry: ReferenceEntry, request: Request) -> ReferenceProteinOut:
+def _reference_out(entry: ReferenceEntry, pdf_url: PdfUrl) -> ReferenceProteinOut:
     return ReferenceProteinOut(
         id=entry.id,
         name=entry.name,
@@ -63,17 +59,17 @@ def _reference_out(entry: ReferenceEntry, request: Request) -> ReferenceProteinO
         is_default=entry.is_default,
         description=entry.description,
         values=[asdict(value) for value in entry.values],
-        source=_source_out(entry, request),
+        source=_source_out(entry, pdf_url),
     )
 
 
 @router.get("/reference-proteins", summary="Эталонные белки ФАО/ВОЗ")
 async def list_reference_proteins(
-    request: Request,
+    pdf_url: Annotated[PdfUrl, Depends(get_pdf_url)],
     catalog: Annotated[ReferenceCatalog, Depends(get_reference_catalog)],
 ) -> list[ReferenceProteinOut]:
     return [
-        _reference_out(entry, request)
+        _reference_out(entry, pdf_url)
         for entry in await catalog.list_reference_proteins()
     ]
 
@@ -89,29 +85,11 @@ async def list_recipes(
 @router.post("/compute", summary="Рассчитать пищевую и биологическую ценность")
 async def compute(
     req: CalcRequest,
-    request: Request,
-    calculator: Annotated[RecipeCalculator, Depends(get_calculator)],
-    norms: Annotated[NormsService, Depends(get_norms_service)],
+    report: Annotated[CompositionReport, Depends(get_composition_report)],
     _user: Annotated[User, Depends(get_current_user)],
 ):
     items = [{"product_id": it.product_id, "amount_g": it.amount_g} for it in req.items]
-    result = await calculator.compute(req.reference_protein_id, items)
-    # Доля от суточной нормы считается здесь же; сумма рецептуры равна 100 г,
-    # поэтому макросостав — это содержание на 100 г рецептуры.
-    macro = result["macro"]
-    result["daily_norms"] = await norms.payload(
-        pdf_url_builder(request),
-        amounts_from_macros(
-            macro["protein"],
-            macro["fat"],
-            macro["carb"],
-            macro["fiber"],
-            energy=result["energy_kcal"],
-        ),
-        result["micro"],
-        result["other"],
-    )
-    return result
+    return await report.compute(req.reference_protein_id, items)
 
 
 @router.post("/optimize-cost", summary="Оптимизировать стоимость рецептуры")

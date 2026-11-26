@@ -97,10 +97,9 @@ modules =
     features.users
 ignore_imports =
     features.norms.domain.** -> features.calculator.domain.**
-    features.calculator.api.router -> features.norms.api.deps
-    features.calculator.api.router -> features.norms.api.documents
-    features.calculator.api.router -> features.norms.app
-    features.calculator.api.router -> features.norms.domain.daily_norms
+    features.calculator.api.deps -> features.norms.api.deps
+    features.calculator.api.deps -> features.norms.api.documents
+    features.calculator.api.deps -> features.norms.app
     features.recipes.api.deps -> features.calculator.api.deps
     features.recipes.api.deps -> features.calculator.app
     features.products.app.service -> features.catalog.domain.rules
