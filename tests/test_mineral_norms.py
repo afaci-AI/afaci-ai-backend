@@ -12,6 +12,7 @@ from features.norms.domain.daily_norms import (
     convert_amount,
     mineral_norm_rows,
 )
+from features.norms.domain.records import CompositionEntry, DailyNorm
 
 MIGRATION = (
     Path(__file__).resolve().parents[1]
@@ -111,20 +112,24 @@ class Units(unittest.TestCase):
 
 
 NORMS = (
-    {"key": "Fe", "unit": "мг", "value": 14.0, "kind": "norm", "source_id": "s"},
-    {"key": "Se", "unit": "мкг", "value": 63.0, "kind": "norm", "source_id": "s"},
-    {"key": "Co", "unit": "мкг", "value": 10.0, "kind": "adequate"},
-    {"key": "energy", "unit": "ккал", "value": 2602.0},
+    DailyNorm(key="Fe", unit="мг", value=14.0, source_id="s"),
+    DailyNorm(key="Se", unit="мкг", value=63.0, source_id="s"),
+    DailyNorm(key="Co", unit="мкг", value=10.0, kind="adequate"),
+    DailyNorm(key="energy", unit="ккал", value=2602.0),
 )
+
+
+def entries(*rows):
+    return [CompositionEntry.of(row) for row in rows]
 
 
 class Rows(unittest.TestCase):
     def test_share_in_norm_unit(self):
         rows = build_class_rows(
-            [
+            entries(
                 {"name": "Fe", "unit": "мг/100г", "amount": 7.0},
                 {"name": "Se", "unit": "мг/100г", "amount": 0.0315},
-            ],
+            ),
             list(NORMS),
         )
         fe, se = rows
@@ -134,16 +139,30 @@ class Rows(unittest.TestCase):
         self.assertEqual(se["percent"], 50.0)
         self.assertEqual(se["kind"], "norm")
 
+    def test_nutrient_without_unit_does_not_break_rows(self):
+        """Нутриент без единицы в справочнике: строка без доли, а не 500."""
+        fe, se = build_class_rows(
+            entries(
+                {"name": "Fe", "unit": None, "amount": 7.0},
+                {"name": "Se", "unit": "%", "amount": 1.0},
+            ),
+            list(NORMS),
+        )
+        for row in (fe, se):
+            self.assertIsNone(row["norm"])
+            self.assertIsNone(row["percent"])
+        self.assertEqual(fe["amount"], 7.0)
+
     def test_adequate_level_keeps_kind(self):
         (row,) = build_class_rows(
-            [{"name": "Co", "unit": "мг/100г", "amount": 0.002}], list(NORMS)
+            entries({"name": "Co", "unit": "мг/100г", "amount": 0.002}), list(NORMS)
         )
         self.assertEqual(row["kind"], "adequate")
         self.assertEqual(row["percent"], 20.0)
 
     def test_mineral_without_norm(self):
         (row,) = build_class_rows(
-            [{"name": "Al", "unit": "мг/100г", "amount": 1.2}], list(NORMS)
+            entries({"name": "Al", "unit": "мг/100г", "amount": 1.2}), list(NORMS)
         )
         self.assertIsNone(row["norm"])
         self.assertIsNone(row["kind"])

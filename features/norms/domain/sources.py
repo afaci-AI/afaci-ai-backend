@@ -3,60 +3,50 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
 
-PdfUrl = Callable[[str | None], str | None]
+from .records import ReferenceSource, RegistrySource, Source
 
 # Пространство имён для стабильных идентификаторов источников эталонных белков.
 _REFERENCE_SOURCE_NS = uuid.UUID("8c1d3a52-6e4f-4b7a-9d20-3f5a1c7e9b01")
 
 
-def registry_source(row: Mapping, pdf_url: PdfUrl) -> dict:
-    return {
-        "id": str(row["id"]),
-        "kind": row["kind"],
-        "title": row["title"],
-        "authors": row["authors"],
-        "year": row["year"],
-        "location": row["location"],
-        "url": row["url"],
-        "pdf_url": pdf_url(row["pdf_filename"]),
-        "used_for": row["used_for"],
-    }
+@dataclass
+class _SharedDocument:
+    """Один документ, на который ссылаются несколько эталонов."""
+
+    first: ReferenceSource
+    names: list[str] = field(default_factory=list)
+
+    def source(self) -> Source:
+        ref = self.first
+        key = (ref.title, ref.year, ref.url)
+        return Source(
+            id=str(uuid.uuid5(_REFERENCE_SOURCE_NS, "|".join(map(str, key)))),
+            kind="article" if "Journal" in (ref.authors or "") else "document",
+            title=ref.title,
+            authors=ref.authors,
+            year=ref.year,
+            location=ref.location,
+            url=ref.url,
+            pdf_filename=ref.pdf_filename,
+            used_for="Эталонный белок: " + ", ".join(self.names),
+        )
 
 
 def merge_sources(
-    registry: list[Mapping], references: list[Mapping], pdf_url: PdfUrl
-) -> list[dict]:
+    registry: list[RegistrySource], references: list[ReferenceSource]
+) -> list[Source]:
     """Записи реестра плюс источники эталонов.
 
     Источники эталонов остаются в `reference_proteins` (единое место правды) и
     добавляются к реестру при чтении; совпадающие записи (один документ у
     нескольких эталонов) объединяются, в «Где применяется» перечисляются эталоны.
     """
-    result = [registry_source(row, pdf_url) for row in registry]
-    merged: dict[tuple, dict] = {}
+    shared: dict[tuple, _SharedDocument] = {}
     for ref in references:
-        key = (ref["source_title"], ref["source_year"], ref["source_url"])
-        entry = merged.get(key)
-        if entry is None:
-            authors = ref["source_authors"] or ""
-            entry = {
-                "id": str(uuid.uuid5(_REFERENCE_SOURCE_NS, "|".join(map(str, key)))),
-                "kind": "article" if "Journal" in authors else "document",
-                "title": ref["source_title"],
-                "authors": ref["source_authors"],
-                "year": ref["source_year"],
-                "location": ref["source_location"],
-                "url": ref["source_url"],
-                "pdf_url": pdf_url(ref["source_pdf_filename"]),
-                "used_for": None,
-                "_names": [],
-            }
-            merged[key] = entry
-        entry["_names"].append(ref["name"])
-    for entry in merged.values():
-        names = entry.pop("_names")
-        entry["used_for"] = "Эталонный белок: " + ", ".join(names)
-        result.append(entry)
-    return result
+        document = shared.setdefault(
+            (ref.title, ref.year, ref.url), _SharedDocument(ref)
+        )
+        document.names.append(ref.reference_name)
+    return list(registry) + [document.source() for document in shared.values()]

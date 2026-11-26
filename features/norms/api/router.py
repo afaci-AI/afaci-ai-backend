@@ -12,31 +12,28 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 
 from ..app import NormsService
-from .deps import get_norms_service
-from .documents import pdf_url_builder
+from .deps import get_norms_service, get_pdf_url
+from .presenters import PdfUrl, present_payload, source_out
 from .schemas import DailyNormsOut, SourceOut
 
 TAG = "Sources and daily norms"
 router = APIRouter(prefix="/api/v1", tags=[TAG])
 
+Norms = Annotated[NormsService, Depends(get_norms_service)]
+PdfLinks = Annotated[PdfUrl, Depends(get_pdf_url)]
+
 
 @router.get("/sources", summary="Источники информации")
-async def list_sources(
-    request: Request, norms: Annotated[NormsService, Depends(get_norms_service)]
-) -> list[SourceOut]:
-    return [
-        SourceOut(**source) for source in await norms.sources(pdf_url_builder(request))
-    ]
+async def list_sources(norms: Norms, pdf_url: PdfLinks) -> list[SourceOut]:
+    return [SourceOut(**source_out(s, pdf_url)) for s in await norms.sources()]
 
 
 @router.get("/daily-norms", summary="Усреднённые суточные нормы")
-async def get_daily_norms(
-    request: Request, norms: Annotated[NormsService, Depends(get_norms_service)]
-) -> DailyNormsOut:
-    return DailyNormsOut(**await norms.payload(pdf_url_builder(request)))
+async def get_daily_norms(norms: Norms, pdf_url: PdfLinks) -> DailyNormsOut:
+    return DailyNormsOut(**present_payload(await norms.payload(), pdf_url))
 
 
 @router.get(
@@ -44,8 +41,6 @@ async def get_daily_norms(
     summary="Суточные нормы и доля от нормы для 100 г продукта",
 )
 async def get_product_daily_norms(
-    id: UUID,
-    request: Request,
-    norms: Annotated[NormsService, Depends(get_norms_service)],
+    id: UUID, norms: Norms, pdf_url: PdfLinks
 ) -> DailyNormsOut:
-    return DailyNormsOut(**await norms.product_payload(id, pdf_url_builder(request)))
+    return DailyNormsOut(**present_payload(await norms.product_payload(id), pdf_url))

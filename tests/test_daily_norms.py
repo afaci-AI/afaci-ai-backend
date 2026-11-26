@@ -21,6 +21,12 @@ from features.norms.domain.daily_norms import (
     build_norm_rows,
     percent_of_norm,
 )
+from features.norms.domain.records import (
+    DailyNorm,
+    ProductComposition,
+    ReferenceSource,
+    RegistrySource,
+)
 from features.norms.domain.sources import merge_sources
 from features.norms.infra.sql_repo import SqlNormsRepository
 
@@ -99,13 +105,15 @@ class DomainTests(unittest.TestCase):
             {"key": "energy", "name": "Энергия", "unit": "ккал", "value": 2602},
             {"key": "other", "name": "Другое", "unit": "г", "value": 1},
         ]
-        rows = build_norm_rows(norms, {"energy": 260.2, "fiber": 2.5})
+        rows = build_norm_rows(
+            [DailyNorm.of(n) for n in norms], {"energy": 260.2, "fiber": 2.5}
+        )
         self.assertEqual([r["key"] for r in rows], ["energy", "fiber"])
         self.assertEqual([r["percent"] for r in rows], [10.0, 10.0])
 
     def test_rows_without_amounts_have_no_share(self):
         norms = [{"key": "protein", "name": "Белки", "unit": "г", "value": 83}]
-        row = build_norm_rows(norms)[0]
+        row = build_norm_rows([DailyNorm.of(n) for n in norms])[0]
         self.assertIsNone(row["amount"])
         self.assertIsNone(row["percent"])
 
@@ -145,9 +153,9 @@ class SeededValuesTests(unittest.TestCase):
 
 class FakeNormsRepository:
     def __init__(self, norms=(), registry=(), references=(), macros=None):
-        self._norms = list(norms)
-        self._registry = list(registry)
-        self._references = list(references)
+        self._norms = [DailyNorm.of(n) for n in norms]
+        self._registry = [RegistrySource.of(r) for r in registry]
+        self._references = [ReferenceSource.of(r) for r in references]
         self._macros = macros
 
     async def registry_sources(self):
@@ -163,7 +171,7 @@ class FakeNormsRepository:
         return self._macros
 
     async def product_composition(self, product_id):
-        return {"micro": [], "other": []}
+        return ProductComposition(micro=[], other=[])
 
 
 class ServiceTests(unittest.IsolatedAsyncioTestCase):
@@ -202,16 +210,19 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
             {"name": "ФАО/ВОЗ 1985", **shared},
             {"name": "ФАО/ВОЗ 1991", **shared},
         ]
-        result = merge_sources(sources, references, lambda name: None)
+        result = merge_sources(
+            [RegistrySource.of(s) for s in sources],
+            [ReferenceSource.of(r) for r in references],
+        )
         self.assertEqual(len(result), 3)
-        by_title = {s["title"]: s for s in result}
-        self.assertEqual(by_title["Young"]["kind"], "article")
-        self.assertEqual(by_title["FAO paper"]["kind"], "document")
+        by_title = {s.title: s for s in result}
+        self.assertEqual(by_title["Young"].kind, "article")
+        self.assertEqual(by_title["FAO paper"].kind, "document")
         self.assertEqual(
-            by_title["FAO paper"]["used_for"],
+            by_title["FAO paper"].used_for,
             "Эталонный белок: ФАО/ВОЗ 1985, ФАО/ВОЗ 1991",
         )
-        self.assertEqual(len({s["id"] for s in result}), 3)
+        self.assertEqual(len({s.id for s in result}), 3)
 
     async def test_payload_returns_only_used_sources_and_info(self):
         source_id = uuid4()
@@ -248,9 +259,9 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
                 ],
             )
         )
-        payload = await service.payload(lambda name: None, {"protein": 41.5})
+        payload = await service.payload({"protein": 41.5})
         self.assertEqual(payload["norms"][0]["percent"], 50.0)
-        self.assertEqual([s["title"] for s in payload["sources"]], ["МР"])
+        self.assertEqual([s.title for s in payload["sources"]], ["МР"])
         self.assertEqual(payload["info"], NORMS_INFO)
 
     async def test_product_macros_none_for_missing_product(self):
@@ -285,13 +296,13 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
             "Углеводы": 20.0,
         }
         service = NormsService(FakeNormsRepository(norms=[norm], macros=macros))
-        payload = await service.product_payload(uuid4(), lambda name: None)
+        payload = await service.product_payload(uuid4())
         self.assertEqual(payload["norms"][0]["amount"], 165.0)
 
     async def test_product_payload_missing_product_is_not_found(self):
         service = NormsService(FakeNormsRepository(macros=None))
         with self.assertRaises(NotFoundError) as caught:
-            await service.product_payload(uuid4(), lambda name: None)
+            await service.product_payload(uuid4())
         self.assertEqual(caught.exception.status_code, 404)
 
 

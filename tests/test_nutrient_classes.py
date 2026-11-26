@@ -10,6 +10,7 @@ from features.catalog.domain.nutrient_classes import (
     default_nutrient_class,
 )
 from features.norms.domain.daily_norms import build_class_rows, short_unit
+from features.norms.domain.records import CompositionEntry
 
 
 def item(amount, micro=None, other=None):
@@ -84,16 +85,14 @@ class RecipeComposition(unittest.TestCase):
 
 class ClassRows(unittest.TestCase):
     def test_rows_have_no_norm_and_short_unit(self):
-        rows = build_class_rows([{"name": "Ca", "unit": "мг/100г", "amount": 12.0}])
+        rows = build_class_rows([CompositionEntry("Ca", "мг/100г", 12.0)])
         self.assertEqual(rows[0]["unit"], "мг")
         self.assertIsNone(rows[0]["norm"])
         self.assertIsNone(rows[0]["percent"])
         self.assertFalse(rows[0]["partial"])
 
     def test_partial_flag_is_kept(self):
-        rows = build_class_rows(
-            [{"name": "Fe", "unit": None, "amount": 1.0, "partial": True}]
-        )
+        rows = build_class_rows([CompositionEntry("Fe", None, 1.0, partial=True)])
         self.assertTrue(rows[0]["partial"])
         self.assertIsNone(rows[0]["unit"])
 

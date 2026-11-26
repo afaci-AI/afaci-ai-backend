@@ -1,24 +1,33 @@
 """Сборка зависимостей калькулятора: порты → SQL-реализация (composition root)."""
 
-from collections.abc import Callable
 from typing import Annotated
 
-from fastapi import Depends, Request
+from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.db.session import get_db
-from features.norms.api.deps import get_norms_service
-from features.norms.api.documents import pdf_url_builder
-from features.norms.app import NormsService
+from features.norms.api.deps import get_norms_service, get_pdf_url
+from features.norms.api.presenters import PdfUrl, present_payload
+from features.norms.app import CompositionEntry, NormsService
 
 from ..app import CompositionReport, RecipeCalculator, ReferenceCatalog
 from ..infra.sql_reader import SqlCalculatorData
 
-PdfUrl = Callable[[str | None], str | None]
+__all__ = [
+    "PdfUrl",
+    "get_calculator",
+    "get_composition_report",
+    "get_pdf_url",
+    "get_reference_catalog",
+]
 
 
 class _DailyNormsAdapter:
-    """Суточные нормы считает фича норм через её публичный сервис."""
+    """Суточные нормы считает фича норм через её публичный сервис.
+
+    Строки состава отчёта переводятся в записи норм, а ссылки на PDF источников
+    строит презентер норм — так же, как в её собственных эндпоинтах.
+    """
 
     def __init__(self, norms: NormsService, pdf_url: PdfUrl) -> None:
         self._norms = norms
@@ -32,14 +41,13 @@ class _DailyNormsAdapter:
         micro: list[dict],
         other: list[dict],
     ) -> dict:
-        return await self._norms.recipe_payload(
-            self._pdf_url, macro, energy_kcal, micro, other
+        payload = await self._norms.recipe_payload(
+            macro,
+            energy_kcal,
+            [CompositionEntry.of(row) for row in micro],
+            [CompositionEntry.of(row) for row in other],
         )
-
-
-def get_pdf_url(request: Request) -> PdfUrl:
-    """Ссылка на локально хранимый PDF источника или None, если файла нет."""
-    return pdf_url_builder(request)
+        return present_payload(payload, self._pdf_url)
 
 
 async def get_calculator(
