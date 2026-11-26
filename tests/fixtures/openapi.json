@@ -5578,6 +5578,119 @@
     ]
    }
   },
+  "/api/v1/reports-temp/recipes": {
+   "get": {
+    "description": "Рецептуры текущего пользователя: id и название.",
+    "operationId": "report_recipes_api_v1_reports_temp_recipes_get",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Сохранённые рецептуры для отчёта о пищевой ценности",
+    "tags": [
+     "Temporary reports"
+    ]
+   }
+  },
+  "/api/v1/reports-temp/recipes/{recipe_id}/nutrition.pdf": {
+   "get": {
+    "operationId": "recipe_nutrition_pdf_api_v1_reports_temp_recipes__recipe_id__nutrition_pdf_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "recipe_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Recipe Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "download",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "Download",
+       "type": "boolean"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/pdf": {}
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "PDF: пищевая ценность рецептуры",
+    "tags": [
+     "Temporary reports"
+    ]
+   }
+  },
   "/api/v1/saved/groups": {
    "get": {
     "operationId": "list_groups_api_v1_saved_groups_get",

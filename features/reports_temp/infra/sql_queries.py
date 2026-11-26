@@ -10,6 +10,9 @@ from features.calculator.domain.formulas.constants import CARB, FAT, PROTEIN
 
 from ..app.models import ListCriteria, RankingCriteria
 
+CHEM_TYPE = "Химический состав"
+AMINO_TYPE = "Аминокислотный состав"
+
 PRODUCT_JOINS = """
         FROM products p
         JOIN categories c          ON p.category_id    = c.id
@@ -128,6 +131,67 @@ class SqlReportQueries:
         ORDER BY nt.name, nn.name
         """)
         return await self._rows(sql, {"id": product_id})
+
+    async def user_recipes(self, user_id: str) -> list[dict]:
+        sql = text("""
+        SELECT id::text AS id, name FROM saved_recipes
+        WHERE user_id = CAST(:user AS uuid)
+        ORDER BY name, id
+        """)
+        return await self._rows(sql, {"user": user_id})
+
+    async def saved_recipe(self, recipe_id: str, user_id: str) -> dict | None:
+        sql = text("""
+        SELECT id::text AS id, name, reference_protein_id::text AS reference_id
+        FROM saved_recipes
+        WHERE id = CAST(:id AS uuid) AND user_id = CAST(:user AS uuid)
+        """)
+        rows = await self._rows(sql, {"id": recipe_id, "user": user_id})
+        return rows[0] if rows else None
+
+    async def recipe_items(self, recipe_id: str) -> list[dict]:
+        sql = text("""
+        SELECT ri.product_id::text AS id, p.name, ri.amount_g, ri.sort_order,
+               nt.name AS ntype, nn.name AS nutrient, n.quantity
+        FROM saved_recipe_items ri
+        JOIN products p              ON p.id  = ri.product_id
+        LEFT JOIN nutrients n        ON n.id_product = p.id
+        LEFT JOIN nutrients_names nn ON nn.id = n.id_name_component
+        LEFT JOIN nutrients_types nt ON nt.id = nn.nutrient_type_id
+        WHERE ri.saved_recipe_id = CAST(:id AS uuid)
+        ORDER BY ri.sort_order, p.name
+        """)
+        items: dict[str, dict] = {}
+        for row in await self._rows(sql, {"id": recipe_id}):
+            item = items.setdefault(
+                row["id"],
+                {
+                    "name": row["name"],
+                    "amount_g": row["amount_g"],
+                    "chem": {},
+                    "amino": {},
+                },
+            )
+            if row["quantity"] is None:
+                continue
+            if row["ntype"] == CHEM_TYPE:
+                item["chem"][row["nutrient"]] = row["quantity"]
+            elif row["ntype"] == AMINO_TYPE:
+                item["amino"][row["nutrient"]] = row["quantity"]
+        return list(items.values())
+
+    async def reference(self, reference_id: str) -> dict:
+        sql = text("""
+        SELECT rp.name, v.amino_acid, v.value
+        FROM reference_proteins rp
+        LEFT JOIN reference_protein_values v ON v.reference_protein_id = rp.id
+        WHERE rp.id = CAST(:id AS uuid)
+        """)
+        rows = await self._rows(sql, {"id": reference_id})
+        return {
+            "name": rows[0]["name"] if rows else "—",
+            "values": {r["amino_acid"]: r["value"] for r in rows if r["amino_acid"]},
+        }
 
     async def options(self) -> dict:
         async def names(table: str) -> list[str]:

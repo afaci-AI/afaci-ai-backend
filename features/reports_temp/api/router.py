@@ -1,4 +1,4 @@
-"""TEMP: reports_temp — PDF-отчёты по выборке сырья (доступны любому вошедшему)."""
+"""TEMP: reports_temp — PDF-отчёты по выборке сырья и пищевой ценности рецептуры."""
 
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -64,6 +64,34 @@ async def lookup_products(
     name: Annotated[str, Query(min_length=1, max_length=200)],
 ):
     return await service.lookup(name)
+
+
+@router.get(
+    "/recipes",
+    summary="Сохранённые рецептуры для отчёта о пищевой ценности",
+    description="Рецептуры текущего пользователя: id и название.",
+)
+async def report_recipes(service: Service, user: CurrentUser):
+    return await service.recipes(str(user.id))
+
+
+@router.get(
+    "/recipes/{recipe_id}/nutrition.pdf",
+    summary="PDF: пищевая ценность рецептуры",
+    response_class=Response,
+    responses={200: {"content": {"application/pdf": {}}}},
+)
+async def recipe_nutrition_pdf(
+    recipe_id: UUID,
+    service: Service,
+    render: Renderer,
+    user: CurrentUser,
+    download: bool = False,
+):
+    doc = await service.nutrition_report(
+        str(recipe_id), str(user.id), user.name, datetime.now(UTC)
+    )
+    return _pdf(render, doc, download)
 
 
 @router.get(

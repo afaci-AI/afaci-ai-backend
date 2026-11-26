@@ -10,6 +10,7 @@ from features.reports_temp.app import (
     ListCriteria,
     RankingCriteria,
     ReportService,
+    recipe_nutrition,
 )
 from features.reports_temp.infra.pdf import render_pdf
 
@@ -51,8 +52,42 @@ class FakeQueries:
     async def product_nutrients(self, product_id):
         return list(self._nutrients)
 
+    async def user_recipes(self, user_id):
+        return [{"id": "r1", "name": "Котлеты"}] if user_id == "u1" else []
+
+    async def saved_recipe(self, recipe_id, user_id):
+        if (recipe_id, user_id) != ("r1", "u1"):
+            return None
+        return {"id": "r1", "name": "Котлеты", "reference_id": "ref"}
+
+    async def recipe_items(self, recipe_id):
+        return [dict(it) for it in RECIPE]
+
+    async def reference(self, reference_id):
+        return dict(REFERENCE)
+
     async def options(self):
         return {}
+
+
+PROTEIN, FAT, CARB = "Массовая доля белка", "Массовая доля жира", "Углеводы"
+REFERENCE = {"name": "ФАО/ВОЗ", "values": {"ЛИЗ": 5.5, "ТРИ": 1.0}}
+RECIPE = [
+    {
+        "name": "Говядина",
+        "amount_g": 60.0,
+        "chem": {PROTEIN: 20.0, FAT: 10.0, CARB: 0.0},
+        # 1600 мг лизина на 20 % белка: 8 г/100 г белка; триптофан 2 г/100 г белка.
+        "amino": {"Лизин": 1600.0, "Триптофан": 400.0},
+    },
+    {
+        "name": "Хлеб",
+        "amount_g": 40.0,
+        "chem": {PROTEIN: 8.0, FAT: 1.0, CARB: 50.0},
+        "amino": {"Лизин": 160.0, "Триптофан": 80.0},
+    },
+    {"name": "Соль", "amount_g": 0.0, "chem": {}, "amino": {}},
+]
 
 
 def product(i, protein=10.0, fat=5.0, carb=2.0):
@@ -156,6 +191,51 @@ class ReportServiceTest(unittest.TestCase):
         )
         with self.assertRaises(NotFoundError):
             run(service.card_report("missing", "И", NOW))
+
+
+class RecipeNutritionTest(unittest.TestCase):
+    def test_macro_energy_and_limiting_amino_acid(self):
+        result = recipe_nutrition(RECIPE, REFERENCE)
+        self.assertAlmostEqual(result.mass_g, 100.0)
+        self.assertAlmostEqual(result.protein, 15.2)  # (20·60 + 8·40) / 100
+        self.assertAlmostEqual(result.fat, 6.4)
+        self.assertAlmostEqual(result.carb, 20.0)
+        self.assertAlmostEqual(result.energy_kcal, 4 * 15.2 + 9 * 6.4 + 4 * 20.0)
+        scores = {s.name: s.score for s in result.scores}
+        # Mⱼ лизина = (1200·8 + 320·2) / 1520 = 6,7368 г/100 г белка.
+        self.assertAlmostEqual(scores["ЛИЗ"], 6.736842 / 5.5 * 100, places=3)
+        self.assertIsNone(scores["ИЗО"])  # в эталоне нет значения
+        self.assertEqual(result.limiting.name, "ЛИЗ")
+
+    def test_empty_recipe_rejected(self):
+        with self.assertRaises(BadRequestError):
+            recipe_nutrition([{"name": "Соль", "amount_g": 0.0}], REFERENCE)
+
+    def test_without_amino_data_no_limiting(self):
+        items = [{**RECIPE[1], "amino": {}}]
+        result = recipe_nutrition(items, REFERENCE)
+        self.assertEqual(result.scores, [])
+        self.assertIsNone(result.limiting)
+
+
+class NutritionReportTest(unittest.TestCase):
+    def test_report_has_composition_value_and_score(self):
+        service = ReportService(FakeQueries())
+        doc = run(service.nutrition_report("r1", "u1", "Иван", NOW))
+        titles = [s.title for s in doc.sections]
+        self.assertEqual(
+            titles,
+            ["Состав рецептуры", "Пищевая ценность на 100 г", "Аминокислотный скор"],
+        )
+        self.assertIn(["Белок", "15,2", "г"], doc.sections[1].table.rows)
+        self.assertTrue(any("Лимитирующая аминокислота: ЛИЗ" in n for n in doc.notes))
+        self.assertTrue(render_pdf(doc).startswith(b"%PDF"))
+
+    def test_foreign_or_missing_recipe_not_found(self):
+        service = ReportService(FakeQueries())
+        with self.assertRaises(NotFoundError):
+            run(service.nutrition_report("r1", "u2", "Иван", NOW))
+        self.assertEqual(run(service.recipes("u2")), [])
 
 
 class PdfRenderTest(unittest.TestCase):

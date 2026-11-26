@@ -16,6 +16,7 @@ from .models import (
     ReportSection,
     ReportTable,
 )
+from .nutrition import recipe_nutrition
 from .ports import ReportQueries
 
 GROUP_ORDER = ["Химический состав", "Аминокислотный состав", "Минеральный состав"]
@@ -52,6 +53,78 @@ class ReportService:
         if name is None:
             return []
         return await self._q.lookup_products(name, LOOKUP_LIMIT)
+
+    async def recipes(self, user_id: str) -> list[dict]:
+        return await self._q.user_recipes(user_id)
+
+    async def nutrition_report(
+        self, recipe_id: str, user_id: str, author: str, now: datetime
+    ) -> ReportDocument:
+        recipe = await self._q.saved_recipe(recipe_id, user_id)
+        if recipe is None:
+            raise NotFoundError("Рецептура не найдена.")
+        items = await self._q.recipe_items(recipe_id)
+        reference = await self._q.reference(recipe["reference_id"])
+        result = recipe_nutrition(items, reference)
+        doc = ReportDocument(
+            title=f"Пищевая ценность рецептуры: {recipe['name']}",
+            author=author,
+            created_at=now,
+            criteria=[
+                ("Рецептура", recipe["name"]),
+                ("Эталон белка", reference["name"]),
+                ("Масса рецептуры, г", fmt(result.mass_g)),
+            ],
+            filename="recipe-nutrition.pdf",
+        )
+        doc.sections.append(
+            ReportSection(
+                "Состав рецептуры",
+                ReportTable(
+                    columns=["Ингредиент", "Масса, г"],
+                    rows=[[it["name"], fmt(it["amount_g"])] for it in items],
+                    widths=[75, 25],
+                    align=["L", "R"],
+                ),
+            )
+        )
+        doc.sections.append(
+            ReportSection(
+                "Пищевая ценность на 100 г",
+                ReportTable(
+                    columns=["Показатель", "Значение", "Единица"],
+                    rows=[
+                        ["Белок", fmt(result.protein), "г"],
+                        ["Жир", fmt(result.fat), "г"],
+                        ["Углеводы", fmt(result.carb), "г"],
+                        ["Энергоценность", fmt(result.energy_kcal), "ккал"],
+                    ],
+                    widths=[50, 25, 25],
+                    align=["L", "R", "L"],
+                ),
+            )
+        )
+        if result.scores:
+            doc.sections.append(
+                ReportSection(
+                    "Аминокислотный скор",
+                    ReportTable(
+                        columns=["Группа НАК", "Скор, %"],
+                        rows=[[s.name, fmt(s.score)] for s in result.scores],
+                        widths=[60, 40],
+                        align=["L", "R"],
+                    ),
+                )
+            )
+        if result.limiting is not None:
+            doc.notes.append(
+                f"Лимитирующая аминокислота: {result.limiting.name}, "
+                f"скор {fmt(result.limiting.score)} %."
+            )
+        else:
+            doc.notes.append("Скор не рассчитан: нет данных по аминокислотам.")
+        doc.notes.append(KCAL_NOTE)
+        return doc
 
     async def products_report(
         self, criteria: ListCriteria, author: str, now: datetime

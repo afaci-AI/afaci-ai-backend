@@ -26,6 +26,22 @@ class ReportQueries(Protocol):
 
     async def product_nutrients(self, product_id: str) -> list[dict]: ...
 
+    async def user_recipes(self, user_id: str) -> list[dict]:
+        """Сохранённые рецептуры пользователя: id, название."""
+        ...
+
+    async def saved_recipe(self, recipe_id: str, user_id: str) -> dict | None:
+        """Рецептура пользователя: название, id эталона белка; None, если чужая или нет."""
+        ...
+
+    async def recipe_items(self, recipe_id: str) -> list[dict]:
+        """Ингредиенты: название, масса, химический (chem) и аминокислотный (amino) состав."""
+        ...
+
+    async def reference(self, reference_id: str) -> dict:
+        """Эталон белка: название и значения НАК по группам."""
+        ...
+
     async def options(self) -> dict:
         """Значения для формы: категории, подкатегории, регионы, нутриенты."""
         ...
