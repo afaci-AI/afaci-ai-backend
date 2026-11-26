@@ -1,6 +1,5 @@
 """Пакет аудита и логирования."""
 
-from core.audit.decorator import audit_log
 from core.audit.events import log_audit_change
 from core.audit.food_audit import (
     FOOD_ENTITY,
@@ -16,7 +15,6 @@ from core.audit.middleware import AuditLogMiddleware
 __all__ = [
     "FOOD_ENTITY",
     "AuditLogMiddleware",
-    "audit_log",
     "compute_diff",
     "get_audit_logger",
     "log_audit_change",
