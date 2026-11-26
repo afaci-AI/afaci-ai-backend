@@ -1,12 +1,30 @@
-"""Порт хранилища справочников. Записи — непрозрачные объекты хранилища:
-у них есть `id`, `name` и поля конкретного справочника."""
+"""Порты справочников.
+
+Записи — объекты хранилища (ORM): DTO не вводятся по решению от 2026-11-09.
+Протоколы ниже описывают только поля, которые читают и меняют сценарии.
+Порты разделены по ответственности: записи справочников, проверки правил,
+единица работы.
+"""
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Protocol
 from uuid import UUID
 
-Row = Any
+
+class DictionaryRow(Protocol):
+    id: UUID
+    name: str
+
+
+class SubcategoryRow(DictionaryRow, Protocol):
+    category_id: UUID
+
+
+class NutrientNameRow(DictionaryRow, Protocol):
+    nutrient_type_id: UUID
+    unit_id: UUID
+    nutrient_class: str | None
 
 
 class DuplicateError(Exception):
@@ -17,29 +35,32 @@ class InUseError(Exception):
     """Запись используется другими данными и не может быть удалена."""
 
 
-class CatalogRepository(Protocol):
-    async def get(self, kind: str, item_id: UUID) -> Row | None: ...
+class DictionaryRepository(Protocol):
+    """Записи любого справочника по его виду (`DictionarySpec.kind`)."""
 
-    async def list(self, kind: str, name: str | None = None) -> list[Row]:
+    async def get(self, kind: str, item_id: UUID) -> DictionaryRow | None: ...
+
+    async def list(self, kind: str, name: str | None = None) -> list[DictionaryRow]:
         """Все записи; `name` — фильтр «содержит» без учёта регистра."""
 
-    async def find_by_name(self, kind: str, name: str) -> Row | None: ...
+    async def find_by_name(self, kind: str, name: str) -> DictionaryRow | None: ...
 
-    async def add(self, kind: str, data: dict) -> Row:
+    async def add(self, kind: str, data: dict) -> DictionaryRow:
         """Создаёт запись и сохраняет. DuplicateError при нарушении уникальности."""
 
-    def stage(self, kind: str, data: dict) -> Row:
-        """Добавляет запись в текущую транзакцию без сохранения."""
+    def stage(self, kind: str, data: dict) -> DictionaryRow:
+        """Добавляет запись в текущую единицу работы без сохранения."""
 
-    async def save(self, row: Row) -> Row:
+    async def save(self, row: DictionaryRow) -> DictionaryRow:
         """Сохраняет изменения. DuplicateError при нарушении уникальности."""
 
-    async def commit(self) -> None: ...
-
-    async def delete(self, row: Row) -> None:
+    async def delete(self, row: DictionaryRow) -> None:
         """Удаляет запись. InUseError, если на неё есть ссылки."""
 
-    # ------------------------------------------------------ специальные
+
+class CatalogRules(Protocol):
+    """Проверки, нужные только подкатегориям и названиям нутриентов."""
+
     async def default_unit_id(self, type_name: str) -> UUID | None:
         """Единица по правилу типа состава либо None."""
 
@@ -52,3 +73,9 @@ class CatalogRepository(Protocol):
     ) -> bool: ...
 
     async def has_values_in_other_unit(self, name_id: UUID, unit_id: UUID) -> bool: ...
+
+
+class UnitOfWork(Protocol):
+    """Транзакция, общая для записей, добавленных через `stage`."""
+
+    async def commit(self) -> None: ...

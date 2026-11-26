@@ -13,14 +13,14 @@ from core.audit.food_audit import (
     snapshot_product,
 )
 
-from ..app.ports import Caller, Row
+from ..app.ports import Caller, NutrientRow, ProductRow
 
 
 class FoodAuditTrail:
-    def snapshot_product(self, row: Row) -> dict:
+    def snapshot_product(self, row: ProductRow) -> dict:
         return snapshot_product(row)
 
-    def snapshot_nutrient(self, row: Row) -> dict:
+    def snapshot_nutrient(self, row: NutrientRow) -> dict:
         return snapshot_nutrient(row)
 
     def diff(self, old: dict, new: dict) -> tuple[dict, dict]:

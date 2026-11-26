@@ -15,10 +15,13 @@ from .ports import (
     AuditTrail,
     Caller,
     DuplicateError,
+    NutrientNameRow,
     NutrientRepository,
+    NutrientRow,
     ProductRepository,
+    ProductRow,
     ReferenceNames,
-    Row,
+    ReferenceRow,
     UnitOfWork,
 )
 
@@ -32,12 +35,12 @@ BULK_CONFLICT = "Transaction rolled back due to conflict"
 class AutoRefs(NamedTuple):
     """Справочники продукта, найденные или добавленные по имени."""
 
-    category: Row
-    region: Row
-    subcategory: Row | None
+    category: ReferenceRow
+    region: ReferenceRow
+    subcategory: ReferenceRow | None
 
 
-def _unit_for(name: Row, requested: UUID | None) -> UUID:
+def _unit_for(name: NutrientNameRow, requested: UUID | None) -> UUID:
     try:
         return nutrient_unit_for(name.unit_id, requested)
     except UnitRuleViolation as exc:
@@ -70,25 +73,25 @@ class ProductService:
         self._uow = uow
         self._audit = audit
 
-    async def get(self, product_id: UUID) -> Row:
+    async def get(self, product_id: UUID) -> ProductRow:
         item = await self._repo.get(product_id)
         if item is None:
             raise NotFoundError("Product not found")
         return item
 
-    async def list(self) -> list[Row]:
+    async def list(self) -> list[ProductRow]:
         return await self._repo.list()
 
     async def count(self) -> int:
         return await self._repo.count()
 
-    async def by_region(self, region_id: UUID) -> list[Row]:
+    async def by_region(self, region_id: UUID) -> list[ProductRow]:
         return await self._repo.by_region(region_id)
 
-    async def by_category(self, category_id: UUID) -> list[Row]:
+    async def by_category(self, category_id: UUID) -> list[ProductRow]:
         return await self._repo.by_category(category_id)
 
-    async def create(self, data: dict, caller: Caller) -> Row:
+    async def create(self, data: dict, caller: Caller) -> ProductRow:
         try:
             item = await self._repo.add(data)
         except DuplicateError as exc:
@@ -110,7 +113,7 @@ class ProductService:
         )
         return {"status": "deleted"}
 
-    async def update(self, product_id: UUID, patch: dict, caller: Caller) -> Row:
+    async def update(self, product_id: UUID, patch: dict, caller: Caller) -> ProductRow:
         item = await self.get(product_id)
         old_snapshot = self._audit.snapshot_product(item)
         if not patch:
@@ -154,7 +157,7 @@ class ProductService:
             subcategory = await self._names.subcategory(data["subcategory_name"])
         return AutoRefs(category, region, subcategory)
 
-    async def _stage(self, data: dict, refs: AutoRefs) -> Row:
+    async def _stage(self, data: dict, refs: AutoRefs) -> ProductRow:
         return await self._repo.stage(
             {
                 "name": data["name"],
@@ -164,7 +167,7 @@ class ProductService:
             }
         )
 
-    async def auto_create(self, data: dict, caller: Caller) -> Row:
+    async def auto_create(self, data: dict, caller: Caller) -> ProductRow:
         try:
             product = await self._stage(data, await self._auto_refs(data))
             await self._uow.commit()
@@ -186,7 +189,7 @@ class ProductService:
         Конфликт уникальности откатывает всю пачку; прочие сбои тоже
         откатывают её и не подменяются текстом ошибки.
         """
-        created: list[Row] = []
+        created: list[ProductRow] = []
         errors: list[str] = []
         try:
             for idx, data in enumerate(items):
@@ -194,13 +197,13 @@ class ProductService:
                     refs = await self._auto_refs(data)
                     if await self._repo.find_in_region(data["name"], refs.region.id):
                         errors.append(
-                            f"Row {idx}: Product '{data['name']}' "
+                            f"ProductRow {idx}: Product '{data['name']}' "
                             "already exists in region"
                         )
                         continue
                     created.append(await self._stage(data, refs))
                 except DuplicateError as exc:
-                    errors.append(f"Row {idx}: {exc!s}")
+                    errors.append(f"ProductRow {idx}: {exc!s}")
                     raise
             await self._uow.commit()
         except DuplicateError:
@@ -225,25 +228,25 @@ class NutrientService:
         self._repo = repo
         self._audit = audit
 
-    async def get(self, nutrient_id: UUID) -> Row:
+    async def get(self, nutrient_id: UUID) -> NutrientRow:
         item = await self._repo.get(nutrient_id)
         if item is None:
             raise NotFoundError("Nutrient not found")
         return item
 
-    async def _name(self, name_id: UUID) -> Row:
+    async def _name(self, name_id: UUID) -> NutrientNameRow:
         name = await self._repo.get_name(name_id)
         if name is None:
             raise NotFoundError("NutrientName not found")
         return name
 
-    async def list(self) -> list[Row]:
+    async def list(self) -> list[NutrientRow]:
         return await self._repo.list()
 
-    async def by_product(self, product_id: UUID) -> list[Row]:
+    async def by_product(self, product_id: UUID) -> list[NutrientRow]:
         return await self._repo.by_product(product_id)
 
-    async def create(self, payload: dict, caller: Caller) -> Row:
+    async def create(self, payload: dict, caller: Caller) -> NutrientRow:
         name = await self._repo.get_name(payload["nutrient_name_id"])
         if not name:
             raise NotFoundError("Nutrient name not found")
@@ -275,7 +278,9 @@ class NutrientService:
         )
         return {"status": "deleted"}
 
-    async def update(self, nutrient_id: UUID, patch: dict, caller: Caller) -> Row:
+    async def update(
+        self, nutrient_id: UUID, patch: dict, caller: Caller
+    ) -> NutrientRow:
         item = await self.get(nutrient_id)
         old_snapshot = self._audit.snapshot_nutrient(item)
         if not patch:

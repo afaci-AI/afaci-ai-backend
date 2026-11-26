@@ -19,8 +19,8 @@ from .ports import (
     ApkInspector,
     ApkStorage,
     AppVersionRepository,
+    AppVersionRow,
     ReadChunk,
-    Row,
 )
 
 NOT_FOUND = "Версия не найдена."
@@ -44,22 +44,22 @@ class AppVersionService:
         self._inspector = inspector
         self._base_url = apk_base_url
 
-    async def _get(self, version_id: UUID) -> Row:
+    async def _get(self, version_id: UUID) -> AppVersionRow:
         version = await self._repo.get(version_id)
         if not version:
             raise NotFoundError(NOT_FOUND)
         return version
 
-    async def current(self) -> Row:
+    async def current(self) -> AppVersionRow:
         version = await self._repo.current()
         if version is None:
             raise ServiceUnavailableError("Информация о версии не настроена.")
         return version
 
-    async def list(self) -> list[Row]:
+    async def list(self) -> list[AppVersionRow]:
         return await self._repo.list()
 
-    async def create(self, data: dict) -> Row:
+    async def create(self, data: dict) -> AppVersionRow:
         """Публикует версию (APK уже в хранилище либо внешняя ссылка)."""
         await self._repo.lock_publication()
         max_code = await self._repo.max_version_code()
@@ -100,7 +100,7 @@ class AppVersionService:
         force_update: bool,
         changelog: str | None,
         min_supported_version_code: int | None,
-    ) -> Row:
+    ) -> AppVersionRow:
         if not has_apk_extension(original_name):
             raise BadRequestError("Файл должен иметь расширение .apk.")
 
@@ -138,7 +138,7 @@ class AppVersionService:
                 raise _error(exc) from exc
             raise
 
-    async def update(self, version_id: UUID, changes: dict) -> Row:
+    async def update(self, version_id: UUID, changes: dict) -> AppVersionRow:
         """changes — поля запроса, переданные клиентом (exclude_unset)."""
         version = await self._get(version_id)
         if changes.get("version") is not None:
@@ -151,7 +151,7 @@ class AppVersionService:
             version.min_supported_version_code = changes["minSupportedVersionCode"]
         return await self._repo.save(version)
 
-    async def set_current(self, version_id: UUID) -> Row:
+    async def set_current(self, version_id: UUID) -> AppVersionRow:
         version = await self._get(version_id)
         await self._repo.clear_current()
         version.is_current = True

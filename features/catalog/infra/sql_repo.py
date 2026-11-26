@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.db import models
 
-from ..app.ports import DuplicateError, InUseError, Row
+from ..app.ports import DictionaryRow, DuplicateError, InUseError
 from ..domain.nutrient_units import default_unit_name
 
 MODELS = {
@@ -23,26 +23,26 @@ MODELS = {
 }
 
 
-class SqlCatalogRepository:
+class SqlDictionaryRepository:
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
-    async def get(self, kind: str, item_id: UUID) -> Row | None:
+    async def get(self, kind: str, item_id: UUID) -> DictionaryRow | None:
         return await self._db.get(MODELS[kind], item_id)
 
-    async def list(self, kind: str, name: str | None = None) -> list[Row]:
+    async def list(self, kind: str, name: str | None = None) -> list[DictionaryRow]:
         model = MODELS[kind]
         query = select(model)
         if name:
             query = query.where(model.name.ilike(f"%{name}%"))
         return list((await self._db.execute(query)).scalars().all())
 
-    async def find_by_name(self, kind: str, name: str) -> Row | None:
+    async def find_by_name(self, kind: str, name: str) -> DictionaryRow | None:
         model = MODELS[kind]
         res = await self._db.execute(select(model).where(model.name == name))
         return res.scalar_one_or_none()
 
-    async def add(self, kind: str, data: dict) -> Row:
+    async def add(self, kind: str, data: dict) -> DictionaryRow:
         try:
             item = MODELS[kind](**data)
             self._db.add(item)
@@ -53,12 +53,12 @@ class SqlCatalogRepository:
             await self._db.rollback()
             raise DuplicateError from exc
 
-    def stage(self, kind: str, data: dict) -> Row:
+    def stage(self, kind: str, data: dict) -> DictionaryRow:
         item = MODELS[kind](**data)
         self._db.add(item)
         return item
 
-    async def save(self, row: Row) -> Row:
+    async def save(self, row: DictionaryRow) -> DictionaryRow:
         try:
             await self._db.commit()
         except IntegrityError as exc:
@@ -67,16 +67,26 @@ class SqlCatalogRepository:
         await self._db.refresh(row)
         return row
 
-    async def commit(self) -> None:
-        await self._db.commit()
-
-    async def delete(self, row: Row) -> None:
+    async def delete(self, row: DictionaryRow) -> None:
         try:
             await self._db.delete(row)
             await self._db.commit()
         except IntegrityError as exc:
             await self._db.rollback()
             raise InUseError from exc
+
+
+class SqlUnitOfWork:
+    def __init__(self, db: AsyncSession) -> None:
+        self._db = db
+
+    async def commit(self) -> None:
+        await self._db.commit()
+
+
+class SqlCatalogRules:
+    def __init__(self, db: AsyncSession) -> None:
+        self._db = db
 
     async def default_unit_id(self, type_name: str) -> UUID | None:
         unit_name = default_unit_name(type_name)

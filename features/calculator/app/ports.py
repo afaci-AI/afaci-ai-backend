@@ -9,6 +9,7 @@ from uuid import UUID
 from ..domain import ProductNutrients, ReferenceProtein, ReferenceSource
 
 __all__ = [
+    "DailyNorms",
     "ExampleRecipe",
     "ExampleRecipeItem",
     "ProductNutrientReader",
@@ -74,3 +75,15 @@ class ReferenceCatalog(Protocol):
     async def list_reference_proteins(self) -> list[ReferenceEntry]: ...
 
     async def list_example_recipes(self) -> list[ExampleRecipe]: ...
+
+
+class DailyNorms(Protocol):
+    async def for_recipe(
+        self,
+        *,
+        macro: dict[str, float | None],
+        energy_kcal: float | None,
+        micro: list[dict],
+        other: list[dict],
+    ) -> dict:
+        """Доля от суточной нормы для состава рецептуры на 100 г."""

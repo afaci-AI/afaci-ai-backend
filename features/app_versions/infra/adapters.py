@@ -12,7 +12,7 @@ from starlette.requests import ClientDisconnect
 
 from core.db.models import AppVersion
 
-from ..app.ports import ReadChunk, Row, StoredApk
+from ..app.ports import AppVersionRow, ReadChunk, StoredApk
 from ..domain.apk import MAX_APK_SIZE, ApkError, parse_badging, stored_filename
 
 PUBLICATION_LOCK = 86422107
@@ -22,14 +22,14 @@ class SqlAppVersionRepository:
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
-    async def current(self) -> Row | None:
+    async def current(self) -> AppVersionRow | None:
         return (
             await self._db.execute(
                 select(AppVersion).where(AppVersion.is_current.is_(True)).limit(1)
             )
         ).scalar_one_or_none()
 
-    async def list(self) -> list[Row]:
+    async def list(self) -> list[AppVersionRow]:
         rows = (
             await self._db.execute(
                 select(AppVersion).order_by(AppVersion.version_code.desc())
@@ -37,7 +37,7 @@ class SqlAppVersionRepository:
         ).scalars()
         return list(rows.all())
 
-    async def get(self, version_id: UUID) -> Row | None:
+    async def get(self, version_id: UUID) -> AppVersionRow | None:
         return await self._db.get(AppVersion, version_id)
 
     async def lock_publication(self) -> None:
@@ -57,19 +57,19 @@ class SqlAppVersionRepository:
             .values(is_current=False)
         )
 
-    async def add(self, data: dict) -> Row:
+    async def add(self, data: dict) -> AppVersionRow:
         version = AppVersion(**data)
         self._db.add(version)
         await self._db.commit()
         await self._db.refresh(version)
         return version
 
-    async def save(self, row: Row) -> Row:
+    async def save(self, row: AppVersionRow) -> AppVersionRow:
         await self._db.commit()
         await self._db.refresh(row)
         return row
 
-    async def delete(self, row: Row) -> None:
+    async def delete(self, row: AppVersionRow) -> None:
         await self._db.delete(row)
         await self._db.commit()
 

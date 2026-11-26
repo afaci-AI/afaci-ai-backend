@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from uuid import UUID
 
 from core.errors import NotFoundError
@@ -61,6 +62,25 @@ class NormsService:
             "sources": sources,
             "info": NORMS_INFO,
         }
+
+    async def recipe_payload(
+        self,
+        pdf_url: PdfUrl,
+        macro: Mapping[str, float | None],
+        energy_kcal: float | None,
+        micro: list[dict],
+        other: list[dict],
+    ) -> dict:
+        """Доля от нормы для рецептуры: её сумма равна 100 г, поэтому макросостав
+        калькулятора — это содержание на 100 г."""
+        amounts = amounts_from_macros(
+            macro.get("protein"),
+            macro.get("fat"),
+            macro.get("carb"),
+            macro.get("fiber"),
+            energy=energy_kcal,
+        )
+        return await self.payload(pdf_url, amounts, micro, other)
 
     async def product_payload(self, product_id: UUID, pdf_url: PdfUrl) -> dict:
         by_name = await self._repo.product_macros(product_id)
