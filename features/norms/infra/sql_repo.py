@@ -2,21 +2,27 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from uuid import UUID
 
 from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..domain.daily_norms import PRODUCT_NUTRIENT_BY_KEY
+from ..domain.records import (
+    CompositionEntry,
+    DailyNorm,
+    ProductComposition,
+    ReferenceSource,
+    RegistrySource,
+)
 
 
 class SqlNormsRepository:
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
-    async def registry_sources(self) -> list[Mapping]:
-        return list(
+    async def registry_sources(self) -> list[RegistrySource]:
+        rows = (
             (
                 await self._db.execute(
                     text(
@@ -28,9 +34,10 @@ class SqlNormsRepository:
             .mappings()
             .all()
         )
+        return [RegistrySource.of(row) for row in rows]
 
-    async def reference_sources(self) -> list[Mapping]:
-        return list(
+    async def reference_sources(self) -> list[ReferenceSource]:
+        rows = (
             (
                 await self._db.execute(
                     text(
@@ -44,8 +51,9 @@ class SqlNormsRepository:
             .mappings()
             .all()
         )
+        return [ReferenceSource.of(row) for row in rows]
 
-    async def norms(self) -> list[dict]:
+    async def norms(self) -> list[DailyNorm]:
         rows = (
             (
                 await self._db.execute(
@@ -58,7 +66,7 @@ class SqlNormsRepository:
             .mappings()
             .all()
         )
-        return [{**row, "source_id": str(row["source_id"])} for row in rows]
+        return [DailyNorm.of(row) for row in rows]
 
     async def product_macros(self, product_id: UUID) -> dict[str, float | None] | None:
         exists = await self._db.scalar(
@@ -83,7 +91,7 @@ class SqlNormsRepository:
         )
         return {row["nutrient"]: row["quantity"] for row in rows}
 
-    async def product_composition(self, product_id: UUID) -> dict[str, list[dict]]:
+    async def product_composition(self, product_id: UUID) -> ProductComposition:
         rows = (
             (
                 await self._db.execute(
@@ -103,9 +111,7 @@ class SqlNormsRepository:
             .mappings()
             .all()
         )
-        result: dict[str, list[dict]] = {"micro": [], "other": []}
+        result = ProductComposition(micro=[], other=[])
         for row in rows:
-            result[row["class"]].append(
-                {"name": row["name"], "unit": row["unit"], "amount": row["amount"]}
-            )
+            getattr(result, row["class"]).append(CompositionEntry.of(row))
         return result

@@ -96,7 +96,7 @@ modules =
 ignore_imports =
     features.norms.domain.** -> features.calculator.domain.**
     features.calculator.api.deps -> features.norms.api.deps
-    features.calculator.api.deps -> features.norms.api.documents
+    features.calculator.api.deps -> features.norms.api.presenters
     features.calculator.api.deps -> features.norms.app
     features.recipes.api.deps -> features.calculator.api.deps
     features.recipes.api.deps -> features.calculator.app

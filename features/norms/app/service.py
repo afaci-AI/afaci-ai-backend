@@ -10,12 +10,12 @@ from core.errors import NotFoundError
 from ..domain.daily_norms import (
     NORMS_INFO,
     PRODUCT_NUTRIENT_BY_KEY,
-    PdfUrl,
     amounts_from_macros,
     build_class_rows,
     build_norm_rows,
     mineral_norm_rows,
 )
+from ..domain.records import CompositionEntry, Source
 from ..domain.sources import merge_sources
 from .ports import NormsRepository
 
@@ -24,19 +24,18 @@ class NormsService:
     def __init__(self, repo: NormsRepository) -> None:
         self._repo = repo
 
-    async def sources(self, pdf_url: PdfUrl) -> list[dict]:
+    async def sources(self) -> list[Source]:
+        """Источники; ссылку на PDF строит слой api по `pdf_filename`."""
         return merge_sources(
             await self._repo.registry_sources(),
             await self._repo.reference_sources(),
-            pdf_url,
         )
 
     async def payload(
         self,
-        pdf_url: PdfUrl,
         amounts: dict[str, float | None] | None = None,
-        micro: list[dict] | None = None,
-        other: list[dict] | None = None,
+        micro: list[CompositionEntry] | None = None,
+        other: list[CompositionEntry] | None = None,
     ) -> dict:
         """
         Блоки макро-, микросостава и прочего, источники и пояснение.
@@ -53,7 +52,7 @@ class NormsService:
             else build_class_rows(micro, norms)
         )
         used = {row["source_id"] for row in rows + micro_rows if row["source_id"]}
-        sources = [s for s in await self.sources(pdf_url) if s["id"] in used]
+        sources = [s for s in await self.sources() if s.id in used]
         return {
             "macro": rows,
             "norms": rows,
@@ -65,11 +64,10 @@ class NormsService:
 
     async def recipe_payload(
         self,
-        pdf_url: PdfUrl,
         macro: Mapping[str, float | None],
         energy_kcal: float | None,
-        micro: list[dict],
-        other: list[dict],
+        micro: list[CompositionEntry],
+        other: list[CompositionEntry],
     ) -> dict:
         """Доля от нормы для рецептуры: её сумма равна 100 г, поэтому макросостав
         калькулятора — это содержание на 100 г."""
@@ -80,9 +78,9 @@ class NormsService:
             macro.get("fiber"),
             energy=energy_kcal,
         )
-        return await self.payload(pdf_url, amounts, micro, other)
+        return await self.payload(amounts, micro, other)
 
-    async def product_payload(self, product_id: UUID, pdf_url: PdfUrl) -> dict:
+    async def product_payload(self, product_id: UUID) -> dict:
         by_name = await self._repo.product_macros(product_id)
         if by_name is None:
             raise NotFoundError("Product not found")
@@ -93,6 +91,4 @@ class NormsService:
             by_name.get(PRODUCT_NUTRIENT_BY_KEY["fiber"]),
         )
         composition = await self._repo.product_composition(product_id)
-        return await self.payload(
-            pdf_url, amounts, composition["micro"], composition["other"]
-        )
+        return await self.payload(amounts, composition.micro, composition.other)

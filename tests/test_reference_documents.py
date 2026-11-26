@@ -9,7 +9,9 @@ from unittest.mock import patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from features.norms.api.documents import document_path, router
+from core.errors import register_error_handlers
+from features.norms.api.documents import router
+from features.norms.infra.documents import LocalDocumentStorage
 
 
 class ReferenceDocumentChecks(unittest.TestCase):
@@ -23,6 +25,7 @@ class ReferenceDocumentChecks(unittest.TestCase):
         self.env.start()
         self.addCleanup(self.env.stop)
         app = FastAPI()
+        register_error_handlers(app)
         app.include_router(router)
         self.client = TestClient(app)
         self.addCleanup(self.client.close)
@@ -57,7 +60,7 @@ class ReferenceDocumentChecks(unittest.TestCase):
             ".hidden.pdf",
         ):
             with self.subTest(filename=filename):
-                self.assertIsNone(document_path(filename))
+                self.assertIsNone(LocalDocumentStorage(self.root).path(filename))
         response = self.client.get(
             "/api/v1/calculator/reference-documents/..%2Fsecret.pdf"
         )

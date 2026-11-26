@@ -12,11 +12,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 
 from features.calculator.domain.formulas import energy_kcal
 
-PdfUrl = Callable[[str | None], str | None]
+from .records import CompositionEntry, DailyNorm
 
 NORM_ORDER = ("energy", "protein", "fat", "carbs", "fiber")
 
@@ -104,33 +104,31 @@ def amounts_from_macros(
 
 
 def build_norm_rows(
-    norms: list[Mapping], amounts: Mapping[str, float | None] | None = None
+    norms: list[DailyNorm], amounts: Mapping[str, float | None] | None = None
 ) -> list[dict]:
     """
     Строки «нутриент — содержание — норма — доля от нормы» в порядке `NORM_ORDER`.
 
-    `norms` — записи справочника (key, name, unit, value, source_id, basis);
-    без `amounts` возвращаются только нормы (содержание и доля — None).
+    Без `amounts` возвращаются только нормы (содержание и доля — None).
     """
-    by_key = {norm["key"]: norm for norm in norms}
+    by_key = {norm.key: norm for norm in norms}
     rows = []
     for key in NORM_ORDER:
         norm = by_key.get(key)
         if norm is None:
             continue
         amount = None if amounts is None else amounts.get(key)
-        value = float(norm["value"])
         rows.append(
             {
                 "key": key,
-                "name": norm["name"],
-                "unit": norm["unit"],
-                "norm": value,
+                "name": norm.name,
+                "unit": norm.unit,
+                "norm": norm.value,
                 "amount": amount,
-                "percent": percent_of_norm(amount, value),
-                "source_id": norm.get("source_id"),
-                "basis": norm.get("basis"),
-                "kind": norm.get("kind", "norm"),
+                "percent": percent_of_norm(amount, norm.value),
+                "source_id": norm.source_id,
+                "basis": norm.basis,
+                "kind": norm.kind,
             }
         )
     return rows
@@ -160,38 +158,43 @@ def short_unit(unit: str | None) -> str | None:
     return None if unit is None else unit.split("/")[0]
 
 
-def _class_row(entry: Mapping, norm: Mapping | None) -> dict:
-    unit = short_unit(entry.get("unit"))
+def _class_row(entry: CompositionEntry, norm: DailyNorm | None) -> dict:
+    unit = short_unit(entry.unit)
     row = {
-        "key": entry["name"],
-        "name": entry["name"],
+        "key": entry.name,
+        "name": entry.name,
         "unit": unit,
         "norm": None,
-        "amount": entry["amount"],
+        "amount": entry.amount,
         "percent": None,
-        "partial": bool(entry.get("partial", False)),
+        "partial": entry.partial,
         "kind": None,
         "source_id": None,
         "basis": None,
     }
     if norm is None:
         return row
-    value = float(norm["value"])
-    amount = convert_amount(entry["amount"], unit, norm["unit"])
+    try:
+        amount = convert_amount(entry.amount, unit, norm.unit)
+    except ValueError:
+        # У нутриента в справочнике нет единицы или её нельзя перевести в
+        # единицу нормы: долю не считаем, чтобы не показать неверный процент,
+        # но и расчёт рецептуры не роняем.
+        return row
     return {
         **row,
-        "unit": norm["unit"],
-        "norm": value,
+        "unit": norm.unit,
+        "norm": norm.value,
         "amount": amount,
-        "percent": percent_of_norm(amount, value),
-        "kind": norm.get("kind", "norm"),
-        "source_id": norm.get("source_id"),
-        "basis": norm.get("basis"),
+        "percent": percent_of_norm(amount, norm.value),
+        "kind": norm.kind,
+        "source_id": norm.source_id,
+        "basis": norm.basis,
     }
 
 
 def build_class_rows(
-    entries: list[Mapping], norms: list[Mapping] | None = None
+    entries: list[CompositionEntry], norms: list[DailyNorm] | None = None
 ) -> list[dict]:
     """
     Строки микросостава и прочих показателей.
@@ -199,17 +202,17 @@ def build_class_rows(
     Если для нутриента есть норма (ключ нормы — название нутриента), значение
     переводится в единицу нормы и считается доля; иначе `norm` и `percent` — None.
     """
-    by_key = {norm["key"]: norm for norm in norms or []}
-    return [_class_row(entry, by_key.get(entry["name"])) for entry in entries]
+    by_key = {norm.key: norm for norm in norms or []}
+    return [_class_row(entry, by_key.get(entry.name)) for entry in entries]
 
 
-def mineral_norm_rows(norms: list[Mapping]) -> list[dict]:
+def mineral_norm_rows(norms: list[DailyNorm]) -> list[dict]:
     """Нормы минералов без содержания — для общего списка норм."""
     return build_class_rows(
         [
-            {"name": norm["key"], "unit": norm["unit"], "amount": None}
+            CompositionEntry(name=norm.key, unit=norm.unit, amount=None)
             for norm in norms
-            if norm["key"] not in NORM_ORDER
+            if norm.key not in NORM_ORDER
         ],
         norms,
     )
