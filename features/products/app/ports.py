@@ -35,22 +35,19 @@ class NutrientRow(Protocol):
     nutrient_name_id: UUID
 
 
-class Actor(Protocol):
-    """Пользователь, от имени которого выполняется запрос."""
-
-    id: UUID
-
-
 class DuplicateError(Exception):
     """Нарушена уникальность записи."""
 
 
-@dataclass
+@dataclass(frozen=True)
 class Caller:
-    """Кто выполняет запрос: пользователь (если определён) и заголовок авторизации."""
+    """Кто выполняет запрос — метка для журнала аудита.
 
-    user: Actor | None
-    authorization: str | None
+    Определяется на краю (api) по пользователю и заголовку авторизации:
+    `user:<id>`, `Anonymous` или `InvalidToken`.
+    """
+
+    actor: str
 
 
 class AuditTrail(Protocol):
@@ -68,6 +65,13 @@ class AuditTrail(Protocol):
 
 
 class ProductRepository(Protocol):
+    """Чтение и изменение продуктов в текущей единице работы.
+
+    Изменения не фиксируются: это делает `UnitOfWork`. DuplicateError при
+    нарушении уникальности; единица работы после этого годится только для
+    `rollback`.
+    """
+
     async def get(self, product_id: UUID) -> ProductRow | None: ...
 
     async def list(self) -> list[ProductRow]: ...
@@ -80,23 +84,13 @@ class ProductRepository(Protocol):
 
     async def find_in_region(self, name: str, region_id: UUID) -> ProductRow | None: ...
 
-    async def add(self, data: dict) -> ProductRow:
-        """Создаёт продукт и сохраняет. DuplicateError при нарушении уникальности."""
+    async def add(self, data: dict) -> ProductRow: ...
 
-    async def add_many(self, items: list[dict]) -> list[ProductRow]:
-        """Создаёт продукты одной транзакцией. DuplicateError при нарушении."""
+    async def add_many(self, items: list[dict]) -> list[ProductRow]: ...
 
-    async def update(self, row: ProductRow, patch: dict) -> ProductRow:
-        """Применяет поля и сохраняет. DuplicateError при нарушении уникальности."""
+    async def update(self, row: ProductRow, patch: dict) -> ProductRow: ...
 
     async def delete(self, row: ProductRow) -> None: ...
-
-    async def stage(self, data: dict) -> ProductRow:
-        """Добавляет продукт в текущую единицу работы без фиксации.
-
-        DuplicateError при нарушении уникальности; единица работы после этого
-        годится только для `rollback`.
-        """
 
 
 class ReferenceNames(Protocol):
@@ -110,7 +104,7 @@ class ReferenceNames(Protocol):
 
 
 class UnitOfWork(Protocol):
-    """Транзакция, общая для операций `stage` и справочников."""
+    """Транзакция, общая для хранилищ продуктов, нутриентов и справочников."""
 
     async def commit(self) -> None:
         """Фиксирует транзакцию. DuplicateError при нарушении уникальности."""
@@ -121,6 +115,8 @@ class UnitOfWork(Protocol):
 
 
 class NutrientRepository(Protocol):
+    """Нутриенты в текущей единице работы; фиксирует `UnitOfWork`."""
+
     async def get(self, nutrient_id: UUID) -> NutrientRow | None: ...
 
     async def list(self) -> list[NutrientRow]: ...
@@ -134,8 +130,7 @@ class NutrientRepository(Protocol):
 
     async def add(self, data: dict) -> NutrientRow: ...
 
-    async def add_many(self, items: list[dict]) -> list[NutrientRow]:
-        """Одной транзакцией. DuplicateError при нарушении уникальности."""
+    async def add_many(self, items: list[dict]) -> list[NutrientRow]: ...
 
     async def update(self, row: NutrientRow, patch: dict) -> NutrientRow: ...
 

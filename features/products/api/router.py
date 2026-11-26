@@ -3,13 +3,17 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends
 
-from core.db.models import User
-from core.security import get_current_user_optional, require_editor
+from core.security import require_editor
 
-from ..app import Caller, NutrientService, ProductService
-from .deps import get_nutrient_service, get_product_service
+from ..app import Caller, NutrientService, ProductImportService, ProductService
+from .deps import (
+    get_caller,
+    get_nutrient_service,
+    get_product_import_service,
+    get_product_service,
+)
 from .schemas import (
     NutrientBulkCreate,
     NutrientCreate,
@@ -22,11 +26,11 @@ from .schemas import (
 
 router = APIRouter(prefix="/api/v1")
 
-CurrentUserOpt = Annotated[User | None, Depends(get_current_user_optional)]
 Products = Annotated[ProductService, Depends(get_product_service)]
+ProductImport = Annotated[ProductImportService, Depends(get_product_import_service)]
 Nutrients = Annotated[NutrientService, Depends(get_nutrient_service)]
 EDITOR = [Depends(require_editor)]
-Authorization = Annotated[str | None, Header()]
+CallerDep = Annotated[Caller, Depends(get_caller)]
 
 
 # ==================== PRODUCTS ====================
@@ -34,10 +38,9 @@ Authorization = Annotated[str | None, Header()]
 async def api_create_product(
     data: ProductCreate,
     service: Products,
-    authorization: Authorization = None,
-    current_user: CurrentUserOpt = None,
+    caller: CallerDep,
 ):
-    return await service.create(data.model_dump(), Caller(current_user, authorization))
+    return await service.create(data.model_dump(), caller)
 
 
 @router.get("/products", tags=["Products"])
@@ -68,10 +71,9 @@ async def api_get_product(id: UUID, service: Products):
 async def api_delete_product(
     id: UUID,
     service: Products,
-    authorization: Authorization = None,
-    current_user: CurrentUserOpt = None,
+    caller: CallerDep,
 ):
-    return await service.delete(id, Caller(current_user, authorization))
+    return await service.delete(id, caller)
 
 
 @router.patch("/products/{id}", tags=["Products"], dependencies=EDITOR)
@@ -79,24 +81,18 @@ async def api_update_product(
     id: UUID,
     data: ProductUpdate,
     service: Products,
-    authorization: Authorization = None,
-    current_user: CurrentUserOpt = None,
+    caller: CallerDep,
 ):
-    return await service.update(
-        id, data.model_dump(exclude_unset=True), Caller(current_user, authorization)
-    )
+    return await service.update(id, data.model_dump(exclude_unset=True), caller)
 
 
 @router.post("/products/bulk", status_code=201, tags=["Products"], dependencies=EDITOR)
 async def api_bulk_products(
     data: list[ProductCreate],
     service: Products,
-    authorization: Authorization = None,
-    current_user: CurrentUserOpt = None,
+    caller: CallerDep,
 ):
-    return await service.bulk_create(
-        [p.model_dump() for p in data], Caller(current_user, authorization)
-    )
+    return await service.bulk_create([p.model_dump() for p in data], caller)
 
 
 @router.get("/products/by-region/{id}", tags=["Products"])
@@ -112,13 +108,10 @@ async def api_products_by_category(id: UUID, service: Products):
 @router.post("/products/auto", status_code=201, tags=["Products"], dependencies=EDITOR)
 async def api_auto_create_product(
     data: ProductAutoCreate,
-    service: Products,
-    authorization: Authorization = None,
-    current_user: CurrentUserOpt = None,
+    service: ProductImport,
+    caller: CallerDep,
 ):
-    return await service.auto_create(
-        data.model_dump(), Caller(current_user, authorization)
-    )
+    return await service.auto_create(data.model_dump(), caller)
 
 
 @router.post(
@@ -126,13 +119,10 @@ async def api_auto_create_product(
 )
 async def api_auto_bulk_products(
     data: list[ProductAutoCreate],
-    service: Products,
-    authorization: Authorization = None,
-    current_user: CurrentUserOpt = None,
+    service: ProductImport,
+    caller: CallerDep,
 ):
-    return await service.auto_bulk(
-        [item.model_dump() for item in data], Caller(current_user, authorization)
-    )
+    return await service.auto_bulk([item.model_dump() for item in data], caller)
 
 
 # ==================== NUTRIENTS ====================
@@ -140,10 +130,9 @@ async def api_auto_bulk_products(
 async def api_create_nutrient(
     data: NutrientCreate,
     service: Nutrients,
-    authorization: Authorization = None,
-    current_user: CurrentUserOpt = None,
+    caller: CallerDep,
 ):
-    return await service.create(data.model_dump(), Caller(current_user, authorization))
+    return await service.create(data.model_dump(), caller)
 
 
 @router.get("/nutrients", tags=["Nutrients"])
@@ -160,10 +149,9 @@ async def api_get_nutrient(id: UUID, service: Nutrients):
 async def api_delete_nutrient(
     id: UUID,
     service: Nutrients,
-    authorization: Authorization = None,
-    current_user: CurrentUserOpt = None,
+    caller: CallerDep,
 ):
-    return await service.delete(id, Caller(current_user, authorization))
+    return await service.delete(id, caller)
 
 
 @router.patch("/nutrients/{id}", tags=["Nutrients"], dependencies=EDITOR)
@@ -171,12 +159,9 @@ async def api_update_nutrient(
     id: UUID,
     data: NutrientUpdate,
     service: Nutrients,
-    authorization: Authorization = None,
-    current_user: CurrentUserOpt = None,
+    caller: CallerDep,
 ):
-    return await service.update(
-        id, data.model_dump(exclude_unset=True), Caller(current_user, authorization)
-    )
+    return await service.update(id, data.model_dump(exclude_unset=True), caller)
 
 
 @router.get("/nutrients/product/{id}", tags=["Nutrients"])
@@ -190,9 +175,6 @@ async def api_product_nutrients(id: UUID, service: Nutrients):
 async def api_bulk_nutrients(
     data: NutrientBulkCreate,
     service: Nutrients,
-    authorization: Authorization = None,
-    current_user: CurrentUserOpt = None,
+    caller: CallerDep,
 ):
-    return await service.bulk_create(
-        [n.model_dump() for n in data.items], Caller(current_user, authorization)
-    )
+    return await service.bulk_create([n.model_dump() for n in data.items], caller)

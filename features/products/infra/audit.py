@@ -8,7 +8,6 @@ from core.audit.food_audit import (
     FOOD_ENTITY,
     compute_diff,
     log_food_event,
-    resolve_food_user,
     snapshot_nutrient,
     snapshot_product,
 )
@@ -31,7 +30,7 @@ class FoodAuditTrail:
     ) -> None:
         log_food_event(
             event=event,
-            user=resolve_food_user(caller.user, caller.authorization),
+            user=caller.actor,
             target_entity=FOOD_ENTITY,
             target_id=target_id,
             changes=changes,
