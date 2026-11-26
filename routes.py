@@ -3,7 +3,6 @@
 from fastapi import FastAPI
 
 from features.app_versions.api import router as app_versions_router
-from features.audit.api import router as audit_demo_router
 from features.auth.api import router as auth_router
 from features.calculator.api import router as calculator_router
 from features.catalog.api import router as catalog_router
@@ -26,5 +25,4 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(auth_router)
     app.include_router(recipes_router)
     app.include_router(users_router)
-    app.include_router(audit_demo_router)
     app.include_router(app_versions_router)
