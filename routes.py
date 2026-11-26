@@ -11,7 +11,6 @@ from features.norms.api import documents_router
 from features.norms.api import router as norms_router
 from features.products.api import router as products_router
 from features.recipes.api import router as recipes_router
-from features.reports_temp.api import router as temp_router  # TEMP: reports_temp
 from features.table.api import router as table_router
 from features.users.api import router as users_router
 
@@ -29,4 +28,3 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(users_router)
     app.include_router(audit_demo_router)
     app.include_router(app_versions_router)
-    app.include_router(temp_router)  # TEMP: reports_temp
