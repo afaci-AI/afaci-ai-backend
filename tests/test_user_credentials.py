@@ -53,7 +53,9 @@ class TemporaryPasswordFlow(unittest.IsolatedAsyncioTestCase):
         self.service = UserService(
             self.users, BcryptHasher(), NoAudit(), self.mailer, now=lambda: self.now
         )
-        self.auth = AuthService(self.users, BcryptPasswords(), JwtTokens())
+        self.auth = AuthService(
+            self.users, BcryptPasswords(), JwtTokens(), now=lambda: self.now
+        )
 
     async def create(self):
         return await self.service.create(
@@ -132,7 +134,7 @@ class TemporaryPasswordFlow(unittest.IsolatedAsyncioTestCase):
         user, _ = await self.create()
         password = password_from(self.mailer.sent[0][1])
         stored = self.users.row(user.id)
-        stored.temp_password_expires_at = datetime.now(UTC) - timedelta(minutes=1)
+        stored.temp_password_expires_at = self.now - timedelta(minutes=1)
         with self.assertRaises(ForbiddenError):
             await self.auth.login("new@example.com", password)
 
