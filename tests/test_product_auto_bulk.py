@@ -4,10 +4,10 @@ import unittest
 from types import SimpleNamespace
 from uuid import uuid4
 
-from features.products.app import Caller, DuplicateError, ProductService
-from features.products.app.service import BULK_CONFLICT
+from features.products.app import Caller, DuplicateError, ProductImportService
+from features.products.app.product_import import BULK_CONFLICT
 
-CALLER = Caller(user=None, authorization=None)
+CALLER = Caller(actor="Anonymous")
 
 
 class FakeNames:
@@ -38,7 +38,7 @@ class FakeProducts:
             None,
         )
 
-    async def stage(self, data):
+    async def add(self, data):
         error = self.fail_on.get(data["name"])
         if error is not None:
             raise error
@@ -76,7 +76,7 @@ def row(name, region="Кыргызстан"):
 class AutoBulk(unittest.IsolatedAsyncioTestCase):
     def build(self, products):
         self.uow, self.audit = FakeUnitOfWork(), FakeAudit()
-        return ProductService(products, FakeNames(), self.uow, self.audit)
+        return ProductImportService(products, FakeNames(), self.uow, self.audit)
 
     async def test_existing_product_is_skipped_and_rest_committed(self):
         service = self.build(FakeProducts())

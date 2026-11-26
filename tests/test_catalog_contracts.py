@@ -27,16 +27,15 @@ from features.products.api.schemas import (
     ProductCount,
 )
 from features.products.app import Caller, NutrientService, ProductService
-from features.products.app.service import _unit_for
+from features.products.app.nutrients import _unit_for
 from features.products.infra.audit import FoodAuditTrail
 from features.products.infra.sql_repo import (
     SqlNutrientRepository,
     SqlProductRepository,
-    SqlReferenceNames,
     SqlUnitOfWork,
 )
 
-NO_CALLER = Caller(None, None)
+NO_CALLER = Caller(actor="Anonymous")
 
 
 def catalog(db):
@@ -44,7 +43,9 @@ def catalog(db):
 
 
 def nutrients(db):
-    return NutrientService(SqlNutrientRepository(db), FoodAuditTrail())
+    return NutrientService(
+        SqlNutrientRepository(db), SqlUnitOfWork(db), FoodAuditTrail()
+    )
 
 
 async def api_create_subcategory(data, db):
@@ -76,10 +77,7 @@ async def api_update_nutrient_name(item_id, data, db):
 
 async def api_count_products(db):
     service = ProductService(
-        SqlProductRepository(db),
-        SqlReferenceNames(db),
-        SqlUnitOfWork(db),
-        FoodAuditTrail(),
+        SqlProductRepository(db), SqlUnitOfWork(db), FoodAuditTrail()
     )
     return ProductCount(count=await service.count())
 
@@ -243,7 +241,13 @@ class NutrientUpdateChecks(unittest.IsolatedAsyncioTestCase):
             unit_id=uuid4(),
             quantity=1,
         )
-        self.db = Mock(get=AsyncMock(), commit=AsyncMock(), refresh=AsyncMock())
+        self.db = Mock(
+            get=AsyncMock(),
+            flush=AsyncMock(),
+            commit=AsyncMock(),
+            rollback=AsyncMock(),
+            refresh=AsyncMock(),
+        )
         self.audit = patch(AUDIT_TARGET).start()
         self.addCleanup(patch.stopall)
 
@@ -307,7 +311,9 @@ class FixedUnitChecks(unittest.IsolatedAsyncioTestCase):
         return Mock(
             get=AsyncMock(side_effect=list(rows)),
             add=Mock(),
+            flush=AsyncMock(),
             commit=AsyncMock(),
+            rollback=AsyncMock(),
             refresh=AsyncMock(),
         )
 
@@ -412,6 +418,7 @@ class FixedUnitChecks(unittest.IsolatedAsyncioTestCase):
         db = Mock(
             scalars=AsyncMock(return_value=[name]),
             add_all=Mock(),
+            flush=AsyncMock(),
             commit=AsyncMock(),
             refresh=AsyncMock(),
             rollback=AsyncMock(),

@@ -1,4 +1,8 @@
-"""SQL-реализации хранилищ продуктов и нутриентов на ORM-моделях."""
+"""SQL-реализации хранилищ продуктов и нутриентов на ORM-моделях.
+
+Хранилища только отправляют изменения в сессию (`flush`); фиксирует и
+откатывает транзакцию `SqlUnitOfWork` по решению сценария.
+"""
 
 from __future__ import annotations
 
@@ -54,42 +58,26 @@ class SqlProductRepository:
         return list(res.scalars().all())
 
     async def add(self, data: dict) -> ProductRow:
-        try:
-            item = models.Product(**data)
-            self._db.add(item)
-            await self._db.commit()
-            await self._db.refresh(item)
-            return item
-        except IntegrityError as exc:
-            await self._db.rollback()
-            raise DuplicateError(str(exc)) from exc
+        item = models.Product(**data)
+        self._db.add(item)
+        await _flush(self._db)
+        return item
 
     async def add_many(self, items: list[dict]) -> list[ProductRow]:
-        try:
-            rows = [models.Product(**p) for p in items]
-            self._db.add_all(rows)
-            await self._db.commit()
-            for row in rows:
-                await self._db.refresh(row)
-            return rows
-        except IntegrityError as exc:
-            await self._db.rollback()
-            raise DuplicateError(str(exc)) from exc
+        rows = [models.Product(**p) for p in items]
+        self._db.add_all(rows)
+        await _flush(self._db)
+        return rows
 
     async def update(self, row: ProductRow, patch: dict) -> ProductRow:
         for field, value in patch.items():
             setattr(row, field, value)
-        try:
-            await self._db.commit()
-            await self._db.refresh(row)
-        except IntegrityError as exc:
-            await self._db.rollback()
-            raise DuplicateError(str(exc)) from exc
+        await _flush(self._db)
         return row
 
     async def delete(self, row: ProductRow) -> None:
         await self._db.delete(row)
-        await self._db.commit()
+        await _flush(self._db)
 
     async def find_in_region(self, name: str, region_id: UUID) -> ProductRow | None:
         res = await self._db.execute(
@@ -99,12 +87,6 @@ class SqlProductRepository:
             )
         )
         return res.scalar_one_or_none()
-
-    async def stage(self, data: dict) -> ProductRow:
-        product = models.Product(**data)
-        self._db.add(product)
-        await _flush(self._db)
-        return product
 
 
 class SqlReferenceNames:
@@ -178,29 +160,21 @@ class SqlNutrientRepository:
     async def add(self, data: dict) -> NutrientRow:
         item = models.Nutrient(**data)
         self._db.add(item)
-        await self._db.commit()
-        await self._db.refresh(item)
+        await _flush(self._db)
         return item
 
     async def add_many(self, items: list[dict]) -> list[NutrientRow]:
-        try:
-            rows = [models.Nutrient(**n) for n in items]
-            self._db.add_all(rows)
-            await self._db.commit()
-            for row in rows:
-                await self._db.refresh(row)
-            return rows
-        except IntegrityError as exc:
-            await self._db.rollback()
-            raise DuplicateError(str(exc)) from exc
+        rows = [models.Nutrient(**n) for n in items]
+        self._db.add_all(rows)
+        await _flush(self._db)
+        return rows
 
     async def update(self, row: NutrientRow, patch: dict) -> NutrientRow:
         for field, value in patch.items():
             setattr(row, field, value)
-        await self._db.commit()
-        await self._db.refresh(row)
+        await _flush(self._db)
         return row
 
     async def delete(self, row: NutrientRow) -> None:
         await self._db.delete(row)
-        await self._db.commit()
+        await _flush(self._db)
