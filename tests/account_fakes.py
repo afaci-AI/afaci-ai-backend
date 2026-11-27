@@ -11,6 +11,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 from core.accounts import Account
+from core.db.text_filters import normalize_search_text
 from features.auth.app.ports import ResetCode
 
 NOW = datetime(2026, 11, 21, 12, 0, tzinfo=UTC)
@@ -40,6 +41,7 @@ class FakeAccounts:
 
     def __init__(self, *rows):
         self.rows = {r.id: r for r in rows}
+        self.list_calls: list[dict] = []
 
     def row(self, user_id) -> SimpleNamespace:
         return self.rows[user_id]
@@ -55,8 +57,17 @@ class FakeAccounts:
         row = self.rows.get(user_id)
         return Account.of(row) if row else None
 
-    async def list(self, role):
+    async def list(self, *, role=None, search=None):
+        self.list_calls.append({"role": role, "search": search})
         rows = [r for r in self.rows.values() if role is None or r.role == role]
+        if search:
+            needle = normalize_search_text(search)
+            rows = [
+                r
+                for r in rows
+                if needle in normalize_search_text(r.email)
+                or needle in normalize_search_text(r.name)
+            ]
         return [Account.of(r) for r in rows]
 
     async def record_login(self, user_id, at):

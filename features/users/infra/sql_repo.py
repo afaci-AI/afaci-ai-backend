@@ -5,12 +5,13 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.accounts import Account
 from core.audit import log_audit_change
 from core.db.models import User
+from core.db.text_filters import contains_clause
 from core.security import hash_password
 
 from ..app.ports import AccountEdit, NewAccount
@@ -31,10 +32,14 @@ class SqlUserRepository:
         await self._db.refresh(row)
         return Account.of(row)
 
-    async def list(self, role: str | None) -> list[Account]:
+    async def list(
+        self, *, role: str | None = None, search: str | None = None
+    ) -> list[Account]:
         query = select(User)
         if role:
             query = query.where(User.role == role)
+        if search:
+            query = query.where(_search_clause(search))
         res = await self._db.execute(query.order_by(User.created_at.desc()))
         return [Account.of(row) for row in res.scalars().all()]
 
@@ -76,6 +81,16 @@ class SqlUserRepository:
         row.temp_password_expires_at = expires_at
         row.token_version = (row.token_version or 0) + 1
         return await self._saved(row)
+
+
+def _search_clause(search: str):
+    """Email или имя содержат запрос. `ILIKE` не годится: БД в локали C не
+    сворачивает регистр кириллицы, поэтому нормализация — `text_filters`."""
+    by_email, email_params = contains_clause("users.email", search, "ue")
+    by_name, name_params = contains_clause("users.name", search, "un")
+    if not by_email:
+        return text("TRUE")
+    return text(f"({by_email} OR {by_name})").bindparams(**email_params, **name_params)
 
 
 class BcryptHasher:
