@@ -14,6 +14,7 @@ from core.errors import (
     ServiceUnavailableError,
 )
 from core.mail_layout import render_html, render_text
+from core.transaction import transaction
 
 from ..domain.rules import (
     UserRuleViolation,
@@ -22,6 +23,7 @@ from ..domain.rules import (
     validate_not_self_demotion,
     validate_role,
 )
+from .commands import NewUser, UserChanges
 from .credentials import (
     SUBJECT,
     TEMP_PASSWORD_TTL,
@@ -36,6 +38,7 @@ from .ports import (
     MailFailure,
     NewAccount,
     PasswordHasher,
+    UnitOfWork,
     UserRepository,
 )
 
@@ -58,12 +61,14 @@ class UserService:
     def __init__(
         self,
         repo: UserRepository,
+        uow: UnitOfWork,
         hasher: PasswordHasher,
         audit: ChangeAudit,
         mailer: Mailer | None = None,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self._repo = repo
+        self._uow = uow
         self._hasher = hasher
         self._audit = audit
         self._mailer = mailer
@@ -94,24 +99,25 @@ class UserService:
     async def get(self, user_id: UUID) -> Account:
         return await self._get(user_id)
 
-    async def create(self, data: dict) -> tuple[Account, dict]:
+    async def create(self, command: NewUser) -> tuple[Account, dict]:
         """Аккаунт с временным паролем и письмом. Сбой почты аккаунт не отменяет."""
-        _rule(validate_role, data["role"])
-        _rule(validate_expiry, data["access_expires_at"])
-        email = data["email"].strip().lower()
+        _rule(validate_role, command.role)
+        _rule(validate_expiry, command.access_expires_at, self._now())
+        email = command.email.strip().lower()
         if await self._repo.find_by_email(email) is not None:
             raise ConflictError("Пользователь с таким email уже существует.")
         password = generate_temp_password()
-        user = await self._repo.add(
-            NewAccount(
-                email=email,
-                name=data["name"].strip(),
-                password_hash=self._hasher.hash(password),
-                role=data["role"],
-                access_expires_at=data["access_expires_at"],
-                temp_password_expires_at=self._now() + TEMP_PASSWORD_TTL,
+        async with transaction(self._uow):
+            user = await self._repo.add(
+                NewAccount(
+                    email=email,
+                    name=command.name.strip(),
+                    password_hash=self._hasher.hash(password),
+                    role=command.role,
+                    access_expires_at=command.access_expires_at,
+                    temp_password_expires_at=self._now() + TEMP_PASSWORD_TTL,
+                )
             )
-        )
         return user, await self._send_credentials(user, password)
 
     async def resend_credentials(self, user_id: UUID) -> tuple[Account, dict]:
@@ -126,44 +132,50 @@ class UserService:
         if not delivery["sent"]:
             raise ServiceUnavailableError(MAIL_FAILED)
         # Сессии, открытые прежним временным паролем, завершаются.
-        user = await self._repo.set_temp_password(
-            user.id, self._hasher.hash(password), self._now() + TEMP_PASSWORD_TTL
-        )
+        async with transaction(self._uow):
+            user = await self._repo.set_temp_password(
+                user.id, self._hasher.hash(password), self._now() + TEMP_PASSWORD_TTL
+            )
         return user, delivery
 
-    async def update(self, user_id: UUID, changes: dict, admin_id: UUID) -> Account:
-        """changes — поля запроса, переданные клиентом (exclude_unset)."""
+    async def update(
+        self, user_id: UUID, changes: UserChanges, admin_id: UUID
+    ) -> Account:
         user = await self._get(user_id)
         is_self = user.id == admin_id
         edit = AccountEdit.of(user)
 
-        role = changes.get("role")
+        role = changes.role
         if role is not None:
             _rule(validate_role, role)
             _rule(validate_not_self_demotion, is_self, role)
             edit = replace(edit, role=role)
 
-        is_active = changes.get("is_active")
+        is_active = changes.is_active
         if is_active is not None:
             if not is_active:
                 _rule(validate_not_self_deactivation, is_self)
             edit = replace(edit, is_active=is_active)
 
-        if changes.get("name") is not None:
-            edit = replace(edit, name=changes["name"].strip())
+        if changes.name is not None:
+            edit = replace(edit, name=changes.name.strip())
 
-        if changes.get("access_expires_at_unlimited"):
+        if changes.access_expires_at_unlimited:
             edit = replace(edit, access_expires_at=None)
-        elif changes.get("access_expires_at") is not None:
-            _rule(validate_expiry, changes["access_expires_at"])
-            edit = replace(edit, access_expires_at=changes["access_expires_at"])
+        elif changes.access_expires_at is not None:
+            _rule(validate_expiry, changes.access_expires_at, self._now())
+            edit = replace(edit, access_expires_at=changes.access_expires_at)
 
-        user = await self._repo.update(user.id, edit)
-        self._audit.user_updated(admin_id, user, user_id, changes)
+        async with transaction(self._uow):
+            user = await self._repo.update(user.id, edit)
+        self._audit.user_updated(admin_id, user, user_id, changes.fields())
         return user
 
     async def deactivate(self, user_id: UUID, admin_id: UUID) -> dict:
         _rule(validate_not_self_deactivation, user_id == admin_id)
         user = await self._get(user_id)
-        await self._repo.update(user.id, replace(AccountEdit.of(user), is_active=False))
+        async with transaction(self._uow):
+            await self._repo.update(
+                user.id, replace(AccountEdit.of(user), is_active=False)
+            )
         return {"status": "deactivated"}

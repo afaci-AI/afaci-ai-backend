@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, Mock
 
 from features.users.app.service import UserService
 from features.users.infra.sql_repo import SqlUserRepository, _search_clause
-from tests.account_fakes import FakeAccounts, account_row
+from tests.account_fakes import FakeAccounts, FakeUnitOfWork, account_row
 
 
 class ServiceDelegatesSearch(unittest.IsolatedAsyncioTestCase):
@@ -14,7 +14,7 @@ class ServiceDelegatesSearch(unittest.IsolatedAsyncioTestCase):
             account_row(email="anna@example.com", name="Анна", role="admin"),
             account_row(email="boris@example.com", name="Борис", role="viewer"),
         )
-        service = UserService(repo, hasher=None, audit=None)
+        service = UserService(repo, FakeUnitOfWork(), hasher=None, audit=None)
         found = await service.list("admin", "АННА")
         self.assertEqual(repo.list_calls, [{"role": "admin", "search": "АННА"}])
         self.assertEqual([u.name for u in found], ["Анна"])

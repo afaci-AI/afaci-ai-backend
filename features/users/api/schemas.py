@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from ..app import NewUser, UserChanges
+
 
 class UserCreateRequest(BaseModel):
     """Пароль задаёт сервер (временный, уходит письмом); поля `password` и
@@ -14,6 +16,14 @@ class UserCreateRequest(BaseModel):
     role: str = "viewer"
     access_expires_at: datetime | None = None
 
+    def command(self) -> NewUser:
+        return NewUser(
+            email=self.email,
+            name=self.name,
+            role=self.role,
+            access_expires_at=self.access_expires_at,
+        )
+
 
 class UserUpdateRequest(BaseModel):
     name: str | None = None
@@ -21,3 +31,6 @@ class UserUpdateRequest(BaseModel):
     is_active: bool | None = None
     access_expires_at: datetime | None = None
     access_expires_at_unlimited: bool | None = None  # True — сбросить срок в null
+
+    def changes(self) -> UserChanges:
+        return UserChanges(**dict(self), provided=frozenset(self.model_fields_set))

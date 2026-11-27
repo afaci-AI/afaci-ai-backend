@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 
 VALID_ROLES = {"admin", "editor", "viewer"}
 
@@ -20,8 +20,8 @@ def validate_role(role: str) -> None:
         raise UserRuleViolation(f"Недопустимая роль: {role}")
 
 
-def validate_expiry(expires_at: datetime | None) -> None:
-    if expires_at is not None and expires_at <= datetime.now(UTC):
+def validate_expiry(expires_at: datetime | None, now: datetime) -> None:
+    if expires_at is not None and expires_at <= now:
         raise UserRuleViolation("Дата окончания доступа не может быть в прошлом.")
 
 

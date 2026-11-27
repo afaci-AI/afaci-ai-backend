@@ -36,6 +36,17 @@ def account_row(**overrides) -> SimpleNamespace:
     return SimpleNamespace(**data)
 
 
+class FakeUnitOfWork:
+    def __init__(self):
+        self.calls = []
+
+    async def commit(self):
+        self.calls.append("commit")
+
+    async def rollback(self):
+        self.calls.append("rollback")
+
+
 class FakeAccounts:
     """Реализует и `AccountRepository` (auth), и `UserRepository` (users)."""
 

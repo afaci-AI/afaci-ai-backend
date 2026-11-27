@@ -50,7 +50,7 @@ def _with_delivery(user: Account, delivery: dict) -> dict:
 
 @router.post("", status_code=201, summary="Создать пользователя")
 async def create_user(data: UserCreateRequest, service: Service, _admin: Admin):
-    return _with_delivery(*await service.create(data.model_dump()))
+    return _with_delivery(*await service.create(data.command()))
 
 
 @router.post("/{id}/resend-credentials", summary="Выслать новый временный пароль")
@@ -62,7 +62,7 @@ async def resend_credentials(id: UUID, service: Service, _admin: Admin):
 async def update_user(
     id: UUID, data: UserUpdateRequest, service: Service, admin: Admin
 ):
-    user = await service.update(id, data.model_dump(exclude_unset=True), admin.id)
+    user = await service.update(id, data.changes(), admin.id)
     return user_public(user)
 
 
