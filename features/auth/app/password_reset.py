@@ -14,6 +14,7 @@ from datetime import UTC, datetime, timedelta
 
 from core.errors import BadRequestError, ServiceUnavailableError
 from core.mail_layout import Email, render_html, render_text
+from core.transaction import transaction
 
 from .ports import (
     Account,
@@ -24,6 +25,7 @@ from .ports import (
     ResetCode,
     ResetCodeHasher,
     ResetCodeRepository,
+    UnitOfWork,
 )
 
 CODE_TTL = timedelta(minutes=30)
@@ -79,6 +81,7 @@ class PasswordResetService:
         self,
         accounts: AccountRepository,
         codes: ResetCodeRepository,
+        uow: UnitOfWork,
         passwords: PasswordHasher,
         code_hasher: ResetCodeHasher,
         mailer: Mailer,
@@ -86,6 +89,7 @@ class PasswordResetService:
     ) -> None:
         self._accounts = accounts
         self._codes = codes
+        self._uow = uow
         self._passwords = passwords
         self._code_hasher = code_hasher
         self._mailer = mailer
@@ -112,19 +116,22 @@ class PasswordResetService:
             return _accepted()
 
         code = _new_code()
-        reset = await self._codes.add(
-            user.id, self._code_hasher.hash(user.id, code), now + CODE_TTL
-        )
+        async with transaction(self._uow):
+            reset = await self._codes.add(
+                user.id, self._code_hasher.hash(user.id, code), now + CODE_TTL
+            )
         try:
             email = reset_email(user.name, code)
             await self._mailer.send(
                 user.email, SUBJECT, render_text(email), render_html(email)
             )
         except MailFailure as exc:
-            await self._codes.delete(reset.id)
+            async with transaction(self._uow):
+                await self._codes.delete(reset.id)
             raise ServiceUnavailableError(MAIL_FAILED) from exc
         # Прежние коды перестают действовать только после успешной отправки.
-        await self._codes.invalidate_others(user.id, keep=reset.id, at=now)
+        async with transaction(self._uow):
+            await self._codes.invalidate_others(user.id, keep=reset.id, at=now)
         return _accepted()
 
     async def _matching_code(self, email: str, code: str) -> tuple[Account, ResetCode]:
@@ -137,7 +144,9 @@ class PasswordResetService:
             raise BadRequestError(INVALID_CODE)
         expected = self._code_hasher.hash(user.id, code.strip())
         if not hmac.compare_digest(reset.code_hash, expected):
-            await self._codes.add_failed_attempt(reset.id)
+            # Попытка тратится даже при отказе, поэтому фиксируется до ошибки.
+            async with transaction(self._uow):
+                await self._codes.add_failed_attempt(reset.id)
             raise BadRequestError(INVALID_CODE)
         return user, reset
 
@@ -149,9 +158,11 @@ class PasswordResetService:
     async def confirm(self, email: str, code: str, new_password: str) -> dict:
         user, reset = await self._matching_code(email, code)
         # Сначала код: при сбое на смене пароля он уже не сработает повторно.
-        await self._codes.consume(reset, self._now())
+        async with transaction(self._uow):
+            await self._codes.consume(reset, self._now())
         # Все выданные ранее токены (другие устройства, вкладки) отклоняются.
-        await self._accounts.set_password(
-            user.id, self._passwords.hash(new_password), revoke_tokens=True
-        )
+        async with transaction(self._uow):
+            await self._accounts.set_password(
+                user.id, self._passwords.hash(new_password), revoke_tokens=True
+            )
         return {"status": "ok"}

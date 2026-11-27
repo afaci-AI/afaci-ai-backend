@@ -1,5 +1,5 @@
 from .password_reset import PasswordResetService
-from .ports import AccountRepository, PasswordHasher, TokenIssuer
+from .ports import AccountRepository, PasswordHasher, TokenIssuer, UnitOfWork
 from .service import AuthService
 
 __all__ = [
@@ -8,4 +8,5 @@ __all__ = [
     "PasswordHasher",
     "PasswordResetService",
     "TokenIssuer",
+    "UnitOfWork",
 ]

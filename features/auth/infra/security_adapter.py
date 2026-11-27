@@ -35,7 +35,7 @@ class SqlAccountRepository:
     async def record_login(self, user_id: UUID, at: datetime) -> Account:
         row = await self._row(user_id)
         row.last_login_at = at
-        await self._db.commit()
+        await self._db.flush()
         await self._db.refresh(row)
         return Account.of(row)
 
@@ -48,7 +48,7 @@ class SqlAccountRepository:
         row.temp_password_expires_at = None
         if revoke_tokens:
             row.token_version = (row.token_version or 0) + 1
-        await self._db.commit()
+        await self._db.flush()
 
 
 class BcryptPasswords:

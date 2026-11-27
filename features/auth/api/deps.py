@@ -6,6 +6,7 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.db.session import get_db
+from core.db.unit_of_work import SqlUnitOfWork
 from core.mail import SmtpMailer
 
 from ..app import AuthService, PasswordResetService
@@ -21,7 +22,9 @@ from ..infra.security_adapter import (
 async def get_auth_service(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> AuthService:
-    return AuthService(SqlAccountRepository(db), BcryptPasswords(), JwtTokens())
+    return AuthService(
+        SqlAccountRepository(db), SqlUnitOfWork(db), BcryptPasswords(), JwtTokens()
+    )
 
 
 async def get_password_reset_service(
@@ -30,6 +33,7 @@ async def get_password_reset_service(
     return PasswordResetService(
         SqlAccountRepository(db),
         SqlResetCodeRepository(db),
+        SqlUnitOfWork(db),
         BcryptPasswords(),
         HmacResetCodes(),
         SmtpMailer(),

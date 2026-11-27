@@ -16,7 +16,13 @@ from features.auth.app.password_reset import (
     PasswordResetService,
 )
 from features.auth.infra.security_adapter import BcryptPasswords, HmacResetCodes
-from tests.account_fakes import NOW, FakeAccounts, FakeCodes, account_row
+from tests.account_fakes import (
+    NOW,
+    FakeAccounts,
+    FakeCodes,
+    FakeUnitOfWork,
+    account_row,
+)
 
 
 class FakeMailer:
@@ -51,12 +57,14 @@ class PasswordResetFlow(unittest.IsolatedAsyncioTestCase):
         self.accounts = FakeAccounts(self.user)
         self.codes = FakeCodes(lambda: self.now)
         self.mailer = FakeMailer()
+        self.uow = FakeUnitOfWork()
         self.service = self.build(self.mailer)
 
     def build(self, mailer):
         return PasswordResetService(
             self.accounts,
             self.codes,
+            self.uow,
             BcryptPasswords(),
             HmacResetCodes(),
             mailer,
@@ -161,6 +169,35 @@ class PasswordResetFlow(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ServiceUnavailableError):
             await service.request(self.user.email)
         self.assertEqual(self.codes.rows, [])
+
+
+class ResetTransactions(PasswordResetFlow):
+    """Что именно фиксируется: порядок и границы транзакций сценария."""
+
+    async def test_request_commits_code_then_invalidation(self):
+        await self.service.request(self.user.email)
+        self.assertEqual(self.uow.calls, ["commit", "commit"])
+
+    async def test_mail_failure_commits_code_then_its_removal(self):
+        service = self.build(FakeMailer(fail=True))
+        with self.assertRaises(ServiceUnavailableError):
+            await service.request(self.user.email)
+        self.assertEqual(self.uow.calls, ["commit", "commit"])
+
+    async def test_failed_attempt_is_committed_before_the_error(self):
+        await self.service.request(self.user.email)
+        self.uow.calls.clear()
+        with self.assertRaises(BadRequestError):
+            await self.service.confirm(self.user.email, "000000", "new-secret")
+        self.assertEqual(self.uow.calls, ["commit"])
+        self.assertEqual(self.codes.rows[0].attempts, 1)
+
+    async def test_confirm_spends_code_and_sets_password_separately(self):
+        await self.service.request(self.user.email)
+        code = sent_code(self.mailer)
+        self.uow.calls.clear()
+        await self.service.confirm(self.user.email, code, "new-secret")
+        self.assertEqual(self.uow.calls, ["commit", "commit"])
 
 
 class ResetEmailContent(unittest.TestCase):
