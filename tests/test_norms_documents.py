@@ -7,7 +7,12 @@ from pathlib import Path
 from core.errors import NotFoundError
 from features.norms.api.presenters import present_payload, source_out
 from features.norms.app import ReferenceDocuments
-from features.norms.domain.records import DailyNorm, RegistrySource
+from features.norms.domain.records import (
+    DailyNorm,
+    NormRow,
+    NormsPayload,
+    RegistrySource,
+)
 from features.norms.infra.documents import LocalDocumentStorage
 
 
@@ -49,8 +54,11 @@ class PresenterTests(unittest.TestCase):
         self.assertNotIn("pdf_filename", shown)
 
     def test_payload_blocks_are_kept(self):
-        payload = {"macro": [1], "sources": []}
-        self.assertEqual(present_payload(payload, lambda name: None)["macro"], [1])
+        row = NormRow(key="fat", name="Жиры", norm=93.0)
+        payload = NormsPayload(macro=[row], micro=[], other=[], sources=[], info={})
+        shown = present_payload(payload, lambda name: None)
+        self.assertEqual(shown["macro"][0]["key"], "fat")
+        self.assertEqual(shown["sources"], [])
 
 
 class DailyNormRecordTests(unittest.TestCase):

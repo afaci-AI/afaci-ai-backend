@@ -86,15 +86,15 @@ class RecipeComposition(unittest.TestCase):
 class ClassRows(unittest.TestCase):
     def test_rows_have_no_norm_and_short_unit(self):
         rows = build_class_rows([CompositionEntry("Ca", "мг/100г", 12.0)])
-        self.assertEqual(rows[0]["unit"], "мг")
-        self.assertIsNone(rows[0]["norm"])
-        self.assertIsNone(rows[0]["percent"])
-        self.assertFalse(rows[0]["partial"])
+        self.assertEqual(rows[0].unit, "мг")
+        self.assertIsNone(rows[0].norm)
+        self.assertIsNone(rows[0].percent)
+        self.assertFalse(rows[0].partial)
 
     def test_partial_flag_is_kept(self):
         rows = build_class_rows([CompositionEntry("Fe", None, 1.0, partial=True)])
-        self.assertTrue(rows[0]["partial"])
-        self.assertIsNone(rows[0]["unit"])
+        self.assertTrue(rows[0].partial)
+        self.assertIsNone(rows[0].unit)
 
     def test_short_unit(self):
         self.assertEqual(short_unit("%/100г"), "%")

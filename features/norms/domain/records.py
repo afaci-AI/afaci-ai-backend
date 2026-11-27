@@ -41,6 +41,35 @@ class DailyNorm:
 
 
 @dataclass(frozen=True)
+class NormRow:
+    """Строка «нутриент — содержание — норма — доля от нормы» для клиентов."""
+
+    key: str
+    name: str
+    unit: str | None = None
+    # None — нормы для нутриента нет: показывается только содержание.
+    norm: float | None = None
+    amount: float | None = None
+    percent: float | None = None
+    source_id: str | None = None
+    basis: str | None = None
+    # Значение есть не у всех ингредиентов рецептуры: сумма неполная.
+    partial: bool = False
+    # norm — физиологическая норма, adequate — адекватный уровень потребления.
+    kind: str | None = None
+
+
+@dataclass(frozen=True)
+class ProductMacros:
+    """Макросостав продукта на 100 г: белки, жиры, углеводы, волокна."""
+
+    protein: float | None = None
+    fat: float | None = None
+    carbs: float | None = None
+    fiber: float | None = None
+
+
+@dataclass(frozen=True)
 class CompositionEntry:
     """Содержание нутриента на 100 г продукта или рецептуры."""
 
@@ -124,3 +153,14 @@ class ReferenceSource:
 
 # Источник для показа совпадает с записью реестра: эталоны приводятся к ней.
 Source = RegistrySource
+
+
+@dataclass(frozen=True)
+class NormsPayload:
+    """Блоки норм для клиента: макро-, микросостав, прочее, источники и пояснение."""
+
+    macro: list[NormRow]
+    micro: list[NormRow]
+    other: list[NormRow]
+    sources: list[Source]
+    info: dict
