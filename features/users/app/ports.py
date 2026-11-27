@@ -18,6 +18,7 @@ __all__ = [
     "Mailer",
     "NewAccount",
     "PasswordHasher",
+    "UnitOfWork",
     "UserRepository",
 ]
 
@@ -51,7 +52,17 @@ class AccountEdit:
         )
 
 
+class UnitOfWork(Protocol):
+    """Транзакция сценария: единственное место фиксации и отката."""
+
+    async def commit(self) -> None: ...
+
+    async def rollback(self) -> None: ...
+
+
 class UserRepository(Protocol):
+    """Изменения только готовятся: фиксирует их `UnitOfWork`."""
+
     async def list(
         self, *, role: str | None = None, search: str | None = None
     ) -> list[Account]:

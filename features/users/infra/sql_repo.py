@@ -28,7 +28,8 @@ class SqlUserRepository:
         return row
 
     async def _saved(self, row: User) -> Account:
-        await self._db.commit()
+        """Готовит изменения (flush) и перечитывает значения базы; не фиксирует."""
+        await self._db.flush()
         await self._db.refresh(row)
         return Account.of(row)
 

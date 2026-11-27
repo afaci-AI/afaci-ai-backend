@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 import core.security as authentication
 from core.db import models
 from core.db.session import get_db
+from core.db.unit_of_work import SqlUnitOfWork
 from features.auth.api import router as auth_router
 from features.catalog.api import router as catalog_router
 from features.products.api import router as products_router
@@ -38,6 +39,8 @@ class AccessPolicyChecks(unittest.IsolatedAsyncioTestCase):
         self.db = Mock(
             execute=AsyncMock(),
             commit=AsyncMock(),
+            flush=AsyncMock(),
+            rollback=AsyncMock(),
             delete=AsyncMock(),
             refresh=AsyncMock(),
         )
@@ -124,7 +127,10 @@ class AccessPolicyChecks(unittest.IsolatedAsyncioTestCase):
         )
         self.db.get = AsyncMock(return_value=user)
         service = UserService(
-            SqlUserRepository(self.db), BcryptHasher(), UserChangeAudit()
+            SqlUserRepository(self.db),
+            SqlUnitOfWork(self.db),
+            BcryptHasher(),
+            UserChangeAudit(),
         )
         result = await service.deactivate(user.id, uuid4())
         self.assertEqual(result, {"status": "deactivated"})

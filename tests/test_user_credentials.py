@@ -16,13 +16,13 @@ from core.errors import (
 )
 from features.auth.app import AuthService
 from features.auth.infra.security_adapter import BcryptPasswords, JwtTokens
-from features.users.app import UserService
+from features.users.app import NewUser, UserChanges, UserService
 from features.users.app.credentials import (
     TEMP_PASSWORD_TTL,
     generate_temp_password,
 )
 from features.users.infra.sql_repo import BcryptHasher
-from tests.account_fakes import NOW, FakeAccounts
+from tests.account_fakes import NOW, FakeAccounts, FakeUnitOfWork
 
 
 class FakeMailer:
@@ -45,13 +45,23 @@ def password_from(text):
     return re.search(r"Временный пароль: (\S+)", text).group(1)
 
 
+def changes(**fields):
+    return UserChanges(**fields, provided=frozenset(fields))
+
+
 class TemporaryPasswordFlow(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.now = NOW
         self.users = FakeAccounts()
         self.mailer = FakeMailer()
+        self.uow = FakeUnitOfWork()
         self.service = UserService(
-            self.users, BcryptHasher(), NoAudit(), self.mailer, now=lambda: self.now
+            self.users,
+            self.uow,
+            BcryptHasher(),
+            NoAudit(),
+            self.mailer,
+            now=lambda: self.now,
         )
         self.auth = AuthService(
             self.users, BcryptPasswords(), JwtTokens(), now=lambda: self.now
@@ -59,12 +69,7 @@ class TemporaryPasswordFlow(unittest.IsolatedAsyncioTestCase):
 
     async def create(self):
         return await self.service.create(
-            {
-                "email": " New@Example.com ",
-                "name": "Новый",
-                "role": "viewer",
-                "access_expires_at": None,
-            }
+            NewUser(email=" New@Example.com ", name="Новый", role="viewer")
         )
 
     async def test_create_sends_login_and_temporary_password(self):
@@ -148,19 +153,21 @@ class TemporaryPasswordFlow(unittest.IsolatedAsyncioTestCase):
 class AdminEditsUser(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.users = FakeAccounts()
-        self.service = UserService(self.users, BcryptHasher(), NoAudit())
+        self.service = UserService(
+            self.users, FakeUnitOfWork(), BcryptHasher(), NoAudit()
+        )
         self.user, _ = await self.service.create(
-            {
-                "email": "a@example.com",
-                "name": "Анна",
-                "role": "viewer",
-                "access_expires_at": datetime(2030, 1, 1, tzinfo=UTC),
-            }
+            NewUser(
+                email="a@example.com",
+                name="Анна",
+                role="viewer",
+                access_expires_at=datetime(2030, 1, 1, tzinfo=UTC),
+            )
         )
 
     async def test_only_sent_fields_change(self):
         updated = await self.service.update(
-            self.user.id, {"name": "  Анна К.  "}, admin_id=uuid4()
+            self.user.id, changes(name="  Анна К.  "), admin_id=uuid4()
         )
         self.assertEqual(updated.name, "Анна К.")
         self.assertEqual(updated.role, "viewer")
@@ -169,7 +176,7 @@ class AdminEditsUser(unittest.IsolatedAsyncioTestCase):
     async def test_unlimited_access_clears_expiry(self):
         updated = await self.service.update(
             self.user.id,
-            {"access_expires_at_unlimited": True, "role": "editor"},
+            changes(access_expires_at_unlimited=True, role="editor"),
             admin_id=uuid4(),
         )
         self.assertIsNone(updated.access_expires_at)
@@ -178,7 +185,7 @@ class AdminEditsUser(unittest.IsolatedAsyncioTestCase):
     async def test_admin_cannot_deactivate_self(self):
         with self.assertRaises(BadRequestError):
             await self.service.update(
-                self.user.id, {"is_active": False}, admin_id=self.user.id
+                self.user.id, changes(is_active=False), admin_id=self.user.id
             )
         self.assertTrue(self.users.row(self.user.id).is_active)
 
@@ -187,6 +194,45 @@ class AdminEditsUser(unittest.IsolatedAsyncioTestCase):
         stored = self.users.row(self.user.id)
         self.assertFalse(stored.is_active)
         self.assertEqual(stored.name, "Анна")
+
+
+class UserTransactionsAndClock(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.users = FakeAccounts()
+        self.uow = FakeUnitOfWork()
+        self.service = UserService(
+            self.users, self.uow, BcryptHasher(), NoAudit(), now=lambda: NOW
+        )
+
+    async def test_create_commits_once(self):
+        await self.service.create(
+            NewUser(email="b@example.com", name="Б", role="viewer")
+        )
+        self.assertEqual(self.uow.calls, ["commit"])
+
+    async def test_expiry_is_checked_against_injected_clock(self):
+        yesterday = NOW - timedelta(days=1)
+        with self.assertRaises(BadRequestError):
+            await self.service.create(
+                NewUser(
+                    email="c@example.com",
+                    name="В",
+                    role="viewer",
+                    access_expires_at=yesterday,
+                )
+            )
+        self.assertEqual(self.uow.calls, [])
+
+    async def test_failed_write_rolls_back(self):
+        async def broken(*args):
+            raise RuntimeError("db down")
+
+        self.users.add = broken
+        with self.assertRaises(RuntimeError):
+            await self.service.create(
+                NewUser(email="d@example.com", name="Г", role="viewer")
+            )
+        self.assertEqual(self.uow.calls, ["rollback"])
 
 
 class TemporaryPasswordShape(unittest.TestCase):
