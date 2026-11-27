@@ -64,7 +64,7 @@ class TemporaryPasswordFlow(unittest.IsolatedAsyncioTestCase):
             now=lambda: self.now,
         )
         self.auth = AuthService(
-            self.users, BcryptPasswords(), JwtTokens(), now=lambda: self.now
+            self.users, self.uow, BcryptPasswords(), JwtTokens(), now=lambda: self.now
         )
 
     async def create(self):

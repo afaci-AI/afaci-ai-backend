@@ -20,6 +20,7 @@ __all__ = [
     "ResetCodeHasher",
     "ResetCodeRepository",
     "TokenIssuer",
+    "UnitOfWork",
 ]
 
 
@@ -33,7 +34,17 @@ class ResetCode:
     attempts: int
 
 
+class UnitOfWork(Protocol):
+    """Транзакция сценария: единственное место фиксации и отката."""
+
+    async def commit(self) -> None: ...
+
+    async def rollback(self) -> None: ...
+
+
 class AccountRepository(Protocol):
+    """Изменения только готовятся: фиксирует их `UnitOfWork`."""
+
     async def find_by_email(self, email: str) -> Account | None: ...
 
     async def get(self, user_id: UUID) -> Account | None: ...
@@ -66,6 +77,8 @@ class ResetCodeHasher(Protocol):
 
 
 class ResetCodeRepository(Protocol):
+    """Изменения только готовятся: фиксирует их `UnitOfWork`."""
+
     async def count_since(self, user_id: UUID, since: datetime) -> int:
         """Сколько кодов выдано пользователю позже `since`."""
 

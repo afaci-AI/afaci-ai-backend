@@ -7,8 +7,9 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from core.errors import BadRequestError, ForbiddenError, UnauthorizedError
+from core.transaction import transaction
 
-from .ports import Account, AccountRepository, PasswordHasher, TokenIssuer
+from .ports import Account, AccountRepository, PasswordHasher, TokenIssuer, UnitOfWork
 
 EXPIRED = "Срок действия учётной записи истёк. Обратитесь в техническую поддержку."
 TEMP_EXPIRED = (
@@ -24,11 +25,13 @@ class AuthService:
     def __init__(
         self,
         repo: AccountRepository,
+        uow: UnitOfWork,
         passwords: PasswordHasher,
         tokens: TokenIssuer,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self._repo = repo
+        self._uow = uow
         self._passwords = passwords
         self._tokens = tokens
         self._now = now
@@ -47,7 +50,8 @@ class AuthService:
         if user.must_change_password and temp_until and temp_until <= now:
             raise ForbiddenError(TEMP_EXPIRED)
 
-        user = await self._repo.record_login(user.id, now)
+        async with transaction(self._uow):
+            user = await self._repo.record_login(user.id, now)
         return self._tokens.issue(user.id, user.token_version), user
 
     async def change_password(
@@ -60,7 +64,8 @@ class AuthService:
             raise UnauthorizedError(WRONG_CURRENT)
         if new_password == current_password:
             raise BadRequestError(SAME_PASSWORD)
-        await self._repo.set_password(
-            user.id, self._passwords.hash(new_password), revoke_tokens=False
-        )
+        async with transaction(self._uow):
+            await self._repo.set_password(
+                user.id, self._passwords.hash(new_password), revoke_tokens=False
+            )
         return {"status": "ok"}

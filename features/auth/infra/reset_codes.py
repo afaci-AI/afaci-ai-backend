@@ -37,7 +37,7 @@ class SqlResetCodeRepository:
             user_id=user_id, code_hash=code_hash, expires_at=expires_at, attempts=0
         )
         self._db.add(row)
-        await self._db.commit()
+        await self._db.flush()
         await self._db.refresh(row)
         return _code(row)
 
@@ -45,7 +45,6 @@ class SqlResetCodeRepository:
         await self._db.execute(
             delete(PasswordResetCode).where(PasswordResetCode.id == code_id)
         )
-        await self._db.commit()
 
     async def latest_active(
         self, user_id: UUID, now: datetime, max_attempts: int
@@ -70,7 +69,6 @@ class SqlResetCodeRepository:
             .where(PasswordResetCode.id == code_id)
             .values(attempts=PasswordResetCode.attempts + 1)
         )
-        await self._db.commit()
 
     async def invalidate_others(self, user_id: UUID, keep: UUID, at: datetime) -> None:
         await self._db.execute(
@@ -82,7 +80,6 @@ class SqlResetCodeRepository:
             )
             .values(used_at=at)
         )
-        await self._db.commit()
 
     async def consume(self, code: ResetCode, at: datetime) -> None:
         await self._db.execute(
@@ -93,4 +90,3 @@ class SqlResetCodeRepository:
             )
             .values(used_at=at)
         )
-        await self._db.commit()
