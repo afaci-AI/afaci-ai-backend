@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from core.errors import BadRequestError, NotFoundError, UnprocessableError
+from core.transaction import transaction
 from features.catalog.domain.rules import UnitRuleViolation, nutrient_unit_for
 
 from .audit_events import (
@@ -23,7 +24,6 @@ from .ports import (
     NutrientRow,
     UnitOfWork,
 )
-from .transaction import transaction
 
 DUPLICATE_NUTRIENT = "Duplicate nutrient entry detected"
 

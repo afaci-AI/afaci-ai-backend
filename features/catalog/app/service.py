@@ -11,6 +11,7 @@ from typing import cast
 from uuid import UUID
 
 from core.errors import BadRequestError, NotFoundError, UnprocessableError
+from core.transaction import transaction
 
 from ..domain.dictionaries import (
     CATEGORIES,
@@ -32,7 +33,6 @@ from .ports import (
     SubcategoryRow,
     UnitOfWork,
 )
-from .transaction import transaction
 
 SUBCATEGORY_EXISTS = "Subcategory already exists in this category"
 NUTRIENT_NAME_EXISTS = "Nutrient name already exists in this type"
