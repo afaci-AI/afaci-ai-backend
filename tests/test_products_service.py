@@ -8,11 +8,19 @@ from core.errors import BadRequestError
 from features.products.app import (
     Caller,
     DuplicateError,
+    NewNutrient,
+    NewProduct,
+    NutrientChanges,
     NutrientService,
+    ProductChanges,
     ProductService,
 )
 
 CALLER = Caller(actor="user:42")
+
+
+def new_product(name):
+    return NewProduct(name=name, category_id=uuid4(), region_id=uuid4())
 
 
 class FakeUnitOfWork:
@@ -80,26 +88,30 @@ class ProductTransactions(unittest.IsolatedAsyncioTestCase):
 
     async def test_create_commits_then_audits_with_callers_actor(self):
         service = self.build()
-        await service.create({"name": "Баранина"}, CALLER)
+        await service.create(new_product("Баранина"), CALLER)
         self.assertEqual(self.uow.calls, ["commit", "refresh"])
         self.assertEqual(self.audit.logged, [("FOOD_PRODUCT_CREATED", "user:42")])
 
     async def test_duplicate_on_create_rolls_back_without_audit(self):
         service = self.build(duplicate=True)
         with self.assertRaises(BadRequestError):
-            await service.create({"name": "Говядина"}, CALLER)
+            await service.create(new_product("Говядина"), CALLER)
         self.assertEqual(self.uow.calls, ["rollback"])
         self.assertEqual(self.audit.logged, [])
 
     async def test_duplicate_on_update_rolls_back(self):
         service = self.build(duplicate=True)
         with self.assertRaises(BadRequestError):
-            await service.update(uuid4(), {"name": "Баранина"}, CALLER)
+            await service.update(
+                uuid4(),
+                ProductChanges("Баранина", provided=frozenset({"name"})),
+                CALLER,
+            )
         self.assertEqual(self.uow.calls, ["rollback"])
 
     async def test_empty_patch_touches_nothing(self):
         service = self.build()
-        await service.update(uuid4(), {}, CALLER)
+        await service.update(uuid4(), ProductChanges(), CALLER)
         self.assertEqual(self.uow.calls, [])
         self.assertEqual(self.audit.logged, [])
 
@@ -117,6 +129,9 @@ class FakeNutrients:
             id=uuid4(), nutrient_type_id=uuid4(), unit_id=uuid4()
         )
 
+    async def get(self, nutrient_id):
+        return SimpleNamespace(id=nutrient_id, product_id=uuid4(), quantity=1)
+
     async def get_name(self, name_id):
         return self.name
 
@@ -132,7 +147,7 @@ class NutrientTransactions(unittest.IsolatedAsyncioTestCase):
         return NutrientService(FakeNutrients(**repo), self.uow, self.audit)
 
     def payload(self):
-        return {"product_id": uuid4(), "nutrient_name_id": uuid4(), "quantity": 1}
+        return NewNutrient(product_id=uuid4(), nutrient_name_id=uuid4(), quantity=1)
 
     async def test_create_commits_and_takes_unit_from_name(self):
         service = self.build()
@@ -146,6 +161,16 @@ class NutrientTransactions(unittest.IsolatedAsyncioTestCase):
             await service.create(self.payload(), CALLER)
         self.assertEqual(self.uow.calls, ["rollback"])
         self.assertEqual(self.audit.logged, [])
+
+    async def test_create_does_not_change_the_command(self):
+        command = self.payload()
+        await self.build().create(command, CALLER)
+        self.assertIsNone(command.unit_id)
+
+    async def test_empty_changes_touch_nothing(self):
+        service = self.build()
+        await service.update(uuid4(), NutrientChanges(), CALLER)
+        self.assertEqual(self.uow.calls, [])
 
 
 if __name__ == "__main__":

@@ -40,7 +40,7 @@ async def api_create_product(
     service: Products,
     caller: CallerDep,
 ):
-    return await service.create(data.model_dump(), caller)
+    return await service.create(data.command(), caller)
 
 
 @router.get("/products", tags=["Products"])
@@ -83,7 +83,7 @@ async def api_update_product(
     service: Products,
     caller: CallerDep,
 ):
-    return await service.update(id, data.model_dump(exclude_unset=True), caller)
+    return await service.update(id, data.changes(), caller)
 
 
 @router.post("/products/bulk", status_code=201, tags=["Products"], dependencies=EDITOR)
@@ -92,7 +92,7 @@ async def api_bulk_products(
     service: Products,
     caller: CallerDep,
 ):
-    return await service.bulk_create([p.model_dump() for p in data], caller)
+    return await service.bulk_create([p.command() for p in data], caller)
 
 
 @router.get("/products/by-region/{id}", tags=["Products"])
@@ -111,7 +111,7 @@ async def api_auto_create_product(
     service: ProductImport,
     caller: CallerDep,
 ):
-    return await service.auto_create(data.model_dump(), caller)
+    return await service.auto_create(data.command(), caller)
 
 
 @router.post(
@@ -122,7 +122,7 @@ async def api_auto_bulk_products(
     service: ProductImport,
     caller: CallerDep,
 ):
-    return await service.auto_bulk([item.model_dump() for item in data], caller)
+    return await service.auto_bulk([item.command() for item in data], caller)
 
 
 # ==================== NUTRIENTS ====================
@@ -132,7 +132,7 @@ async def api_create_nutrient(
     service: Nutrients,
     caller: CallerDep,
 ):
-    return await service.create(data.model_dump(), caller)
+    return await service.create(data.command(), caller)
 
 
 @router.get("/nutrients", tags=["Nutrients"])
@@ -161,7 +161,7 @@ async def api_update_nutrient(
     service: Nutrients,
     caller: CallerDep,
 ):
-    return await service.update(id, data.model_dump(exclude_unset=True), caller)
+    return await service.update(id, data.changes(), caller)
 
 
 @router.get("/nutrients/product/{id}", tags=["Nutrients"])
@@ -177,4 +177,4 @@ async def api_bulk_nutrients(
     service: Nutrients,
     caller: CallerDep,
 ):
-    return await service.bulk_create([n.model_dump() for n in data.items], caller)
+    return await service.bulk_create([n.command() for n in data.items], caller)

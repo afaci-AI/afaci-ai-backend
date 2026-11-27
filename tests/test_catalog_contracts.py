@@ -77,19 +77,15 @@ async def api_count_products(db):
 
 
 async def api_create_nutrient(data, db):
-    return await nutrients(db).create(data.model_dump(), NO_CALLER)
+    return await nutrients(db).create(data.command(), NO_CALLER)
 
 
 async def api_update_nutrient(item_id, data, db):
-    return await nutrients(db).update(
-        item_id, data.model_dump(exclude_unset=True), NO_CALLER
-    )
+    return await nutrients(db).update(item_id, data.changes(), NO_CALLER)
 
 
 async def api_bulk_nutrients(data, db):
-    return await nutrients(db).bulk_create(
-        [n.model_dump() for n in data.items], NO_CALLER
-    )
+    return await nutrients(db).bulk_create([n.command() for n in data.items], NO_CALLER)
 
 
 _router = APIRouter()

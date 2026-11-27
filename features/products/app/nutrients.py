@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from uuid import UUID
 
 from core.errors import BadRequestError, NotFoundError, UnprocessableError
@@ -15,6 +16,7 @@ from .audit_events import (
     FOOD_UPDATED,
     bulk_changes,
 )
+from .commands import NewNutrient, NutrientChanges
 from .ports import (
     AuditTrail,
     Caller,
@@ -34,6 +36,15 @@ def _unit_for(name: NutrientNameRow, requested: UUID | None) -> UUID:
     except UnitRuleViolation as exc:
         error = UnprocessableError if exc.code == "required" else BadRequestError
         raise error(exc.detail) from exc
+
+
+def _payload(command: NewNutrient, name: NutrientNameRow) -> dict:
+    """Поля новой записи: тип и единица берутся у названия нутриента."""
+    return {
+        **asdict(command),
+        "nutrient_type_id": name.nutrient_type_id,
+        "unit_id": _unit_for(name, command.unit_id),
+    }
 
 
 class NutrientService:
@@ -62,12 +73,11 @@ class NutrientService:
     async def by_product(self, product_id: UUID) -> list[NutrientRow]:
         return await self._repo.by_product(product_id)
 
-    async def create(self, payload: dict, caller: Caller) -> NutrientRow:
-        name = await self._repo.get_name(payload["nutrient_name_id"])
+    async def create(self, command: NewNutrient, caller: Caller) -> NutrientRow:
+        name = await self._repo.get_name(command.nutrient_name_id)
         if not name:
             raise NotFoundError("Nutrient name not found")
-        payload["nutrient_type_id"] = name.nutrient_type_id
-        payload["unit_id"] = _unit_for(name, payload.get("unit_id"))
+        payload = _payload(command, name)
         try:
             async with transaction(self._uow):
                 item = await self._repo.add(payload)
@@ -100,8 +110,12 @@ class NutrientService:
         )
         return {"status": "deleted"}
 
-    async def _apply_name_and_unit(self, item: NutrientRow, patch: dict) -> None:
-        """Тип и единица следуют за названием; явный null единицы — «не менять»."""
+    async def _patch(self, item: NutrientRow, changes: NutrientChanges) -> dict:
+        """Изменения записи: тип и единица следуют за названием.
+
+        Явный null единицы означает «не менять».
+        """
+        patch = changes.fields()
         requested_unit = patch.pop("unit_id", None)
         name = None
         if "nutrient_name_id" in patch:
@@ -113,15 +127,16 @@ class NutrientService:
             name = await self._name(item.nutrient_name_id)
         if name is not None:
             patch["unit_id"] = _unit_for(name, requested_unit)
+        return patch
 
     async def update(
-        self, nutrient_id: UUID, patch: dict, caller: Caller
+        self, nutrient_id: UUID, changes: NutrientChanges, caller: Caller
     ) -> NutrientRow:
         item = await self.get(nutrient_id)
         old_snapshot = self._audit.snapshot_nutrient(item)
-        if not patch:
+        if not changes.provided:
             return item
-        await self._apply_name_and_unit(item, patch)
+        patch = await self._patch(item, changes)
         try:
             async with transaction(self._uow):
                 await self._repo.update(item, patch)
@@ -140,17 +155,18 @@ class NutrientService:
             )
         return item
 
-    async def _resolve_names(self, payloads: list[dict]) -> None:
-        names = await self._repo.names_by_ids({p["nutrient_name_id"] for p in payloads})
-        for p in payloads:
-            name = names.get(p["nutrient_name_id"])
+    async def _payloads(self, commands: list[NewNutrient]) -> list[dict]:
+        names = await self._repo.names_by_ids({c.nutrient_name_id for c in commands})
+        payloads = []
+        for command in commands:
+            name = names.get(command.nutrient_name_id)
             if not name:
                 raise NotFoundError("Nutrient name not found")
-            p["nutrient_type_id"] = name.nutrient_type_id
-            p["unit_id"] = _unit_for(name, p.get("unit_id"))
+            payloads.append(_payload(command, name))
+        return payloads
 
-    async def bulk_create(self, payloads: list[dict], caller: Caller) -> dict:
-        await self._resolve_names(payloads)
+    async def bulk_create(self, commands: list[NewNutrient], caller: Caller) -> dict:
+        payloads = await self._payloads(commands)
         try:
             async with transaction(self._uow):
                 items = await self._repo.add_many(payloads)

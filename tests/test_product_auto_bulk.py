@@ -4,7 +4,12 @@ import unittest
 from types import SimpleNamespace
 from uuid import uuid4
 
-from features.products.app import Caller, DuplicateError, ProductImportService
+from features.products.app import (
+    AutoProduct,
+    Caller,
+    DuplicateError,
+    ProductImportService,
+)
 from features.products.app.product_import import BULK_CONFLICT
 
 CALLER = Caller(actor="Anonymous")
@@ -70,7 +75,7 @@ class FakeAudit:
 
 
 def row(name, region="Кыргызстан"):
-    return {"name": name, "category_name": "Мясо", "region_name": region}
+    return AutoProduct(name=name, category_name="Мясо", region_name=region)
 
 
 class AutoBulk(unittest.IsolatedAsyncioTestCase):
