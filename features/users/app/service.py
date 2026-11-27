@@ -89,11 +89,7 @@ class UserService:
         return user
 
     async def list(self, role: str | None, search: str | None) -> list[Account]:
-        users = await self._repo.list(role)
-        if search:
-            s = search.lower()
-            users = [u for u in users if s in u.email.lower() or s in u.name.lower()]
-        return users
+        return await self._repo.list(role=role, search=search)
 
     async def get(self, user_id: UUID) -> Account:
         return await self._get(user_id)

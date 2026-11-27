@@ -52,8 +52,14 @@ class AccountEdit:
 
 
 class UserRepository(Protocol):
-    async def list(self, role: str | None) -> list[Account]:
-        """Пользователи по убыванию даты создания, при `role` — только этой роли."""
+    async def list(
+        self, *, role: str | None = None, search: str | None = None
+    ) -> list[Account]:
+        """Пользователи по убыванию даты создания.
+
+        `role` — только этой роли; `search` — email или имя содержат запрос без
+        учёта регистра (включая кириллицу), `ё/е`, пробелов и дефисов.
+        """
 
     async def get(self, user_id: UUID) -> Account | None: ...
 
