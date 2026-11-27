@@ -7,7 +7,8 @@ class InvalidRecipeSumError(DomainError):
         self.actual = actual
         self.expected = expected
         super().__init__(
-            f"Сумма Xᵢ должна быть {expected:.0f} г, получено {actual:.2f} г"
+            f"Сумма Xᵢ должна быть ровно {expected:.0f} г "
+            f"(сейчас {actual:.2f} г). Расчёт невозможен."
         )
 
 

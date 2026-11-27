@@ -16,8 +16,16 @@ from fastapi import APIRouter, Depends
 from core.db.models import User
 from core.security import get_current_user
 
-from ..app import CompositionReport, RecipeCalculator, ReferenceCatalog
+from ..app import (
+    CompositionItemInput,
+    CompositionReport,
+    CostCandidateInput,
+    RecipeCalculator,
+    RecipeItemInput,
+    ReferenceCatalog,
+)
 from ..app.ports import ReferenceEntry
+from ..domain import CostOptimizationConstraints
 from .deps import (
     PdfUrl,
     get_calculator,
@@ -88,7 +96,7 @@ async def compute(
     report: Annotated[CompositionReport, Depends(get_composition_report)],
     _user: Annotated[User, Depends(get_current_user)],
 ):
-    items = [{"product_id": it.product_id, "amount_g": it.amount_g} for it in req.items]
+    items = [RecipeItemInput(it.product_id, it.amount_g) for it in req.items]
     return await report.compute(req.reference_protein_id, items)
 
 
@@ -103,18 +111,17 @@ async def optimize_cost_endpoint(
     Возвращает 422 с описанием, если задача неразрешима.
     """
     candidates = [
-        {
-            "product_id": str(c.product_id),
-            "price_per_kg": c.price_per_kg,
-            "min_amount_g": c.min_amount_g,
-            "max_amount_g": c.max_amount_g,
-        }
+        CostCandidateInput(
+            product_id=c.product_id,
+            price_per_kg=c.price_per_kg,
+            min_amount_g=c.min_amount_g,
+            max_amount_g=c.max_amount_g,
+        )
         for c in req.candidates
     ]
-    constraints = {
-        "bc_min": req.constraints.bc_min,
-        "kras_max": req.constraints.kras_max,
-    }
+    constraints = CostOptimizationConstraints(
+        bc_min=req.constraints.bc_min, kras_max=req.constraints.kras_max
+    )
     return await calculator.optimize_cost(
         req.reference_protein_id, candidates, constraints
     )
@@ -131,9 +138,6 @@ async def optimize_recipe_endpoint(
 ):
     return await calculator.optimize_composition(
         req.reference_protein_id,
-        [
-            {**item.model_dump(), "product_id": str(item.product_id)}
-            for item in req.items
-        ],
+        [CompositionItemInput(**item.model_dump()) for item in req.items],
         req.mode,
     )

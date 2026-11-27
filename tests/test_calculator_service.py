@@ -6,8 +6,8 @@ from pathlib import Path
 from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4
 
-from core.errors import NotFoundError
-from features.calculator.app import RecipeCalculator
+from core.errors import BadRequestError, NotFoundError
+from features.calculator.app import RecipeCalculator, RecipeItemInput
 from features.calculator.domain import (
     CandidateItem,
     ProductNutrients,
@@ -72,9 +72,9 @@ class CalculatorThroughPorts(unittest.IsolatedAsyncioTestCase):
         self.data = FakeData(products, ref)
         self.calculator = RecipeCalculator(self.data, self.data)
 
-    async def test_compute_matches_formulas_on_plain_dicts(self):
+    async def test_compute_matches_formulas_on_typed_items(self):
         items = [
-            {"product_id": UUID(pid), "amount_g": amount}
+            RecipeItemInput(UUID(pid), amount)
             for pid, amount in zip(self.ids, self.baseline, strict=True)
         ]
         result = await self.calculator.compute(uuid4(), items)
@@ -90,15 +90,45 @@ class CalculatorThroughPorts(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, expected)
 
     async def test_missing_product_is_reported(self):
-        items = [{"product_id": uuid4(), "amount_g": 100.0}]
+        items = [RecipeItemInput(uuid4(), 100.0)]
         with self.assertRaises(NotFoundError):
             await self.calculator.compute(uuid4(), items)
 
+    async def test_wrong_sum_is_400_before_loading_data(self):
+        self.data.reference = None
+        items = [RecipeItemInput(UUID(self.ids[0]), 99.0)]
+        with self.assertRaises(BadRequestError) as caught:
+            await self.calculator.compute(uuid4(), items)
+        self.assertEqual(
+            caught.exception.detail,
+            "Сумма Xᵢ должна быть ровно 100 г (сейчас 99.00 г). Расчёт невозможен.",
+        )
+
+    async def test_empty_recipe_is_400(self):
+        with self.assertRaises(BadRequestError) as caught:
+            await self.calculator.compute(uuid4(), [])
+        self.assertEqual(caught.exception.detail, "Список ингредиентов пуст.")
+
     async def test_missing_reference_is_reported(self):
         self.data.reference = None
-        items = [{"product_id": UUID(self.ids[0]), "amount_g": 100.0}]
+        items = [RecipeItemInput(UUID(self.ids[0]), 100.0)]
         with self.assertRaises(NotFoundError):
             await self.calculator.compute(uuid4(), items)
+
+
+class RecipesAdapterChecks(unittest.IsolatedAsyncioTestCase):
+    async def test_recipe_items_reach_calculator_as_typed_input(self):
+        from features.recipes.api.deps import _CalculatorAdapter
+
+        calculator = Mock(compute=AsyncMock(return_value={"ok": True}))
+        product_id, reference_id = uuid4(), uuid4()
+        result = await _CalculatorAdapter(calculator).compute(
+            reference_id, [{"product_id": product_id, "amount_g": 100.0}]
+        )
+        self.assertEqual(result, {"ok": True})
+        calculator.compute.assert_awaited_once_with(
+            reference_id, [RecipeItemInput(product_id, 100.0)]
+        )
 
 
 def nutrient_row(pid, nutrient, ntype, quantity, nclass=None, unit=None):

@@ -1,7 +1,7 @@
 """Сценарии калькулятора: расчёт рецептуры и оптимизация.
 
-Загрузка данных идёт через порты; математика — в `domain`. Сумма ингредиентов,
-наличие эталона и продуктов проверяются здесь и переводятся в общие ошибки.
+Загрузка данных идёт через порты; математика и правило суммы — в `domain`.
+Здесь доменные ошибки и отсутствие эталона или продуктов переводятся в общие.
 """
 
 from __future__ import annotations
@@ -13,18 +13,25 @@ from core.errors import BadRequestError, NotFoundError, UnprocessableError
 
 from ..domain import (
     PER_KILOGRAM,
-    REQUIRED_SUM,
-    SUM_TOLERANCE,
     CandidateItem,
     CostOptimizationConstraints,
+    EmptyRecipeError,
+    InvalidRecipeSumError,
     OptimizationInfeasibleError,
     ProductNutrients,
     RecipeOptimizationError,
     compute_report,
     optimize_cost,
     optimize_recipe,
+    validate_recipe_sum,
 )
-from .ports import ProductNutrientReader, ReferenceReader
+from .ports import (
+    CompositionItemInput,
+    CostCandidateInput,
+    ProductNutrientReader,
+    RecipeItemInput,
+    ReferenceReader,
+)
 
 
 class RecipeCalculator:
@@ -42,40 +49,33 @@ class RecipeCalculator:
             raise NotFoundError("Эталонный белок не найден.")
         return reference.formula_input()
 
-    async def _products_by_id(self, ids: list[UUID]) -> dict[str, ProductNutrients]:
-        return await self._products.load_products(ids)
+    async def _products_for(self, ids: list[UUID]) -> list[ProductNutrients]:
+        """Продукты в порядке `ids`; NotFoundError, если какого-то нет.
 
-    @staticmethod
-    def _require_found(
-        requested: list[str], products: dict[str, ProductNutrients]
-    ) -> None:
-        missing = [pid for pid in requested if pid not in products]
+        Хранилище отдаёт продукты по строковому id — это единственное место,
+        где UUID переводится в строку.
+        """
+        found = await self._products.load_products(ids)
+        missing = [str(pid) for pid in ids if str(pid) not in found]
         if missing:
             raise NotFoundError(f"Продукты не найдены: {', '.join(missing)}")
+        return [found[str(pid)] for pid in ids]
 
     # ----------------------------------------------------------- расчёт
-    async def compute(self, reference_protein_id: UUID, items: list[dict]) -> dict:
-        """items: [{product_id: UUID|str, amount_g: float}, ...]
-
-        Валидирует сумму (= 100 ± SUM_TOLERANCE), грузит эталон и продукты,
-        возвращает полный отчёт `compute_report`.
-        """
-        if not items:
-            raise BadRequestError("Список ингредиентов пуст.")
-
-        total = sum(it["amount_g"] for it in items)
-        if abs(total - REQUIRED_SUM) > SUM_TOLERANCE:
-            raise BadRequestError(
-                f"Сумма Xᵢ должна быть ровно {REQUIRED_SUM:.0f} г "
-                f"(сейчас {total:.2f} г). Расчёт невозможен."
-            )
+    async def compute(
+        self, reference_protein_id: UUID, items: list[RecipeItemInput]
+    ) -> dict:
+        """Полный отчёт `compute_report`; сумма масс — ровно 100 г."""
+        try:
+            validate_recipe_sum(it.amount_g for it in items)
+        except (EmptyRecipeError, InvalidRecipeSumError) as exc:
+            raise BadRequestError(str(exc)) from exc
 
         reference = await self._reference(reference_protein_id)
-        products = await self._products_by_id([it["product_id"] for it in items])
-        self._require_found([str(it["product_id"]) for it in items], products)
-
+        products = await self._products_for([it.product_id for it in items])
         enriched = [
-            products[str(it["product_id"])].report_item(it["amount_g"]) for it in items
+            product.report_item(it.amount_g)
+            for product, it in zip(products, items, strict=True)
         ]
         return compute_report(enriched, reference)
 
@@ -83,56 +83,42 @@ class RecipeCalculator:
     async def optimize_cost(
         self,
         reference_protein_id: UUID,
-        candidates: list[dict],
-        constraints: dict,
+        candidates: list[CostCandidateInput],
+        constraints: CostOptimizationConstraints,
     ) -> dict:
-        """candidates: [{product_id, price_per_kg, min_amount_g, max_amount_g}];
-        constraints: {bc_min?, kras_max?}.
-        Возвращает {optimal_items, total_cost_per_kg, report}."""
+        """Возвращает {optimal_items, total_cost_per_kg, report}."""
         if not candidates:
             raise BadRequestError("Список кандидатов пуст.")
 
         reference = await self._reference(reference_protein_id)
-        products = await self._products_by_id(
-            [UUID(c["product_id"]) for c in candidates]
-        )
-        self._require_found([c["product_id"] for c in candidates], products)
-
+        products = await self._products_for([c.product_id for c in candidates])
         domain_candidates = [
-            _candidate(
-                c["product_id"],
-                products,
-                float(c["price_per_kg"]),
-                float(c.get("min_amount_g", 0.0)),
-                float(c.get("max_amount_g", 100.0)),
+            CandidateItem.of(
+                product,
+                float(c.price_per_kg),
+                float(c.min_amount_g),
+                float(c.max_amount_g),
             )
-            for c in candidates
+            for product, c in zip(products, candidates, strict=True)
         ]
         try:
-            opt = optimize_cost(
-                domain_candidates,
-                reference,
-                CostOptimizationConstraints(
-                    bc_min=constraints.get("bc_min"),
-                    kras_max=constraints.get("kras_max"),
-                ),
-            )
+            opt = optimize_cost(domain_candidates, reference, constraints)
         except OptimizationInfeasibleError as e:
             raise UnprocessableError(e.detail) from e
 
         amounts = opt["amounts"]
         enriched = [
-            products[c.product_id].report_item(amounts[i])
-            for i, c in enumerate(domain_candidates)
+            product.report_item(amount)
+            for product, amount in zip(products, amounts, strict=True)
         ]
         return {
             "optimal_items": [
                 {
                     "product_id": c.product_id,
-                    "amount_g": amounts[i],
+                    "amount_g": amount,
                     "price_per_kg": c.price_per_kg,
                 }
-                for i, c in enumerate(domain_candidates)
+                for c, amount in zip(domain_candidates, amounts, strict=True)
             ],
             # `total_cost_per_100g` устарело: оставлено для выпущенных клиентов.
             "total_cost_per_100g": opt["total_cost_per_100g"],
@@ -142,41 +128,32 @@ class RecipeCalculator:
 
     # --------------------------------------------- оптимизация состава
     async def optimize_composition(
-        self, reference_protein_id: UUID, items: list[dict], mode: str
+        self,
+        reference_protein_id: UUID,
+        items: list[CompositionItemInput],
+        mode: str,
     ) -> dict:
         reference = await self._reference(reference_protein_id)
-        products = await self._products_by_id([UUID(i["product_id"]) for i in items])
-        self._require_found([i["product_id"] for i in items], products)
+        products = await self._products_for([item.product_id for item in items])
         candidates = [
-            _candidate(
-                item["product_id"],
-                products,
-                item.get("price_per_kg") or 0.0,
-                item["min_amount_g"],
-                item["max_amount_g"],
+            CandidateItem.of(
+                product,
+                item.price_per_kg or 0.0,
+                item.min_amount_g,
+                item.max_amount_g,
             )
-            for item in items
+            for product, item in zip(products, items, strict=True)
         ]
         try:
             result = await asyncio.to_thread(
                 optimize_recipe,
                 candidates,
                 reference,
-                [item["amount_g"] for item in items],
+                [item.amount_g for item in items],
                 mode,
             )
         except RecipeOptimizationError as exc:
             raise UnprocessableError({"code": exc.code, "message": str(exc)}) from exc
         for output, source in zip(result["optimal_items"], items, strict=True):
-            output["price_per_kg"] = source.get("price_per_kg")
+            output["price_per_kg"] = source.price_per_kg
         return result
-
-
-def _candidate(
-    product_id: str,
-    products: dict[str, ProductNutrients],
-    price: float,
-    low: float,
-    high: float,
-) -> CandidateItem:
-    return CandidateItem.of(products[product_id], price, low, high)

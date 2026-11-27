@@ -8,20 +8,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.db.session import get_db
 from features.calculator.api.deps import get_calculator
-from features.calculator.app import RecipeCalculator
+from features.calculator.app import RecipeCalculator, RecipeItemInput
 
 from ..app import RecipeService
 from ..infra.sql_repo import SqlRecipeRepository
 
 
 class _CalculatorAdapter:
-    """Метрики рецептуры считает калькулятор через его публичный сервис."""
+    """Метрики рецептуры считает калькулятор через его публичный сервис.
+
+    Порт рецептур не зависит от калькулятора: состав переводится во входные
+    данные калькулятора здесь.
+    """
 
     def __init__(self, calculator: RecipeCalculator) -> None:
         self._calculator = calculator
 
     async def compute(self, reference_protein_id: UUID, items: list[dict]) -> dict:
-        return await self._calculator.compute(reference_protein_id, items)
+        return await self._calculator.compute(
+            reference_protein_id,
+            [RecipeItemInput(it["product_id"], it["amount_g"]) for it in items],
+        )
 
 
 async def get_recipe_service(
