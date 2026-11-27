@@ -4,6 +4,14 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from ..app import (
+    AutoProduct,
+    NewNutrient,
+    NewProduct,
+    NutrientChanges,
+    ProductChanges,
+)
+
 
 class ProductCreate(BaseModel):
     name: str
@@ -11,12 +19,18 @@ class ProductCreate(BaseModel):
     subcategory_id: UUID | None = None
     region_id: UUID
 
+    def command(self) -> NewProduct:
+        return NewProduct(**dict(self))
+
 
 class ProductUpdate(BaseModel):
     name: str | None = None
     category_id: UUID | None = None
     subcategory_id: UUID | None = None
     region_id: UUID | None = None
+
+    def changes(self) -> ProductChanges:
+        return ProductChanges(**dict(self), provided=frozenset(self.model_fields_set))
 
 
 class ProductCount(BaseModel):
@@ -32,6 +46,9 @@ class NutrientCreate(BaseModel):
     quantity: float
     error_rate: float | None = None
 
+    def command(self) -> NewNutrient:
+        return NewNutrient(**dict(self))
+
 
 class NutrientUpdate(BaseModel):
     product_id: UUID | None = None
@@ -40,12 +57,18 @@ class NutrientUpdate(BaseModel):
     quantity: float | None = None
     error_rate: float | None = None
 
+    def changes(self) -> NutrientChanges:
+        return NutrientChanges(**dict(self), provided=frozenset(self.model_fields_set))
+
 
 class ProductAutoCreate(BaseModel):
     name: str
     category_name: str
     subcategory_name: str | None = None
     region_name: str
+
+    def command(self) -> AutoProduct:
+        return AutoProduct(**dict(self))
 
 
 class NutrientBulkCreate(BaseModel):

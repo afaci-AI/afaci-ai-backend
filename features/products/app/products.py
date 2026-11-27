@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from uuid import UUID
 
 from core.errors import BadRequestError, NotFoundError
@@ -14,6 +15,7 @@ from .audit_events import (
     FOOD_UPDATED,
     bulk_changes,
 )
+from .commands import NewProduct, ProductChanges
 from .ports import (
     AuditTrail,
     Caller,
@@ -52,10 +54,10 @@ class ProductService:
     async def by_category(self, category_id: UUID) -> list[ProductRow]:
         return await self._repo.by_category(category_id)
 
-    async def create(self, data: dict, caller: Caller) -> ProductRow:
+    async def create(self, command: NewProduct, caller: Caller) -> ProductRow:
         try:
             async with transaction(self._uow):
-                item = await self._repo.add(data)
+                item = await self._repo.add(asdict(command))
         except DuplicateError as exc:
             raise BadRequestError(ALREADY_IN_REGION) from exc
         await self._uow.refresh(item)
@@ -77,14 +79,16 @@ class ProductService:
         )
         return {"status": "deleted"}
 
-    async def update(self, product_id: UUID, patch: dict, caller: Caller) -> ProductRow:
+    async def update(
+        self, product_id: UUID, changes: ProductChanges, caller: Caller
+    ) -> ProductRow:
         item = await self.get(product_id)
         old_snapshot = self._audit.snapshot_product(item)
-        if not patch:
+        if not changes.provided:
             return item
         try:
             async with transaction(self._uow):
-                await self._repo.update(item, patch)
+                await self._repo.update(item, changes.fields())
         except DuplicateError as exc:
             raise BadRequestError(ALREADY_IN_REGION) from exc
         await self._uow.refresh(item)
@@ -97,10 +101,10 @@ class ProductService:
             )
         return item
 
-    async def bulk_create(self, items: list[dict], caller: Caller) -> dict:
+    async def bulk_create(self, items: list[NewProduct], caller: Caller) -> dict:
         try:
             async with transaction(self._uow):
-                created = await self._repo.add_many(items)
+                created = await self._repo.add_many([asdict(it) for it in items])
         except DuplicateError as exc:
             raise BadRequestError(
                 "Some products already exist or invalid data"
