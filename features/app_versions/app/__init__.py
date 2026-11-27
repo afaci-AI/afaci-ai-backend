@@ -1,5 +1,11 @@
 from .commands import AppVersionChanges, NewAppVersion
-from .ports import ApkInspector, ApkStorage, AppVersionRepository
+from .ports import (
+    ApkInspector,
+    ApkStorage,
+    AppVersionRepository,
+    NewVersionRecord,
+    UnitOfWork,
+)
 from .service import AppVersionService
 
 __all__ = [
@@ -9,4 +15,6 @@ __all__ = [
     "AppVersionRepository",
     "AppVersionService",
     "NewAppVersion",
+    "NewVersionRecord",
+    "UnitOfWork",
 ]

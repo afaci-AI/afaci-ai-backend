@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
@@ -22,6 +23,21 @@ class AppVersionRow(Protocol):
     is_current: bool
 
 
+@dataclass(frozen=True)
+class NewVersionRecord:
+    """Поля новой записи версии; публичный адрес и время уже вычислены."""
+
+    version: str
+    version_code: int
+    apk_url: str
+    apk_filename: str
+    changelog: str | None
+    force_update: bool
+    min_supported_version_code: int | None
+    is_current: bool
+    published_at: datetime
+
+
 @dataclass
 class StoredApk:
     filename: str
@@ -31,6 +47,8 @@ class StoredApk:
 
 
 class AppVersionRepository(Protocol):
+    """Изменения только готовятся: фиксирует и откатывает их `UnitOfWork`."""
+
     async def current(self) -> AppVersionRow | None: ...
 
     async def list(self) -> list[AppVersionRow]:
@@ -45,13 +63,22 @@ class AppVersionRepository(Protocol):
 
     async def clear_current(self) -> None: ...
 
-    async def add(self, data: dict) -> AppVersionRow: ...
+    async def add(self, record: NewVersionRecord) -> AppVersionRow: ...
 
     async def save(self, row: AppVersionRow) -> AppVersionRow: ...
 
     async def delete(self, row: AppVersionRow) -> None: ...
 
+
+class UnitOfWork(Protocol):
+    """Транзакция сценария: единственное место фиксации и отката."""
+
+    async def commit(self) -> None: ...
+
     async def rollback(self) -> None: ...
+
+    async def refresh(self, row: object) -> None:
+        """Перечитывает значения, выставленные базой при фиксации."""
 
 
 class ApkStorage(Protocol):
