@@ -58,7 +58,7 @@ class SqlRecipeRepository:
     async def add_group(self, user_id: UUID, name: str) -> RecipeGroup:
         row = GroupRow(user_id=user_id, name=name)
         self._db.add(row)
-        await self._db.commit()
+        await self._db.flush()
         await self._db.refresh(row)
         return to_group(row)
 
@@ -69,7 +69,7 @@ class SqlRecipeRepository:
         if row is None:
             return None
         row.name = name
-        await self._db.commit()
+        await self._db.flush()
         await self._db.refresh(row)
         return to_group(row)
 
@@ -83,7 +83,7 @@ class SqlRecipeRepository:
             .values(group_id=None)
         )
         await self._db.delete(row)
-        await self._db.commit()
+        await self._db.flush()
         return True
 
     async def group_names(self, user_id: UUID) -> dict[UUID, str]:
@@ -156,7 +156,7 @@ class SqlRecipeRepository:
         for item in recipe.items:
             row.items.append(to_item_row(item))
         self._db.add(row)
-        await self._db.commit()
+        await self._db.flush()
         await self._db.refresh(row)
         return to_recipe(row, with_items=False)
 
@@ -170,7 +170,7 @@ class SqlRecipeRepository:
             row.items.clear()
             for item in recipe.items:
                 row.items.append(to_item_row(item))
-        await self._db.commit()
+        await self._db.flush()
         await self._db.refresh(row)
         return to_recipe(row, with_items=False)
 
@@ -179,5 +179,5 @@ class SqlRecipeRepository:
         if row is None:
             return False
         await self._db.delete(row)
-        await self._db.commit()
+        await self._db.flush()
         return True

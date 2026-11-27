@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 from core.errors import BadRequestError, NotFoundError
+from core.transaction import transaction
 
 from ..domain import (
     RankingWeights,
@@ -15,7 +16,7 @@ from ..domain import (
     metrics_from_report,
     rank_recipes,
 )
-from .ports import MetricsCalculator, RecipeRepository
+from .ports import MetricsCalculator, RecipeRepository, UnitOfWork
 
 RECIPE_NOT_FOUND = "Рецептура не найдена."
 GROUP_NOT_FOUND = "Группа не найдена."
@@ -57,8 +58,11 @@ def _recipe_items(items: list[ItemData]) -> list[RecipeItem]:
 
 
 class RecipeService:
-    def __init__(self, repo: RecipeRepository, calculator: MetricsCalculator) -> None:
+    def __init__(
+        self, repo: RecipeRepository, uow: UnitOfWork, calculator: MetricsCalculator
+    ) -> None:
         self._repo = repo
+        self._uow = uow
         self._calculator = calculator
 
     # ----------------------------------------------------------- группы
@@ -66,16 +70,20 @@ class RecipeService:
         return await self._repo.list_groups(user_id)
 
     async def create_group(self, user_id: UUID, name: str) -> RecipeGroup:
-        return await self._repo.add_group(user_id, name.strip())
+        async with transaction(self._uow):
+            return await self._repo.add_group(user_id, name.strip())
 
     async def rename_group(self, user_id: UUID, group_id: UUID, name: str):
-        group = await self._repo.rename_group(user_id, group_id, name.strip())
+        async with transaction(self._uow):
+            group = await self._repo.rename_group(user_id, group_id, name.strip())
         if group is None:
             raise NotFoundError(GROUP_NOT_FOUND)
         return group
 
     async def delete_group(self, user_id: UUID, group_id: UUID) -> None:
-        if not await self._repo.delete_group(user_id, group_id):
+        async with transaction(self._uow):
+            deleted = await self._repo.delete_group(user_id, group_id)
+        if not deleted:
             raise NotFoundError(GROUP_NOT_FOUND)
 
     async def _require_group(self, user_id: UUID, group_id: UUID) -> None:
@@ -123,7 +131,8 @@ class RecipeService:
         )
         if report:
             recipe.apply_metrics(metrics_from_report(report))
-        return await self._repo.create_recipe(user_id, recipe, group_name or None)
+        async with transaction(self._uow):
+            return await self._repo.create_recipe(user_id, recipe, group_name or None)
 
     async def update_recipe(
         self, user_id: UUID, recipe_id: UUID, changes: RecipeChanges
@@ -153,7 +162,8 @@ class RecipeService:
             recipe.reference_protein_id = new_ref
             await self._recalculate(recipe, new_ref, recipe.sorted_items(), make_draft)
 
-        return await self._repo.save_recipe(user_id, recipe)
+        async with transaction(self._uow):
+            return await self._repo.save_recipe(user_id, recipe)
 
     async def _recalculate(self, recipe: Recipe, reference_id, items, draft: bool):
         if draft:
@@ -163,7 +173,9 @@ class RecipeService:
         recipe.apply_metrics(metrics_from_report(report))
 
     async def delete_recipe(self, user_id: UUID, recipe_id: UUID) -> None:
-        if not await self._repo.delete_recipe(user_id, recipe_id):
+        async with transaction(self._uow):
+            deleted = await self._repo.delete_recipe(user_id, recipe_id)
+        if not deleted:
             raise NotFoundError(RECIPE_NOT_FOUND)
 
     # ----------------------------------------------------- ранжирование
