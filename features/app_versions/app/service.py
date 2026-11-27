@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -15,6 +16,7 @@ from core.errors import (
 )
 
 from ..domain.apk import APK_MAGIC, ApkError, has_apk_extension, public_apk_url
+from .commands import AppVersionChanges, NewAppVersion
 from .ports import (
     ApkInspector,
     ApkStorage,
@@ -38,11 +40,13 @@ class AppVersionService:
         storage: ApkStorage,
         inspector: ApkInspector,
         apk_base_url: str,
+        now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self._repo = repo
         self._storage = storage
         self._inspector = inspector
         self._base_url = apk_base_url
+        self._now = now
 
     async def _get(self, version_id: UUID) -> AppVersionRow:
         version = await self._repo.get(version_id)
@@ -59,36 +63,42 @@ class AppVersionService:
     async def list(self) -> list[AppVersionRow]:
         return await self._repo.list()
 
-    async def create(self, data: dict) -> AppVersionRow:
+    async def create(self, command: NewAppVersion) -> AppVersionRow:
         """Публикует версию (APK уже в хранилище либо внешняя ссылка)."""
         await self._repo.lock_publication()
+        await self._check_version_code(command.version_code)
+        self._check_apk_exists(command.apk_filename)
+        return await self._publish(command)
+
+    async def _check_version_code(self, version_code: int) -> None:
         max_code = await self._repo.max_version_code()
-        if max_code is not None and data["versionCode"] <= max_code:
+        if max_code is not None and version_code <= max_code:
             raise BadRequestError(
                 f"versionCode должен быть больше текущего максимального значения ({max_code})."
             )
 
-        filename = data["apkFilename"]
-        is_external = filename.startswith(("http://", "https://"))
-        if not is_external and not self._storage.exists(filename.lstrip("/")):
+    def _check_apk_exists(self, filename: str) -> None:
+        if filename.startswith(("http://", "https://")):
+            return
+        if not self._storage.exists(filename.lstrip("/")):
             raise BadRequestError(
                 "Указанный APK-файл не найден в хранилище. Сначала загрузите файл."
             )
 
-        if data["isCurrent"]:
+    async def _publish(self, command: NewAppVersion) -> AppVersionRow:
+        if command.is_current:
             await self._repo.clear_current()
-
         return await self._repo.add(
             {
-                "version": data["version"],
-                "version_code": data["versionCode"],
-                "apk_url": public_apk_url(self._base_url, filename),
-                "apk_filename": filename,
-                "changelog": data["changelog"],
-                "force_update": data["forceUpdate"],
-                "min_supported_version_code": data["minSupportedVersionCode"],
-                "is_current": data["isCurrent"],
-                "published_at": datetime.now(UTC),
+                "version": command.version,
+                "version_code": command.version_code,
+                "apk_url": public_apk_url(self._base_url, command.apk_filename),
+                "apk_filename": command.apk_filename,
+                "changelog": command.changelog,
+                "force_update": command.force_update,
+                "min_supported_version_code": command.min_supported_version_code,
+                "is_current": command.is_current,
+                "published_at": self._now(),
             }
         )
 
@@ -121,15 +131,14 @@ class AppVersionService:
                 self._inspector.read_version, stored.path
             )
             return await self.create(
-                {
-                    "version": version,
-                    "versionCode": version_code,
-                    "apkFilename": stored.filename,
-                    "changelog": changelog,
-                    "forceUpdate": force_update,
-                    "minSupportedVersionCode": min_supported_version_code,
-                    "isCurrent": True,
-                }
+                NewAppVersion(
+                    version=version,
+                    version_code=version_code,
+                    apk_filename=stored.filename,
+                    changelog=changelog,
+                    force_update=force_update,
+                    min_supported_version_code=min_supported_version_code,
+                )
             )
         except BaseException as exc:
             await self._repo.rollback()
@@ -138,17 +147,18 @@ class AppVersionService:
                 raise _error(exc) from exc
             raise
 
-    async def update(self, version_id: UUID, changes: dict) -> AppVersionRow:
-        """changes — поля запроса, переданные клиентом (exclude_unset)."""
+    async def update(
+        self, version_id: UUID, changes: AppVersionChanges
+    ) -> AppVersionRow:
         version = await self._get(version_id)
-        if changes.get("version") is not None:
-            version.version = changes["version"]
-        if changes.get("changelog") is not None:
-            version.changelog = changes["changelog"]
-        if changes.get("forceUpdate") is not None:
-            version.force_update = changes["forceUpdate"]
-        if "minSupportedVersionCode" in changes:
-            version.min_supported_version_code = changes["minSupportedVersionCode"]
+        if changes.version is not None:
+            version.version = changes.version
+        if changes.changelog is not None:
+            version.changelog = changes.changelog
+        if changes.force_update is not None:
+            version.force_update = changes.force_update
+        if "min_supported_version_code" in changes.provided:
+            version.min_supported_version_code = changes.min_supported_version_code
         return await self._repo.save(version)
 
     async def set_current(self, version_id: UUID) -> AppVersionRow:

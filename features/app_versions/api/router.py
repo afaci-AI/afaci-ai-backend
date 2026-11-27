@@ -72,14 +72,14 @@ async def list_app_versions(service: Service, _admin_user: Admin):
 async def create_app_version(
     data: AppVersionCreate, service: Service, _admin_user: Admin
 ):
-    return admin(await service.create(data.model_dump()))
+    return admin(await service.create(data.command()))
 
 
 @router.patch("/api/v1/admin/app-versions/{id}", summary="Отредактировать версию")
 async def update_app_version(
     id: UUID, data: AppVersionUpdate, service: Service, _admin_user: Admin
 ):
-    return admin(await service.update(id, data.model_dump(exclude_unset=True)))
+    return admin(await service.update(id, data.changes()))
 
 
 @router.patch(
