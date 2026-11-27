@@ -1,3 +1,9 @@
+from .commands import (
+    NewNutrientName,
+    NewSubcategory,
+    NutrientNameChanges,
+    SubcategoryChanges,
+)
 from .ports import (
     CatalogRules,
     DictionaryRepository,
@@ -17,7 +23,11 @@ __all__ = [
     "DictionaryRow",
     "DuplicateError",
     "InUseError",
+    "NewNutrientName",
+    "NewSubcategory",
+    "NutrientNameChanges",
     "NutrientNameRow",
+    "SubcategoryChanges",
     "SubcategoryRow",
     "UnitOfWork",
 ]

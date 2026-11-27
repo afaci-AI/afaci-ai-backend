@@ -4,9 +4,17 @@ import unittest
 from types import SimpleNamespace
 from uuid import uuid4
 
-from core.errors import BadRequestError, NotFoundError
-from features.catalog.app import CatalogService, DuplicateError, InUseError
+from core.errors import BadRequestError, NotFoundError, UnprocessableError
+from features.catalog.app import (
+    CatalogService,
+    DuplicateError,
+    InUseError,
+    NewNutrientName,
+    NewSubcategory,
+    SubcategoryChanges,
+)
 from features.catalog.domain.dictionaries import CATEGORIES, REGIONS, SUBCATEGORIES
+from features.catalog.domain.nutrient_units import AMINO_ACID_TYPE
 
 
 class FakeUnitOfWork:
@@ -59,6 +67,12 @@ class FakeDictionaries:
 
 
 class NoRules:
+    def __init__(self, default_unit=None):
+        self.default_unit = default_unit
+
+    async def default_unit_id(self, type_name):
+        return self.default_unit
+
     async def duplicate_subcategory(self, category_id, name, exclude_id):
         return False
 
@@ -68,20 +82,20 @@ def row(name="Мясо", **fields):
 
 
 class CatalogTransactions(unittest.IsolatedAsyncioTestCase):
-    def build(self, **repo):
+    def build(self, *, default_unit=None, **repo):
         self.uow = FakeUnitOfWork()
         self.repo = FakeDictionaries(**repo)
-        return CatalogService(self.repo, NoRules(), self.uow)
+        return CatalogService(self.repo, NoRules(default_unit), self.uow)
 
     async def test_create_commits_then_refreshes(self):
-        await self.build().create(REGIONS, {"name": "Сибирь"})
+        await self.build().create(REGIONS, "Сибирь")
         self.assertEqual(self.uow.calls, ["commit", "refresh"])
         self.assertEqual(self.repo.added[0][0], "region")
 
     async def test_duplicate_rolls_back_with_message_of_the_dictionary(self):
         service = self.build(duplicate=True)
         with self.assertRaises(BadRequestError) as caught:
-            await service.create(REGIONS, {"name": "Сибирь"})
+            await service.create(REGIONS, "Сибирь")
         self.assertEqual(caught.exception.detail, "Region already exists")
         self.assertEqual(self.uow.calls, ["rollback"])
 
@@ -113,9 +127,7 @@ class CatalogTransactions(unittest.IsolatedAsyncioTestCase):
     async def test_subcategory_checks_parent_category(self):
         service = self.build()
         with self.assertRaises(NotFoundError) as caught:
-            await service.create_subcategory(
-                {"name": "Говядина", "category_id": uuid4()}
-            )
+            await service.create_subcategory(NewSubcategory("Говядина", uuid4()))
         self.assertEqual(caught.exception.detail, "Category not found")
         self.assertEqual(self.uow.calls, [])
 
@@ -125,12 +137,32 @@ class CatalogTransactions(unittest.IsolatedAsyncioTestCase):
         service = self.build(rows=[category, item], duplicate=True)
         with self.assertRaises(BadRequestError) as caught:
             await service.update_subcategory(
-                item.id, name="Телятина", category_id=None, provided={"name"}
+                item.id,
+                SubcategoryChanges(name="Телятина", provided=frozenset({"name"})),
             )
         self.assertEqual(
             caught.exception.detail, "Subcategory already exists in this category"
         )
         self.assertEqual(self.uow.calls, ["rollback"])
+
+    async def test_nutrient_name_gets_default_unit_and_class_from_type(self):
+        nutrient_type = row(AMINO_ACID_TYPE)
+        unit_id = uuid4()
+        service = self.build(rows=[nutrient_type], default_unit=unit_id)
+        command = NewNutrientName("Лизин", nutrient_type.id)
+        await service.create_nutrient_name(command)
+        saved = self.repo.added[0][1]
+        self.assertEqual((saved.unit_id, saved.nutrient_class), (unit_id, "amino"))
+        self.assertIsNone(command.unit_id)
+
+    async def test_nutrient_name_without_any_unit_is_422(self):
+        nutrient_type = row(AMINO_ACID_TYPE)
+        service = self.build(rows=[nutrient_type])
+        with self.assertRaises(UnprocessableError):
+            await service.create_nutrient_name(
+                NewNutrientName("Лизин", nutrient_type.id)
+            )
+        self.assertEqual(self.uow.calls, [])
 
 
 if __name__ == "__main__":

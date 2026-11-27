@@ -54,30 +54,19 @@ def nutrients(db):
 
 
 async def api_create_subcategory(data, db):
-    return await catalog(db).create_subcategory(data.model_dump())
+    return await catalog(db).create_subcategory(data.command())
 
 
 async def api_create_nutrient_name(data, db):
-    return await catalog(db).create_nutrient_name(data.model_dump())
+    return await catalog(db).create_nutrient_name(data.command())
 
 
 async def api_update_subcategory(item_id, data, db):
-    return await catalog(db).update_subcategory(
-        item_id,
-        name=data.name,
-        category_id=data.category_id,
-        provided=set(data.model_fields_set),
-    )
+    return await catalog(db).update_subcategory(item_id, data.changes())
 
 
 async def api_update_nutrient_name(item_id, data, db):
-    return await catalog(db).update_nutrient_name(
-        item_id,
-        name=data.name,
-        nutrient_type_id=data.nutrient_type_id,
-        unit_id=data.unit_id,
-        provided=set(data.model_fields_set),
-    )
+    return await catalog(db).update_nutrient_name(item_id, data.changes())
 
 
 async def api_count_products(db):

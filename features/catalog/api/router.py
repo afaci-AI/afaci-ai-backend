@@ -84,7 +84,7 @@ def register_simple(spec: DictionarySpec) -> None:
     """Категории, регионы, единицы, типы нутриентов: создать, прочитать, изменить имя."""
 
     async def create(data: SimpleCreate, service: Service):
-        return await service.create(spec, data.model_dump())
+        return await service.create(spec, data.name)
 
     async def update(id: UUID, data: SimpleUpdate, service: Service):
         return await service.rename(spec, id, data.name)
@@ -108,7 +108,7 @@ register_simple(CATEGORIES)
     "/subcategories", status_code=201, tags=["Subcategories"], dependencies=EDITOR
 )
 async def api_create_subcategory(data: SubcategoryCreate, service: Service):
-    return await service.create_subcategory(data.model_dump())
+    return await service.create_subcategory(data.command())
 
 
 _register_read_delete(SUBCATEGORIES)
@@ -116,12 +116,7 @@ _register_read_delete(SUBCATEGORIES)
 
 @router.patch("/subcategories/{id}", tags=["Subcategories"], dependencies=EDITOR)
 async def api_update_subcategory(id: UUID, data: SubcategoryUpdate, service: Service):
-    return await service.update_subcategory(
-        id,
-        name=data.name,
-        category_id=data.category_id,
-        provided=set(data.model_fields_set),
-    )
+    return await service.update_subcategory(id, data.changes())
 
 
 # ==================== REGIONS, UNITS, NUTRIENT TYPES ====================
@@ -135,7 +130,7 @@ register_simple(NUTRIENT_TYPES)
     "/nutrient-names", status_code=201, tags=["Nutrient Names"], dependencies=EDITOR
 )
 async def api_create_nutrient_name(data: NutrientNameCreate, service: Service):
-    return await service.create_nutrient_name(data.model_dump())
+    return await service.create_nutrient_name(data.command())
 
 
 _register_read_delete(NUTRIENT_NAMES)
@@ -145,14 +140,7 @@ _register_read_delete(NUTRIENT_NAMES)
 async def api_update_nutrient_name(
     id: UUID, data: NutrientNameUpdate, service: Service
 ):
-    return await service.update_nutrient_name(
-        id,
-        name=data.name,
-        nutrient_type_id=data.nutrient_type_id,
-        unit_id=data.unit_id,
-        nutrient_class=data.nutrient_class,
-        provided=set(data.model_fields_set),
-    )
+    return await service.update_nutrient_name(id, data.changes())
 
 
 _register_bulk(NUTRIENT_NAMES)
