@@ -133,11 +133,11 @@ class Rows(unittest.TestCase):
             list(NORMS),
         )
         fe, se = rows
-        self.assertEqual((fe["unit"], fe["percent"]), ("мг", 50.0))
-        self.assertEqual(se["unit"], "мкг")
-        self.assertAlmostEqual(se["amount"], 31.5)
-        self.assertEqual(se["percent"], 50.0)
-        self.assertEqual(se["kind"], "norm")
+        self.assertEqual((fe.unit, fe.percent), ("мг", 50.0))
+        self.assertEqual(se.unit, "мкг")
+        self.assertAlmostEqual(se.amount, 31.5)
+        self.assertEqual(se.percent, 50.0)
+        self.assertEqual(se.kind, "norm")
 
     def test_nutrient_without_unit_does_not_break_rows(self):
         """Нутриент без единицы в справочнике: строка без доли, а не 500."""
@@ -149,30 +149,30 @@ class Rows(unittest.TestCase):
             list(NORMS),
         )
         for row in (fe, se):
-            self.assertIsNone(row["norm"])
-            self.assertIsNone(row["percent"])
-        self.assertEqual(fe["amount"], 7.0)
+            self.assertIsNone(row.norm)
+            self.assertIsNone(row.percent)
+        self.assertEqual(fe.amount, 7.0)
 
     def test_adequate_level_keeps_kind(self):
         (row,) = build_class_rows(
             entries({"name": "Co", "unit": "мг/100г", "amount": 0.002}), list(NORMS)
         )
-        self.assertEqual(row["kind"], "adequate")
-        self.assertEqual(row["percent"], 20.0)
+        self.assertEqual(row.kind, "adequate")
+        self.assertEqual(row.percent, 20.0)
 
     def test_mineral_without_norm(self):
         (row,) = build_class_rows(
             entries({"name": "Al", "unit": "мг/100г", "amount": 1.2}), list(NORMS)
         )
-        self.assertIsNone(row["norm"])
-        self.assertIsNone(row["kind"])
-        self.assertEqual(row["unit"], "мг")
+        self.assertIsNone(row.norm)
+        self.assertIsNone(row.kind)
+        self.assertEqual(row.unit, "мг")
 
     def test_general_list_has_only_minerals_without_amount(self):
         rows = mineral_norm_rows(list(NORMS))
-        self.assertEqual([row["key"] for row in rows], ["Fe", "Se", "Co"])
-        self.assertTrue(all(row["amount"] is None for row in rows))
-        self.assertTrue(all(row["percent"] is None for row in rows))
+        self.assertEqual([row.key for row in rows], ["Fe", "Se", "Co"])
+        self.assertTrue(all(row.amount is None for row in rows))
+        self.assertTrue(all(row.percent is None for row in rows))
 
 
 if __name__ == "__main__":

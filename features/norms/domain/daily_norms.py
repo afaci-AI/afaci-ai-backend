@@ -13,10 +13,11 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import replace
 
 from features.calculator.domain.formulas import energy_kcal
 
-from .records import CompositionEntry, DailyNorm
+from .records import CompositionEntry, DailyNorm, NormRow
 
 NORM_ORDER = ("energy", "protein", "fat", "carbs", "fiber")
 
@@ -105,7 +106,7 @@ def amounts_from_macros(
 
 def build_norm_rows(
     norms: list[DailyNorm], amounts: Mapping[str, float | None] | None = None
-) -> list[dict]:
+) -> list[NormRow]:
     """
     Строки «нутриент — содержание — норма — доля от нормы» в порядке `NORM_ORDER`.
 
@@ -119,17 +120,17 @@ def build_norm_rows(
             continue
         amount = None if amounts is None else amounts.get(key)
         rows.append(
-            {
-                "key": key,
-                "name": norm.name,
-                "unit": norm.unit,
-                "norm": norm.value,
-                "amount": amount,
-                "percent": percent_of_norm(amount, norm.value),
-                "source_id": norm.source_id,
-                "basis": norm.basis,
-                "kind": norm.kind,
-            }
+            NormRow(
+                key=key,
+                name=norm.name,
+                unit=norm.unit,
+                norm=norm.value,
+                amount=amount,
+                percent=percent_of_norm(amount, norm.value),
+                source_id=norm.source_id,
+                basis=norm.basis,
+                kind=norm.kind,
+            )
         )
     return rows
 
@@ -158,20 +159,15 @@ def short_unit(unit: str | None) -> str | None:
     return None if unit is None else unit.split("/")[0]
 
 
-def _class_row(entry: CompositionEntry, norm: DailyNorm | None) -> dict:
+def _class_row(entry: CompositionEntry, norm: DailyNorm | None) -> NormRow:
     unit = short_unit(entry.unit)
-    row = {
-        "key": entry.name,
-        "name": entry.name,
-        "unit": unit,
-        "norm": None,
-        "amount": entry.amount,
-        "percent": None,
-        "partial": entry.partial,
-        "kind": None,
-        "source_id": None,
-        "basis": None,
-    }
+    row = NormRow(
+        key=entry.name,
+        name=entry.name,
+        unit=unit,
+        amount=entry.amount,
+        partial=entry.partial,
+    )
     if norm is None:
         return row
     try:
@@ -181,21 +177,21 @@ def _class_row(entry: CompositionEntry, norm: DailyNorm | None) -> dict:
         # единицу нормы: долю не считаем, чтобы не показать неверный процент,
         # но и расчёт рецептуры не роняем.
         return row
-    return {
-        **row,
-        "unit": norm.unit,
-        "norm": norm.value,
-        "amount": amount,
-        "percent": percent_of_norm(amount, norm.value),
-        "kind": norm.kind,
-        "source_id": norm.source_id,
-        "basis": norm.basis,
-    }
+    return replace(
+        row,
+        unit=norm.unit,
+        norm=norm.value,
+        amount=amount,
+        percent=percent_of_norm(amount, norm.value),
+        kind=norm.kind,
+        source_id=norm.source_id,
+        basis=norm.basis,
+    )
 
 
 def build_class_rows(
     entries: list[CompositionEntry], norms: list[DailyNorm] | None = None
-) -> list[dict]:
+) -> list[NormRow]:
     """
     Строки микросостава и прочих показателей.
 
@@ -206,7 +202,7 @@ def build_class_rows(
     return [_class_row(entry, by_key.get(entry.name)) for entry in entries]
 
 
-def mineral_norm_rows(norms: list[DailyNorm]) -> list[dict]:
+def mineral_norm_rows(norms: list[DailyNorm]) -> list[NormRow]:
     """Нормы минералов без содержания — для общего списка норм."""
     return build_class_rows(
         [

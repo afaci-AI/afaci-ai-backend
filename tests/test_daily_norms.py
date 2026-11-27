@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from core.errors import NotFoundError
 from features.calculator.domain import compute_report
 from features.calculator.domain.formulas import energy_kcal
+from features.norms.api.presenters import present_payload
 from features.norms.app import NormsService
 from features.norms.domain.daily_norms import (
     NORM_ORDER,
@@ -23,9 +24,13 @@ from features.norms.domain.daily_norms import (
 )
 from features.norms.domain.records import (
     DailyNorm,
+    NormRow,
+    NormsPayload,
     ProductComposition,
+    ProductMacros,
     ReferenceSource,
     RegistrySource,
+    Source,
 )
 from features.norms.domain.sources import merge_sources
 from features.norms.infra.sql_repo import SqlNormsRepository
@@ -108,14 +113,14 @@ class DomainTests(unittest.TestCase):
         rows = build_norm_rows(
             [DailyNorm.of(n) for n in norms], {"energy": 260.2, "fiber": 2.5}
         )
-        self.assertEqual([r["key"] for r in rows], ["energy", "fiber"])
-        self.assertEqual([r["percent"] for r in rows], [10.0, 10.0])
+        self.assertEqual([r.key for r in rows], ["energy", "fiber"])
+        self.assertEqual([r.percent for r in rows], [10.0, 10.0])
 
     def test_rows_without_amounts_have_no_share(self):
         norms = [{"key": "protein", "name": "Белки", "unit": "г", "value": 83}]
         row = build_norm_rows([DailyNorm.of(n) for n in norms])[0]
-        self.assertIsNone(row["amount"])
-        self.assertIsNone(row["percent"])
+        self.assertIsNone(row.amount)
+        self.assertIsNone(row.percent)
 
     def test_amounts_compute_energy_only_when_all_macros_known(self):
         self.assertEqual(amounts_from_macros(10, 5, 20, 2)["energy"], 165)
@@ -260,9 +265,9 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
             )
         )
         payload = await service.payload({"protein": 41.5})
-        self.assertEqual(payload["norms"][0]["percent"], 50.0)
-        self.assertEqual([s.title for s in payload["sources"]], ["МР"])
-        self.assertEqual(payload["info"], NORMS_INFO)
+        self.assertEqual(payload.macro[0].percent, 50.0)
+        self.assertEqual([s.title for s in payload.sources], ["МР"])
+        self.assertEqual(payload.info, NORMS_INFO)
 
     async def test_product_macros_none_for_missing_product(self):
         db = Mock(scalar=AsyncMock(return_value=None))
@@ -279,7 +284,7 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
             execute=AsyncMock(return_value=FakeResult(rows)),
         )
         macros = await SqlNormsRepository(db).product_macros(uuid4())
-        self.assertEqual(macros["Углеводы"], 20.0)
+        self.assertEqual(macros.carbs, 20.0)
 
     async def test_product_payload_computes_energy_and_skips_missing_fiber(self):
         norm = {
@@ -290,20 +295,30 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
             "source_id": None,
             "basis": "b",
         }
-        macros = {
-            "Массовая доля белка": 10.0,
-            "Массовая доля жира": 5.0,
-            "Углеводы": 20.0,
-        }
+        macros = ProductMacros(protein=10.0, fat=5.0, carbs=20.0)
         service = NormsService(FakeNormsRepository(norms=[norm], macros=macros))
         payload = await service.product_payload(uuid4())
-        self.assertEqual(payload["norms"][0]["amount"], 165.0)
+        self.assertEqual(payload.macro[0].amount, 165.0)
 
     async def test_product_payload_missing_product_is_not_found(self):
         service = NormsService(FakeNormsRepository(macros=None))
         with self.assertRaises(NotFoundError) as caught:
             await service.product_payload(uuid4())
         self.assertEqual(caught.exception.status_code, 404)
+
+
+class PresenterTests(unittest.TestCase):
+    def test_macro_is_repeated_as_legacy_norms_and_pdf_url_is_added(self):
+        row = NormRow(key="protein", name="Белки", unit="г", norm=83.0)
+        source = Source(id="s", kind="document", title="МР", pdf_filename="mr.pdf")
+        payload = NormsPayload(
+            macro=[row], micro=[], other=[], sources=[source], info=NORMS_INFO
+        )
+        out = present_payload(payload, lambda name: f"/pdf/{name}")
+        self.assertEqual(out["norms"], out["macro"])
+        self.assertEqual(out["macro"][0]["key"], "protein")
+        self.assertEqual(out["sources"][0]["pdf_url"], "/pdf/mr.pdf")
+        self.assertNotIn("pdf_filename", out["sources"][0])
 
 
 async def unused_db():

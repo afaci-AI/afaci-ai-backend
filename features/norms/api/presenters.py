@@ -8,7 +8,7 @@ from dataclasses import asdict
 from fastapi import Request
 
 from ..app import ReferenceDocuments
-from ..domain.records import Source
+from ..domain.records import NormsPayload, Source
 
 PdfUrl = Callable[[str | None], str | None]
 
@@ -30,9 +30,17 @@ def source_out(source: Source, pdf_url: PdfUrl) -> dict:
     return fields
 
 
-def present_payload(payload: dict, pdf_url: PdfUrl) -> dict:
-    """Блоки норм как есть, источники — со ссылками на PDF."""
+def present_payload(payload: NormsPayload, pdf_url: PdfUrl) -> dict:
+    """Ответ норм: строки как словари, источники — со ссылками на PDF.
+
+    `norms` — прежнее имя списка `macro`: оно нужно уже выпущенным клиентам.
+    """
+    macro = [asdict(row) for row in payload.macro]
     return {
-        **payload,
-        "sources": [source_out(source, pdf_url) for source in payload["sources"]],
+        "macro": macro,
+        "norms": macro,
+        "micro": [asdict(row) for row in payload.micro],
+        "other": [asdict(row) for row in payload.other],
+        "sources": [source_out(source, pdf_url) for source in payload.sources],
+        "info": payload.info,
     }

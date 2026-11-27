@@ -12,6 +12,7 @@ from ..domain.records import (
     CompositionEntry,
     DailyNorm,
     ProductComposition,
+    ProductMacros,
     ReferenceSource,
     RegistrySource,
 )
@@ -68,7 +69,7 @@ class SqlNormsRepository:
         )
         return [DailyNorm.of(row) for row in rows]
 
-    async def product_macros(self, product_id: UUID) -> dict[str, float | None] | None:
+    async def product_macros(self, product_id: UUID) -> ProductMacros | None:
         exists = await self._db.scalar(
             text("SELECT 1 FROM products WHERE id = :id"), {"id": product_id}
         )
@@ -89,7 +90,10 @@ class SqlNormsRepository:
             .mappings()
             .all()
         )
-        return {row["nutrient"]: row["quantity"] for row in rows}
+        by_name = {row["nutrient"]: row["quantity"] for row in rows}
+        return ProductMacros(
+            **{key: by_name.get(name) for key, name in PRODUCT_NUTRIENT_BY_KEY.items()}
+        )
 
     async def product_composition(self, product_id: UUID) -> ProductComposition:
         rows = (

@@ -90,7 +90,7 @@ class RecipePayloadTests(unittest.IsolatedAsyncioTestCase):
 
         payload = await service.recipe_payload(REPORT["macro"], 190.0, [], [])
 
-        self.assertEqual(payload["macro"][0]["percent"], 25.0)
+        self.assertEqual(payload.macro[0].percent, 25.0)
 
 
 class DailyNormsAdapterTests(unittest.IsolatedAsyncioTestCase):

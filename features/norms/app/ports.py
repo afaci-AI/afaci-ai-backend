@@ -9,6 +9,7 @@ from uuid import UUID
 from ..domain.records import (
     DailyNorm,
     ProductComposition,
+    ProductMacros,
     ReferenceSource,
     RegistrySource,
 )
@@ -24,8 +25,8 @@ class NormsRepository(Protocol):
     async def norms(self) -> list[DailyNorm]:
         """Суточные нормы по порядку показа."""
 
-    async def product_macros(self, product_id: UUID) -> dict[str, float | None] | None:
-        """{название нутриента: количество} либо None, если продукта нет."""
+    async def product_macros(self, product_id: UUID) -> ProductMacros | None:
+        """Макросостав продукта на 100 г либо None, если продукта нет."""
 
     async def product_composition(self, product_id: UUID) -> ProductComposition:
         """Микросостав и прочее продукта, по названию."""
