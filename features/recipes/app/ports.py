@@ -6,7 +6,17 @@ from uuid import UUID
 from ..domain import Recipe, RecipeGroup
 
 
+class UnitOfWork(Protocol):
+    """Транзакция сценария: единственное место фиксации и отката."""
+
+    async def commit(self) -> None: ...
+
+    async def rollback(self) -> None: ...
+
+
 class RecipeRepository(Protocol):
+    """Изменения только готовятся: фиксирует их `UnitOfWork`."""
+
     # ----------------------------------------------------------- группы
     async def list_groups(self, user_id: UUID) -> list[tuple[RecipeGroup, int]]:
         """Группы пользователя по дате создания с числом рецептур."""

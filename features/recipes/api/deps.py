@@ -7,6 +7,7 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.db.session import get_db
+from core.db.unit_of_work import SqlUnitOfWork
 from features.calculator.api.deps import get_calculator
 from features.calculator.app import RecipeCalculator, RecipeItemInput
 
@@ -35,4 +36,6 @@ async def get_recipe_service(
     db: Annotated[AsyncSession, Depends(get_db)],
     calculator: Annotated[RecipeCalculator, Depends(get_calculator)],
 ) -> RecipeService:
-    return RecipeService(SqlRecipeRepository(db), _CalculatorAdapter(calculator))
+    return RecipeService(
+        SqlRecipeRepository(db), SqlUnitOfWork(db), _CalculatorAdapter(calculator)
+    )

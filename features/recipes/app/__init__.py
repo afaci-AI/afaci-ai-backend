@@ -1,4 +1,4 @@
-from .ports import MetricsCalculator, RecipeRepository
+from .ports import MetricsCalculator, RecipeRepository, UnitOfWork
 from .service import ItemData, RecipeChanges, RecipeService
 
 __all__ = [
@@ -7,4 +7,5 @@ __all__ = [
     "RecipeChanges",
     "RecipeRepository",
     "RecipeService",
+    "UnitOfWork",
 ]

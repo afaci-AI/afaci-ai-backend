@@ -8,11 +8,13 @@ from features.recipes.app import ItemData, RecipeChanges, RecipeService
 from features.recipes.domain import (
     RankingWeights,
     Recipe,
+    RecipeGroup,
     RecipeItem,
     RecipeMetrics,
     normalize,
     rank_recipes,
 )
+from tests.account_fakes import FakeUnitOfWork
 
 USER = uuid4()
 REPORT = {
@@ -58,6 +60,14 @@ class FakeRepo:
     async def group_names(self, user_id):
         return {}
 
+    async def delete_recipe(self, user_id, recipe_id):
+        return self.recipes.pop(recipe_id, None) is not None
+
+    async def add_group(self, user_id, name):
+        if name == "boom":
+            raise RuntimeError("db down")
+        return RecipeGroup(id=uuid4(), name=name)
+
 
 def recipe(**metrics):
     return Recipe(
@@ -94,7 +104,7 @@ class RankingTests(unittest.TestCase):
 class ServiceTests(unittest.IsolatedAsyncioTestCase):
     async def test_draft_is_saved_without_calculation(self):
         calc, repo = FakeCalculator(), FakeRepo()
-        service = RecipeService(repo, calc)
+        service = RecipeService(repo, FakeUnitOfWork(), calc)
         await service.create_recipe(
             USER,
             name=" черновик ",
@@ -112,7 +122,7 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_create_stores_metrics_and_checks_group(self):
         calc, repo = FakeCalculator(), FakeRepo()
-        service = RecipeService(repo, calc)
+        service = RecipeService(repo, FakeUnitOfWork(), calc)
         with self.assertRaises(NotFoundError) as caught:
             await service.create_recipe(
                 USER,
@@ -141,7 +151,7 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
     async def test_reference_change_recalculates_from_sorted_items(self):
         existing = recipe(bc=1.0)
         calc, repo = FakeCalculator(), FakeRepo([existing])
-        service = RecipeService(repo, calc)
+        service = RecipeService(repo, FakeUnitOfWork(), calc)
         new_ref = uuid4()
         await service.update_recipe(
             USER,
@@ -159,7 +169,7 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
     async def test_draft_update_clears_metrics_and_replaces_items(self):
         existing = recipe(bc=1.0, kras=2.0)
         calc, repo = FakeCalculator(), FakeRepo([existing])
-        service = RecipeService(repo, calc)
+        service = RecipeService(repo, FakeUnitOfWork(), calc)
         await service.update_recipe(
             USER,
             existing.id,
@@ -170,7 +180,7 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(existing.items_changed)
 
     async def test_unknown_recipe_and_empty_ranking(self):
-        service = RecipeService(FakeRepo(), FakeCalculator())
+        service = RecipeService(FakeRepo(), FakeUnitOfWork(), FakeCalculator())
         with self.assertRaises(NotFoundError):
             await service.get_recipe(USER, uuid4())
         with self.assertRaises(BadRequestError):
@@ -178,6 +188,41 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(NotFoundError) as caught:
             await service.rank(USER, [uuid4()], RankingWeights())
         self.assertEqual(caught.exception.detail, "Некоторые рецептуры не найдены.")
+
+
+class Transactions(unittest.IsolatedAsyncioTestCase):
+    def build(self, *recipes):
+        self.uow = FakeUnitOfWork()
+        self.repo = FakeRepo(recipes)
+        return RecipeService(self.repo, self.uow, FakeCalculator())
+
+    async def test_update_commits_once(self):
+        existing = recipe(bc=1.0)
+        service = self.build(existing)
+        await service.update_recipe(
+            USER, existing.id, RecipeChanges(name="н", provided={"name"})
+        )
+        self.assertEqual(self.uow.calls, ["commit"])
+
+    async def test_delete_commits_and_unknown_recipe_is_404(self):
+        existing = recipe(bc=1.0)
+        service = self.build(existing)
+        await service.delete_recipe(USER, existing.id)
+        self.assertEqual(self.uow.calls, ["commit"])
+        with self.assertRaises(NotFoundError):
+            await service.delete_recipe(USER, existing.id)
+
+    async def test_failed_write_rolls_back(self):
+        service = self.build()
+        with self.assertRaises(RuntimeError):
+            await service.create_group(USER, "boom")
+        self.assertEqual(self.uow.calls, ["rollback"])
+
+    async def test_reading_does_not_commit(self):
+        existing = recipe(bc=1.0)
+        service = self.build(existing)
+        await service.get_recipe(USER, existing.id)
+        self.assertEqual(self.uow.calls, [])
 
 
 if __name__ == "__main__":
