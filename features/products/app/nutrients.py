@@ -7,8 +7,8 @@ from uuid import UUID
 
 from core.errors import BadRequestError, NotFoundError, UnprocessableError
 from core.transaction import transaction
-from features.catalog.domain.rules import UnitRuleViolation, nutrient_unit_for
 
+from ..domain import UnitRuleViolation, changed_fields, nutrient_unit_for
 from .audit_events import (
     FOOD_BULK_CREATED,
     FOOD_CREATED,
@@ -18,12 +18,13 @@ from .audit_events import (
 )
 from .commands import NewNutrient, NutrientChanges
 from .ports import (
-    AuditTrail,
+    AuditLog,
     Caller,
     DuplicateError,
     NutrientNameRow,
     NutrientRepository,
     NutrientRow,
+    NutrientSnapshots,
     UnitOfWork,
 )
 
@@ -49,11 +50,16 @@ def _payload(command: NewNutrient, name: NutrientNameRow) -> dict:
 
 class NutrientService:
     def __init__(
-        self, repo: NutrientRepository, uow: UnitOfWork, audit: AuditTrail
+        self,
+        repo: NutrientRepository,
+        uow: UnitOfWork,
+        audit: AuditLog,
+        snapshots: NutrientSnapshots,
     ) -> None:
         self._repo = repo
         self._uow = uow
         self._audit = audit
+        self._snapshots = snapshots
 
     async def get(self, nutrient_id: UUID) -> NutrientRow:
         item = await self._repo.get(nutrient_id)
@@ -90,7 +96,7 @@ class NutrientService:
             item.product_id,
             {
                 "old": None,
-                "new": self._audit.snapshot_nutrient(item),
+                "new": self._snapshots.of(item),
                 "nutrient_id": str(item.id),
             },
         )
@@ -98,7 +104,7 @@ class NutrientService:
 
     async def delete(self, nutrient_id: UUID, caller: Caller) -> dict:
         item = await self.get(nutrient_id)
-        old_snapshot = self._audit.snapshot_nutrient(item)
+        old_snapshot = self._snapshots.of(item)
         product_id = item.product_id
         async with transaction(self._uow):
             await self._repo.delete(item)
@@ -133,7 +139,7 @@ class NutrientService:
         self, nutrient_id: UUID, changes: NutrientChanges, caller: Caller
     ) -> NutrientRow:
         item = await self.get(nutrient_id)
-        old_snapshot = self._audit.snapshot_nutrient(item)
+        old_snapshot = self._snapshots.of(item)
         if not changes.provided:
             return item
         patch = await self._patch(item, changes)
@@ -143,9 +149,7 @@ class NutrientService:
         except DuplicateError as exc:
             raise BadRequestError(DUPLICATE_NUTRIENT) from exc
         await self._uow.refresh(item)
-        old_diff, new_diff = self._audit.diff(
-            old_snapshot, self._audit.snapshot_nutrient(item)
-        )
+        old_diff, new_diff = changed_fields(old_snapshot, self._snapshots.of(item))
         if old_diff:
             self._audit.log(
                 FOOD_UPDATED,

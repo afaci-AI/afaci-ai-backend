@@ -100,7 +100,6 @@ ignore_imports =
     features.calculator.api.deps -> features.norms.app
     features.recipes.api.deps -> features.calculator.api.deps
     features.recipes.api.deps -> features.calculator.app
-    features.products.app.nutrients -> features.catalog.domain.rules
 
 # libs — переиспользуемые алгоритмы: никакого приложения и фреймворков внутри.
 [importlinter:contract:libs-are-pure]

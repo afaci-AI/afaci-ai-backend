@@ -8,6 +8,7 @@ from uuid import UUID
 from core.errors import BadRequestError, NotFoundError
 from core.transaction import transaction
 
+from ..domain import changed_fields
 from .audit_events import (
     FOOD_BULK_CREATED,
     FOOD_CREATED,
@@ -17,11 +18,12 @@ from .audit_events import (
 )
 from .commands import NewProduct, ProductChanges
 from .ports import (
-    AuditTrail,
+    AuditLog,
     Caller,
     DuplicateError,
     ProductRepository,
     ProductRow,
+    ProductSnapshots,
     UnitOfWork,
 )
 
@@ -30,11 +32,16 @@ ALREADY_IN_REGION = "Product already exists in this region"
 
 class ProductService:
     def __init__(
-        self, repo: ProductRepository, uow: UnitOfWork, audit: AuditTrail
+        self,
+        repo: ProductRepository,
+        uow: UnitOfWork,
+        audit: AuditLog,
+        snapshots: ProductSnapshots,
     ) -> None:
         self._repo = repo
         self._uow = uow
         self._audit = audit
+        self._snapshots = snapshots
 
     async def get(self, product_id: UUID) -> ProductRow:
         item = await self._repo.get(product_id)
@@ -65,13 +72,13 @@ class ProductService:
             FOOD_CREATED,
             caller,
             item.id,
-            {"old": None, "new": self._audit.snapshot_product(item)},
+            {"old": None, "new": self._snapshots.of(item)},
         )
         return item
 
     async def delete(self, product_id: UUID, caller: Caller) -> dict:
         item = await self.get(product_id)
-        old_snapshot = self._audit.snapshot_product(item)
+        old_snapshot = self._snapshots.of(item)
         async with transaction(self._uow):
             await self._repo.delete(item)
         self._audit.log(
@@ -83,7 +90,7 @@ class ProductService:
         self, product_id: UUID, changes: ProductChanges, caller: Caller
     ) -> ProductRow:
         item = await self.get(product_id)
-        old_snapshot = self._audit.snapshot_product(item)
+        old_snapshot = self._snapshots.of(item)
         if not changes.provided:
             return item
         try:
@@ -92,9 +99,7 @@ class ProductService:
         except DuplicateError as exc:
             raise BadRequestError(ALREADY_IN_REGION) from exc
         await self._uow.refresh(item)
-        old_diff, new_diff = self._audit.diff(
-            old_snapshot, self._audit.snapshot_product(item)
-        )
+        old_diff, new_diff = changed_fields(old_snapshot, self._snapshots.of(item))
         if old_diff:
             self._audit.log(
                 FOOD_UPDATED, caller, product_id, {"old": old_diff, "new": new_diff}

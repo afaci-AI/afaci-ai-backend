@@ -82,27 +82,6 @@ def snapshot_nutrient(nutrient: Any) -> dict[str, Any]:
     }
 
 
-def compute_diff(
-    old: dict[str, Any], new: dict[str, Any]
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Возвращает (old_diff, new_diff) — только поля где old != new."""
-    old_diff: dict[str, Any] = {}
-    new_diff: dict[str, Any] = {}
-    keys = set(old.keys()) | set(new.keys())
-    for key in keys:
-        old_val = old.get(key)
-        new_val = new.get(key)
-        # Нормализуем UUID к str для сравнения
-        if isinstance(old_val, UUID):
-            old_val = str(old_val)
-        if isinstance(new_val, UUID):
-            new_val = str(new_val)
-        if old_val != new_val:
-            old_diff[key] = old_val
-            new_diff[key] = new_val
-    return old_diff, new_diff
-
-
 def _resolve_user(current_user: Any | None, authorization: str | None) -> str:
     """Определяет user для лога: user:<id> / Anonymous / InvalidToken."""
     if current_user is not None:

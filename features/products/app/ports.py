@@ -50,14 +50,20 @@ class Caller:
     actor: str
 
 
-class AuditTrail(Protocol):
-    """Бизнес-аудит продуктов; сбой записи не должен ломать операцию."""
+class ProductSnapshots(Protocol):
+    """Снимок продукта для сравнения «было / стало»."""
 
-    def snapshot_product(self, row: ProductRow) -> dict: ...
+    def of(self, row: ProductRow) -> dict: ...
 
-    def snapshot_nutrient(self, row: NutrientRow) -> dict: ...
 
-    def diff(self, old: dict, new: dict) -> tuple[dict, dict]: ...
+class NutrientSnapshots(Protocol):
+    """Снимок значения нутриента для сравнения «было / стало»."""
+
+    def of(self, row: NutrientRow) -> dict: ...
+
+
+class AuditLog(Protocol):
+    """Журнал бизнес-аудита; сбой записи не должен ломать операцию."""
 
     def log(
         self, event: str, caller: Caller, target_id: str | UUID, changes: dict
