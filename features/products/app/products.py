@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from core.errors import BadRequestError, NotFoundError
+from core.transaction import transaction
 
 from .audit_events import (
     FOOD_BULK_CREATED,
@@ -21,7 +22,6 @@ from .ports import (
     ProductRow,
     UnitOfWork,
 )
-from .transaction import transaction
 
 ALREADY_IN_REGION = "Product already exists in this region"
 

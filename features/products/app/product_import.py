@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import NamedTuple
 
 from core.errors import BadRequestError
+from core.transaction import transaction
 
 from .audit_events import FOOD_BULK_CREATED, FOOD_CREATED, bulk_changes
 from .ports import (
@@ -17,7 +18,6 @@ from .ports import (
     ReferenceRow,
     UnitOfWork,
 )
-from .transaction import transaction
 
 BULK_CONFLICT = "Transaction rolled back due to conflict"
 
