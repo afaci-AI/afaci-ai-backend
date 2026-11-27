@@ -8,7 +8,13 @@ from .exceptions import (
     OptimizationInfeasibleError,
     ReferenceProteinNotFoundError,
 )
-from .formulas import NAK_GROUPS, REQUIRED_SUM, SUM_TOLERANCE, compute_report
+from .formulas import (
+    NAK_GROUPS,
+    REQUIRED_SUM,
+    SUM_TOLERANCE,
+    compute_report,
+    validate_recipe_sum,
+)
 from .recipe_optimizer import PER_KILOGRAM, RecipeOptimizationError, optimize_recipe
 
 __all__ = [
@@ -31,4 +37,5 @@ __all__ = [
     "compute_report",
     "optimize_cost",
     "optimize_recipe",
+    "validate_recipe_sum",
 ]

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from .ports import DailyNorms
+from .ports import DailyNorms, RecipeItemInput
 from .service import RecipeCalculator
 
 
@@ -19,7 +19,9 @@ class CompositionReport:
         self._calculator = calculator
         self._norms = norms
 
-    async def compute(self, reference_protein_id: UUID, items: list[dict]) -> dict:
+    async def compute(
+        self, reference_protein_id: UUID, items: list[RecipeItemInput]
+    ) -> dict:
         result = await self._calculator.compute(reference_protein_id, items)
         result["daily_norms"] = await self._norms.for_recipe(
             macro=result["macro"],

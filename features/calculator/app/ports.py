@@ -9,11 +9,14 @@ from uuid import UUID
 from ..domain import ProductNutrients, ReferenceProtein, ReferenceSource
 
 __all__ = [
+    "CompositionItemInput",
+    "CostCandidateInput",
     "DailyNorms",
     "ExampleRecipe",
     "ExampleRecipeItem",
     "ProductNutrientReader",
     "ProductNutrients",
+    "RecipeItemInput",
     "ReferenceCatalog",
     "ReferenceEntry",
     "ReferenceProtein",
@@ -21,6 +24,35 @@ __all__ = [
     "ReferenceSource",
     "ReferenceValue",
 ]
+
+
+@dataclass(frozen=True, slots=True)
+class RecipeItemInput:
+    """Ингредиент рецептуры для расчёта: масса на 100 г смеси."""
+
+    product_id: UUID
+    amount_g: float
+
+
+@dataclass(frozen=True, slots=True)
+class CostCandidateInput:
+    """Кандидат оптимизации цены: цена и допустимый диапазон массы."""
+
+    product_id: UUID
+    price_per_kg: float
+    min_amount_g: float = 0.0
+    max_amount_g: float = 100.0
+
+
+@dataclass(frozen=True, slots=True)
+class CompositionItemInput:
+    """Ингредиент исходной рецептуры для оптимизации состава."""
+
+    product_id: UUID
+    amount_g: float
+    min_amount_g: float = 0.0
+    max_amount_g: float = 100.0
+    price_per_kg: float | None = None
 
 
 @dataclass(frozen=True, slots=True)

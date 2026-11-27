@@ -7,6 +7,7 @@ from .macro import (
     KCAL_PER_G_PROTEIN,
     energy_kcal,
 )
+from .recipe_sum import validate_recipe_sum
 from .report import compute_report
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "SUM_TOLERANCE",
     "compute_report",
     "energy_kcal",
+    "validate_recipe_sum",
 ]
