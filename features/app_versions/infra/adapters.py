@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+from dataclasses import asdict
 from uuid import UUID
 
 from sqlalchemy import func, select, text
@@ -12,7 +13,7 @@ from starlette.requests import ClientDisconnect
 
 from core.db.models import AppVersion
 
-from ..app.ports import AppVersionRow, ReadChunk, StoredApk
+from ..app.ports import AppVersionRow, NewVersionRecord, ReadChunk, StoredApk
 from ..domain.apk import MAX_APK_SIZE, ApkError, parse_badging, stored_filename
 
 PUBLICATION_LOCK = 86422107
@@ -57,24 +58,19 @@ class SqlAppVersionRepository:
             .values(is_current=False)
         )
 
-    async def add(self, data: dict) -> AppVersionRow:
-        version = AppVersion(**data)
+    async def add(self, record: NewVersionRecord) -> AppVersionRow:
+        version = AppVersion(**asdict(record))
         self._db.add(version)
-        await self._db.commit()
-        await self._db.refresh(version)
+        await self._db.flush()
         return version
 
     async def save(self, row: AppVersionRow) -> AppVersionRow:
-        await self._db.commit()
-        await self._db.refresh(row)
+        await self._db.flush()
         return row
 
     async def delete(self, row: AppVersionRow) -> None:
         await self._db.delete(row)
-        await self._db.commit()
-
-    async def rollback(self) -> None:
-        await self._db.rollback()
+        await self._db.flush()
 
 
 class FileApkStorage:

@@ -30,7 +30,12 @@ class ApkUploadTests(unittest.TestCase):
         )
         self.env_patch.start()
         self.addCleanup(self.env_patch.stop)
-        self.db = Mock(execute=AsyncMock(), commit=AsyncMock(), rollback=AsyncMock())
+        self.db = Mock(
+            execute=AsyncMock(),
+            commit=AsyncMock(),
+            flush=AsyncMock(),
+            rollback=AsyncMock(),
+        )
         self.db.execute.return_value = Mock()
         self.db.execute.return_value.scalar_one_or_none.return_value = None
 

@@ -14,6 +14,7 @@ from core.errors import (
     PayloadTooLargeError,
     ServiceUnavailableError,
 )
+from core.transaction import transaction
 
 from ..domain.apk import APK_MAGIC, ApkError, has_apk_extension, public_apk_url
 from .commands import AppVersionChanges, NewAppVersion
@@ -22,7 +23,10 @@ from .ports import (
     ApkStorage,
     AppVersionRepository,
     AppVersionRow,
+    NewVersionRecord,
     ReadChunk,
+    StoredApk,
+    UnitOfWork,
 )
 
 NOT_FOUND = "Версия не найдена."
@@ -37,12 +41,14 @@ class AppVersionService:
     def __init__(
         self,
         repo: AppVersionRepository,
+        uow: UnitOfWork,
         storage: ApkStorage,
         inspector: ApkInspector,
         apk_base_url: str,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self._repo = repo
+        self._uow = uow
         self._storage = storage
         self._inspector = inspector
         self._base_url = apk_base_url
@@ -65,10 +71,13 @@ class AppVersionService:
 
     async def create(self, command: NewAppVersion) -> AppVersionRow:
         """Публикует версию (APK уже в хранилище либо внешняя ссылка)."""
-        await self._repo.lock_publication()
-        await self._check_version_code(command.version_code)
-        self._check_apk_exists(command.apk_filename)
-        return await self._publish(command)
+        async with transaction(self._uow):
+            await self._repo.lock_publication()
+            await self._check_version_code(command.version_code)
+            self._check_apk_exists(command.apk_filename)
+            row = await self._publish(command)
+        await self._uow.refresh(row)
+        return row
 
     async def _check_version_code(self, version_code: int) -> None:
         max_code = await self._repo.max_version_code()
@@ -89,17 +98,17 @@ class AppVersionService:
         if command.is_current:
             await self._repo.clear_current()
         return await self._repo.add(
-            {
-                "version": command.version,
-                "version_code": command.version_code,
-                "apk_url": public_apk_url(self._base_url, command.apk_filename),
-                "apk_filename": command.apk_filename,
-                "changelog": command.changelog,
-                "force_update": command.force_update,
-                "min_supported_version_code": command.min_supported_version_code,
-                "is_current": command.is_current,
-                "published_at": self._now(),
-            }
+            NewVersionRecord(
+                version=command.version,
+                version_code=command.version_code,
+                apk_url=public_apk_url(self._base_url, command.apk_filename),
+                apk_filename=command.apk_filename,
+                changelog=command.changelog,
+                force_update=command.force_update,
+                min_supported_version_code=command.min_supported_version_code,
+                is_current=command.is_current,
+                published_at=self._now(),
+            )
         )
 
     async def upload(
@@ -111,21 +120,11 @@ class AppVersionService:
         changelog: str | None,
         min_supported_version_code: int | None,
     ) -> AppVersionRow:
-        if not has_apk_extension(original_name):
-            raise BadRequestError("Файл должен иметь расширение .apk.")
+        """Файл → проверка → версия из манифеста → публикация.
 
-        try:
-            stored = await self._storage.store(original_name, read_chunk)
-        except ApkError as exc:
-            raise _error(exc) from exc
-
-        if stored.size == 0:
-            self._storage.remove(stored.path)
-            raise BadRequestError("APK-файл пуст.")
-        if stored.magic != APK_MAGIC:
-            self._storage.remove(stored.path)
-            raise BadRequestError("Файл не является действительным APK архивом.")
-
+        Если публикация не состоялась, сохранённый файл удаляется.
+        """
+        stored = await self._receive(original_name, read_chunk)
         try:
             version, version_code = await asyncio.to_thread(
                 self._inspector.read_version, stored.path
@@ -141,11 +140,28 @@ class AppVersionService:
                 )
             )
         except BaseException as exc:
-            await self._repo.rollback()
             self._storage.remove(stored.path)
             if isinstance(exc, ApkError):
                 raise _error(exc) from exc
             raise
+
+    async def _receive(
+        self, original_name: str | None, read_chunk: ReadChunk
+    ) -> StoredApk:
+        """Сохраняет загруженный файл и убеждается, что это непустой APK."""
+        if not has_apk_extension(original_name):
+            raise BadRequestError("Файл должен иметь расширение .apk.")
+        try:
+            stored = await self._storage.store(original_name, read_chunk)
+        except ApkError as exc:
+            raise _error(exc) from exc
+        if stored.size == 0:
+            self._storage.remove(stored.path)
+            raise BadRequestError("APK-файл пуст.")
+        if stored.magic != APK_MAGIC:
+            self._storage.remove(stored.path)
+            raise BadRequestError("Файл не является действительным APK архивом.")
+        return stored
 
     async def update(
         self, version_id: UUID, changes: AppVersionChanges
@@ -159,17 +175,27 @@ class AppVersionService:
             version.force_update = changes.force_update
         if "min_supported_version_code" in changes.provided:
             version.min_supported_version_code = changes.min_supported_version_code
-        return await self._repo.save(version)
+        return await self._saved(version)
+
+    async def _saved(self, version: AppVersionRow) -> AppVersionRow:
+        async with transaction(self._uow):
+            await self._repo.save(version)
+        await self._uow.refresh(version)
+        return version
 
     async def set_current(self, version_id: UUID) -> AppVersionRow:
         version = await self._get(version_id)
-        await self._repo.clear_current()
-        version.is_current = True
-        return await self._repo.save(version)
+        async with transaction(self._uow):
+            await self._repo.clear_current()
+            version.is_current = True
+            await self._repo.save(version)
+        await self._uow.refresh(version)
+        return version
 
     async def delete(self, version_id: UUID) -> dict:
         version = await self._get(version_id)
         if version.is_current:
             raise BadRequestError("Нельзя удалить текущую версию.")
-        await self._repo.delete(version)
+        async with transaction(self._uow):
+            await self._repo.delete(version)
         return {"status": "deleted"}
