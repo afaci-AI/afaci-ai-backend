@@ -23,6 +23,12 @@ from ..domain.dictionaries import (
 )
 from ..domain.nutrient_classes import default_nutrient_class
 from ..domain.rules import UNIT_CHANGE_FORBIDDEN, UNIT_REQUIRED, UNIT_REQUIRED_FOR_TYPE
+from .commands import (
+    NewNutrientName,
+    NewSubcategory,
+    NutrientNameChanges,
+    SubcategoryChanges,
+)
 from .ports import (
     CatalogRules,
     DictionaryRepository,
@@ -58,10 +64,13 @@ class CatalogService:
     ) -> list[DictionaryRow]:
         return await self._repo.list(spec.kind, name if spec.searchable else None)
 
-    async def create(self, spec: DictionarySpec, data: dict) -> DictionaryRow:
+    async def create(self, spec: DictionarySpec, name: str) -> DictionaryRow:
+        return await self._add(spec, {"name": name})
+
+    async def _add(self, spec: DictionarySpec, fields: dict) -> DictionaryRow:
         try:
             async with transaction(self._uow):
-                item = await self._repo.add(spec.kind, data)
+                item = await self._repo.add(spec.kind, fields)
         except DuplicateError as exc:
             raise BadRequestError(spec.duplicate_message) from exc
         await self._uow.refresh(item)
@@ -108,19 +117,22 @@ class CatalogService:
         return item
 
     # ----------------------------------------------------------- подкатегории
-    async def create_subcategory(self, data: dict) -> DictionaryRow:
-        await self.get(CATEGORIES, data["category_id"])
-        return await self.create(SUBCATEGORIES, data)
+    async def create_subcategory(self, command: NewSubcategory) -> DictionaryRow:
+        await self.get(CATEGORIES, command.category_id)
+        return await self._add(
+            SUBCATEGORIES,
+            {"name": command.name, "category_id": command.category_id},
+        )
 
     async def update_subcategory(
-        self, item_id: UUID, *, name: str | None, category_id, provided: set[str]
+        self, item_id: UUID, changes: SubcategoryChanges
     ) -> DictionaryRow:
         item = cast(SubcategoryRow, await self.get(SUBCATEGORIES, item_id))
-        if "category_id" in provided and category_id is None:
+        if "category_id" in changes.provided and changes.category_id is None:
             raise UnprocessableError("Category is required")
-        category_id = category_id or item.category_id
+        category_id = changes.category_id or item.category_id
         await self.get(CATEGORIES, category_id)
-        name = name if name is not None else item.name
+        name = changes.name if changes.name is not None else item.name
         if await self._rules.duplicate_subcategory(category_id, name, item_id):
             raise BadRequestError(SUBCATEGORY_EXISTS)
         item.name = name
@@ -128,46 +140,50 @@ class CatalogService:
         return await self._save(item, SUBCATEGORY_EXISTS)
 
     # ------------------------------------------------- названия нутриентов
-    async def create_nutrient_name(self, data: dict) -> DictionaryRow:
-        nutrient_type = await self.get(NUTRIENT_TYPES, data["nutrient_type_id"])
-        if data.get("unit_id") is not None:
-            await self.get(UNITS, data["unit_id"])
+    async def create_nutrient_name(self, command: NewNutrientName) -> DictionaryRow:
+        nutrient_type = await self.get(NUTRIENT_TYPES, command.nutrient_type_id)
+        unit_id = command.unit_id
+        if unit_id is not None:
+            await self.get(UNITS, unit_id)
         else:
-            data["unit_id"] = await self._rules.default_unit_id(nutrient_type.name)
-            if data["unit_id"] is None:
+            unit_id = await self._rules.default_unit_id(nutrient_type.name)
+            if unit_id is None:
                 raise UnprocessableError(UNIT_REQUIRED_FOR_TYPE)
-        if data.get("nutrient_class") is None:
-            data["nutrient_class"] = default_nutrient_class(nutrient_type.name)
-        return await self.create(NUTRIENT_NAMES, data)
+        nutrient_class = command.nutrient_class or default_nutrient_class(
+            nutrient_type.name
+        )
+        return await self._add(
+            NUTRIENT_NAMES,
+            {
+                "name": command.name,
+                "nutrient_type_id": command.nutrient_type_id,
+                "unit_id": unit_id,
+                "nutrient_class": nutrient_class,
+            },
+        )
 
     async def update_nutrient_name(
-        self,
-        item_id: UUID,
-        *,
-        name: str | None,
-        nutrient_type_id,
-        unit_id,
-        nutrient_class: str | None = None,
-        provided: set[str],
+        self, item_id: UUID, changes: NutrientNameChanges
     ) -> DictionaryRow:
         item = cast(NutrientNameRow, await self.get(NUTRIENT_NAMES, item_id))
-        if "nutrient_type_id" in provided and nutrient_type_id is None:
+        provided = changes.provided
+        if "nutrient_type_id" in provided and changes.nutrient_type_id is None:
             raise UnprocessableError("Nutrient type is required")
-        type_id = nutrient_type_id or item.nutrient_type_id
+        type_id = changes.nutrient_type_id or item.nutrient_type_id
         await self.get(NUTRIENT_TYPES, type_id)
-        name = name if name is not None else item.name
+        name = changes.name if changes.name is not None else item.name
         if await self._rules.duplicate_nutrient_name(type_id, name, item_id):
             raise BadRequestError(NUTRIENT_NAME_EXISTS)
         new_unit_id = (
-            await self._checked_unit(item, unit_id)
+            await self._checked_unit(item, changes.unit_id)
             if "unit_id" in provided
             else item.unit_id
         )
         item.name = name
         item.nutrient_type_id = type_id
         item.unit_id = new_unit_id
-        if nutrient_class is not None:
-            item.nutrient_class = nutrient_class
+        if changes.nutrient_class is not None:
+            item.nutrient_class = changes.nutrient_class
         return await self._save(item, NUTRIENT_NAME_EXISTS)
 
     async def _checked_unit(self, item: NutrientNameRow, unit_id: UUID | None) -> UUID:
