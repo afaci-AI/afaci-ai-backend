@@ -59,7 +59,7 @@ def _register_read_delete(spec: DictionarySpec, *, list_filter: bool = False) ->
             return await service.list(spec)
 
     async def get_one(id: UUID, service: Service):
-        return await service.get_one(spec, id)
+        return await service.get(spec, id)
 
     async def delete(id: UUID, service: Service):
         return await service.delete(spec, id)
