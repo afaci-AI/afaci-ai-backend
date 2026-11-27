@@ -66,6 +66,11 @@ class FakeUnitOfWork:
         pass
 
 
+class FakeSnapshots:
+    def of(self, row):
+        return {"name": row.name}
+
+
 class FakeAudit:
     def __init__(self):
         self.events = []
@@ -81,7 +86,9 @@ def row(name, region="Кыргызстан"):
 class AutoBulk(unittest.IsolatedAsyncioTestCase):
     def build(self, products):
         self.uow, self.audit = FakeUnitOfWork(), FakeAudit()
-        return ProductImportService(products, FakeNames(), self.uow, self.audit)
+        return ProductImportService(
+            products, FakeNames(), self.uow, self.audit, FakeSnapshots()
+        )
 
     async def test_existing_product_is_skipped_and_rest_committed(self):
         service = self.build(FakeProducts())

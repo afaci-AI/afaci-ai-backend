@@ -10,11 +10,12 @@ from core.transaction import transaction
 from .audit_events import FOOD_BULK_CREATED, FOOD_CREATED, bulk_changes
 from .commands import AutoProduct
 from .ports import (
-    AuditTrail,
+    AuditLog,
     Caller,
     DuplicateError,
     ProductRepository,
     ProductRow,
+    ProductSnapshots,
     ReferenceNames,
     ReferenceRow,
     UnitOfWork,
@@ -37,12 +38,14 @@ class ProductImportService:
         repo: ProductRepository,
         names: ReferenceNames,
         uow: UnitOfWork,
-        audit: AuditTrail,
+        audit: AuditLog,
+        snapshots: ProductSnapshots,
     ) -> None:
         self._repo = repo
         self._names = names
         self._uow = uow
         self._audit = audit
+        self._snapshots = snapshots
 
     async def _refs(self, product: AutoProduct) -> AutoRefs:
         category = await self._names.category(product.category_name)
@@ -73,7 +76,7 @@ class ProductImportService:
             FOOD_CREATED,
             caller,
             product.id,
-            {"old": None, "new": self._audit.snapshot_product(product)},
+            {"old": None, "new": self._snapshots.of(product)},
         )
         return product
 

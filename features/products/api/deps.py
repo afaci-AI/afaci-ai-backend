@@ -11,7 +11,7 @@ from core.db.session import get_db
 from core.security import get_current_user_optional
 
 from ..app import Caller, NutrientService, ProductImportService, ProductService
-from ..infra.audit import FoodAuditTrail
+from ..infra.audit import FoodAuditLog, FoodNutrientSnapshots, FoodProductSnapshots
 from ..infra.sql_repo import (
     SqlNutrientRepository,
     SqlProductRepository,
@@ -31,7 +31,12 @@ async def get_caller(
 
 
 async def get_product_service(db: Db) -> ProductService:
-    return ProductService(SqlProductRepository(db), SqlUnitOfWork(db), FoodAuditTrail())
+    return ProductService(
+        SqlProductRepository(db),
+        SqlUnitOfWork(db),
+        FoodAuditLog(),
+        FoodProductSnapshots(),
+    )
 
 
 async def get_product_import_service(db: Db) -> ProductImportService:
@@ -39,11 +44,15 @@ async def get_product_import_service(db: Db) -> ProductImportService:
         SqlProductRepository(db),
         SqlReferenceNames(db),
         SqlUnitOfWork(db),
-        FoodAuditTrail(),
+        FoodAuditLog(),
+        FoodProductSnapshots(),
     )
 
 
 async def get_nutrient_service(db: Db) -> NutrientService:
     return NutrientService(
-        SqlNutrientRepository(db), SqlUnitOfWork(db), FoodAuditTrail()
+        SqlNutrientRepository(db),
+        SqlUnitOfWork(db),
+        FoodAuditLog(),
+        FoodNutrientSnapshots(),
     )

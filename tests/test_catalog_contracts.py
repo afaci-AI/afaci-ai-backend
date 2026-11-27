@@ -18,7 +18,6 @@ from features.catalog.api.schemas import (
     SubcategoryCreate,
     SubcategoryUpdate,
 )
-from features.catalog.domain.rules import UNIT_MISMATCH
 from features.products.api import router as products_router
 from features.products.api.schemas import (
     NutrientBulkCreate,
@@ -28,7 +27,12 @@ from features.products.api.schemas import (
 )
 from features.products.app import Caller, NutrientService, ProductService
 from features.products.app.nutrients import _unit_for
-from features.products.infra.audit import FoodAuditTrail
+from features.products.domain import UNIT_MISMATCH
+from features.products.infra.audit import (
+    FoodAuditLog,
+    FoodNutrientSnapshots,
+    FoodProductSnapshots,
+)
 from features.products.infra.sql_repo import (
     SqlNutrientRepository,
     SqlProductRepository,
@@ -49,7 +53,10 @@ def catalog(db):
 
 def nutrients(db):
     return NutrientService(
-        SqlNutrientRepository(db), SqlUnitOfWork(db), FoodAuditTrail()
+        SqlNutrientRepository(db),
+        SqlUnitOfWork(db),
+        FoodAuditLog(),
+        FoodNutrientSnapshots(),
     )
 
 
@@ -71,7 +78,10 @@ async def api_update_nutrient_name(item_id, data, db):
 
 async def api_count_products(db):
     service = ProductService(
-        SqlProductRepository(db), SqlUnitOfWork(db), FoodAuditTrail()
+        SqlProductRepository(db),
+        SqlUnitOfWork(db),
+        FoodAuditLog(),
+        FoodProductSnapshots(),
     )
     return ProductCount(count=await service.count())
 

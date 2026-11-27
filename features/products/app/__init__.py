@@ -6,12 +6,20 @@ from .commands import (
     ProductChanges,
 )
 from .nutrients import NutrientService
-from .ports import AuditTrail, Caller, DuplicateError, ReferenceNames, UnitOfWork
+from .ports import (
+    AuditLog,
+    Caller,
+    DuplicateError,
+    NutrientSnapshots,
+    ProductSnapshots,
+    ReferenceNames,
+    UnitOfWork,
+)
 from .product_import import ProductImportService
 from .products import ProductService
 
 __all__ = [
-    "AuditTrail",
+    "AuditLog",
     "AutoProduct",
     "Caller",
     "DuplicateError",
@@ -19,9 +27,11 @@ __all__ = [
     "NewProduct",
     "NutrientChanges",
     "NutrientService",
+    "NutrientSnapshots",
     "ProductChanges",
     "ProductImportService",
     "ProductService",
+    "ProductSnapshots",
     "ReferenceNames",
     "UnitOfWork",
 ]

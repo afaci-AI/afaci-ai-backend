@@ -41,18 +41,18 @@ class FakeAudit:
     def __init__(self):
         self.logged = []
 
-    def snapshot_product(self, row):
-        return {"name": row.name}
-
-    def snapshot_nutrient(self, row):
-        return {"quantity": row.quantity}
-
-    def diff(self, old, new):
-        changed = {k for k in new if old.get(k) != new[k]}
-        return {k: old.get(k) for k in changed}, {k: new[k] for k in changed}
-
     def log(self, event, caller, target_id, changes):
         self.logged.append((event, caller.actor))
+
+
+class FakeProductSnapshots:
+    def of(self, row):
+        return {"name": row.name}
+
+
+class FakeNutrientSnapshots:
+    def of(self, row):
+        return {"quantity": row.quantity}
 
 
 class FakeProducts:
@@ -84,7 +84,9 @@ class FakeProducts:
 class ProductTransactions(unittest.IsolatedAsyncioTestCase):
     def build(self, **repo):
         self.uow, self.audit = FakeUnitOfWork(), FakeAudit()
-        return ProductService(FakeProducts(**repo), self.uow, self.audit)
+        return ProductService(
+            FakeProducts(**repo), self.uow, self.audit, FakeProductSnapshots()
+        )
 
     async def test_create_commits_then_audits_with_callers_actor(self):
         service = self.build()
@@ -144,7 +146,9 @@ class FakeNutrients:
 class NutrientTransactions(unittest.IsolatedAsyncioTestCase):
     def build(self, **repo):
         self.uow, self.audit = FakeUnitOfWork(), FakeAudit()
-        return NutrientService(FakeNutrients(**repo), self.uow, self.audit)
+        return NutrientService(
+            FakeNutrients(**repo), self.uow, self.audit, FakeNutrientSnapshots()
+        )
 
     def payload(self):
         return NewNutrient(product_id=uuid4(), nutrient_name_id=uuid4(), quantity=1)
