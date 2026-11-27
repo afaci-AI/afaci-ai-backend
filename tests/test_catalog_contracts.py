@@ -39,6 +39,11 @@ NO_CALLER = Caller(actor="Anonymous")
 
 
 def catalog(db):
+    # Хранилище справочников только готовит изменения (flush), фиксирует и
+    # откатывает их единица работы.
+    for method in ("flush", "rollback"):
+        if not isinstance(getattr(db, method), AsyncMock):
+            setattr(db, method, AsyncMock())
     return build_catalog_service(db)
 
 

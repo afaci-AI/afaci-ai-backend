@@ -36,7 +36,11 @@ class InUseError(Exception):
 
 
 class DictionaryRepository(Protocol):
-    """Записи любого справочника по его виду (`DictionarySpec.kind`)."""
+    """Записи любого справочника по его виду (`DictionarySpec.kind`).
+
+    Изменения не фиксируются: это делает `UnitOfWork`. После DuplicateError или
+    InUseError единица работы годится только для `rollback`.
+    """
 
     async def get(self, kind: str, item_id: UUID) -> DictionaryRow | None: ...
 
@@ -46,13 +50,10 @@ class DictionaryRepository(Protocol):
     async def find_by_name(self, kind: str, name: str) -> DictionaryRow | None: ...
 
     async def add(self, kind: str, data: dict) -> DictionaryRow:
-        """Создаёт запись и сохраняет. DuplicateError при нарушении уникальности."""
-
-    def stage(self, kind: str, data: dict) -> DictionaryRow:
-        """Добавляет запись в текущую единицу работы без сохранения."""
+        """Добавляет запись. DuplicateError при нарушении уникальности."""
 
     async def save(self, row: DictionaryRow) -> DictionaryRow:
-        """Сохраняет изменения. DuplicateError при нарушении уникальности."""
+        """Готовит изменения записи. DuplicateError при нарушении уникальности."""
 
     async def delete(self, row: DictionaryRow) -> None:
         """Удаляет запись. InUseError, если на неё есть ссылки."""
@@ -76,6 +77,11 @@ class CatalogRules(Protocol):
 
 
 class UnitOfWork(Protocol):
-    """Транзакция, общая для записей, добавленных через `stage`."""
+    """Транзакция сценария: единственное место фиксации и отката."""
 
     async def commit(self) -> None: ...
+
+    async def rollback(self) -> None: ...
+
+    async def refresh(self, row: object) -> None:
+        """Перечитывает значения, выставленные базой при фиксации."""

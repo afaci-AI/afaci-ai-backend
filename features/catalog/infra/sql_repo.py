@@ -43,37 +43,24 @@ class SqlDictionaryRepository:
         return res.scalar_one_or_none()
 
     async def add(self, kind: str, data: dict) -> DictionaryRow:
-        try:
-            item = MODELS[kind](**data)
-            self._db.add(item)
-            await self._db.commit()
-            await self._db.refresh(item)
-            return item
-        except IntegrityError as exc:
-            await self._db.rollback()
-            raise DuplicateError from exc
-
-    def stage(self, kind: str, data: dict) -> DictionaryRow:
         item = MODELS[kind](**data)
         self._db.add(item)
+        await self._flush(DuplicateError)
         return item
 
     async def save(self, row: DictionaryRow) -> DictionaryRow:
-        try:
-            await self._db.commit()
-        except IntegrityError as exc:
-            await self._db.rollback()
-            raise DuplicateError from exc
-        await self._db.refresh(row)
+        await self._flush(DuplicateError)
         return row
 
     async def delete(self, row: DictionaryRow) -> None:
+        await self._db.delete(row)
+        await self._flush(InUseError)
+
+    async def _flush(self, error: type[Exception]) -> None:
         try:
-            await self._db.delete(row)
-            await self._db.commit()
+            await self._db.flush()
         except IntegrityError as exc:
-            await self._db.rollback()
-            raise InUseError from exc
+            raise error from exc
 
 
 class SqlUnitOfWork:
@@ -82,6 +69,12 @@ class SqlUnitOfWork:
 
     async def commit(self) -> None:
         await self._db.commit()
+
+    async def rollback(self) -> None:
+        await self._db.rollback()
+
+    async def refresh(self, row: object) -> None:
+        await self._db.refresh(row)
 
 
 class SqlCatalogRules:
